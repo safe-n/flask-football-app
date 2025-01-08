@@ -37,7 +37,7 @@ def index():
             "goals": {"home": 2, "away": 1}
         },
         {
-            "fixture": {"date": "2025-01-08T18:00:00Z"},
+            "fixture": {"date": "2025-01-08T18:00:00Z"},4
             "teams": {"home": {"name": "Team C"}, "away": {"name": "Team D"}},
             "goals": {"home": 0, "away": 0}
         }
@@ -47,4 +47,4 @@ def index():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host="0.0.0.0",port=int(os.environ.get("PORT",10000)))
