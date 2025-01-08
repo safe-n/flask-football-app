@@ -37,7 +37,7 @@ def index():
             "goals": {"home": 2, "away": 1}
         },
         {
-            "fixture": {"date": "2025-01-09T18:00:00Z"},4
+            "fixture": {"date": "2025-01-09T18:00:00Z"}
             "teams": {"home": {"name": "Team C"}, "away": {"name": "Team D"}},
             "goals": {"home": 0, "away": 0}
         }
