@@ -32,12 +32,12 @@ def fetch_matches(league_id, season, date=None, status="FT"):
 def index():
     test_data = [
         {
-            "fixture": {"date": "2025-01-08T20:00:00Z"},
+            "fixture": {"date": "2025-01-09T20:00:00Z"},
             "teams": {"home": {"name": "Team A"}, "away": {"name": "Team B"}},
             "goals": {"home": 2, "away": 1}
         },
         {
-            "fixture": {"date": "2025-01-08T18:00:00Z"},4
+            "fixture": {"date": "2025-01-09T18:00:00Z"},4
             "teams": {"home": {"name": "Team C"}, "away": {"name": "Team D"}},
             "goals": {"home": 0, "away": 0}
         }
