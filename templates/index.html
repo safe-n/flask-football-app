@@ -20,19 +20,21 @@
 
     {% if matches %}
         <h2>Matches on {{ selected_date }}</h2>
-        <table>
+        <table border="1">
             <thead>
                 <tr>
                     <th>Home Team</th>
                     <th>Away Team</th>
                     <th>Time</th>
+                    <th>Statistics</th>
                 </tr>
             </thead>
             <tbody>
                 {% for match in matches %}
                 <tr>
-                    <td>{{ match.fixture.date }}</td>
-                    <td>{{ match.teams.home.name }} vs {{ match.teams.away.name }}</td>
+                    <td>{{ match.teams.home.name }}</td>
+                    <td>{{ match.teams.away.name }}</td>
+                    <td>{{ match.fixture.date | date('H:i') }}</td>
                     <td>
                         {% if match.statistics %}
                             <ul>
