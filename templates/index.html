@@ -30,11 +30,21 @@
             </thead>
             <tbody>
                 {% for match in matches %}
-                    <tr>
-                        <td>{{ match['teams']['home']['name'] }}</td>
-                        <td>{{ match['teams']['away']['name'] }}</td>
-                        <td>{{ match['fixture']['date'] }}</td>
-                    </tr>
+                <tr>
+                    <td>{{ match.fixture.date }}</td>
+                    <td>{{ match.teams.home.name }} vs {{ match.teams.away.name }}</td>
+                    <td>
+                        {% if match.statistics %}
+                            <ul>
+                                {% for stat in match.statistics %}
+                                    <li>{{ stat.type }}: {{ stat.value }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            No statistics available.
+                        {% endif %}
+                    </td>
+                </tr>
                 {% endfor %}
             </tbody>
         </table>

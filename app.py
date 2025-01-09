@@ -11,11 +11,25 @@ API_HOST = "api-football-v1.p.rapidapi.com"
 API_KEY = "your_api_key"  # Replace this with your API key
 
 # Function to fetch matches for a given date
+def fetch_match_statistics(fixture_id):
+    url = f"https://{API_HOST}/v3/fixtures/statistics"
+    headers = {
+        "X-RapidAPI-Key": "40027c6adcmshfb4e864cb9e7855p12d50cjsn6eb6ef9031a6",
+        "X-RapidAPI-Host": "api-football-v1.p.rapidapi.com"
+    }
+    params = {"fixture": fixture_id}
+    response = requests.get(url, headers=headers, params=params)
+    if response.status_code == 200:
+        return response.json()["response"]
+    else:
+        print(f"Error fetching stats for fixture {fixture_id}: {response.status_code}, {response.text}")
+        return None
+
 def fetch_matches(date):
     url = f"https://{API_HOST}/v3/fixtures"
     headers = {
-       "X-RapidAPI-Key": "40027c6adcmshfb4e864cb9e7855p12d50cjsn6eb6ef9031a6",
-       "X-RapidAPI-Host": "api-football-v1.p.rapidapi.com"
+        "X-RapidAPI-Key": "40027c6adcmshfb4e864cb9e7855p12d50cjsn6eb6ef9031a6",
+        "X-RapidAPI-Host": "api-football-v1.p.rapidapi.com"
     }
     params = {
         "date": date,
@@ -24,7 +38,13 @@ def fetch_matches(date):
     }
     response = requests.get(url, headers=headers, params=params)
     if response.status_code == 200:
-        return response.json()["response"]
+        matches = response.json()["response"]
+        # Fetch statistics for each match
+        for match in matches:
+            fixture_id = match["fixture"]["id"]
+            stats = fetch_match_statistics(fixture_id)
+            match["statistics"] = stats
+        return matches
     else:
         print(f"Error: {response.status_code}, {response.text}")
         return []
