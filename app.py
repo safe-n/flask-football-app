@@ -1,52 +1,52 @@
 from flask import Flask, render_template, request
 import requests
-from datetime import datetime
+import pandas as pd
 import os
-from flask import Flask, render_template
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
-# Funkcja pomocnicza do pobrania danych z API
-def fetch_matches(league_id, season, date=None, status="FT"):
-    url = "https://api-football-v1.p.rapidapi.com/v3/fixtures"
-    querystring = {
-    "league": league_id,
-    "season": season,
-    "status": status
-    }
-    if date:  # Dodaj datę, jeśli została podana
-        querystring["date"] = date
+# RapidAPI configuration
+API_HOST = "v3.football.api-sports.io"
+API_KEY = "your_api_key"  # Replace this with your API key
 
+# Function to fetch matches for a given date
+def fetch_matches(date):
+    url = f"https://{API_HOST}/fixtures"
     headers = {
-        "X-RapidAPI-Key": "40027c6adcmshfb4e864cb9e7855p12d50cjsn6eb6ef9031a6",
-        "X-RapidAPI-Host": "api-football-v1.p.rapidapi.com"
+       "X-RapidAPI-Key": "40027c6adcmshfb4e864cb9e7855p12d50cjsn6eb6ef9031a6",
+       "X-RapidAPI-Host": "api-football-v1.p.rapidapi.com"
     }
-
-    response = requests.get(url, headers=headers, params=querystring)
-
+    params = {
+        "date": date,
+        "league": "140",  # La Liga ID
+        "season": "2024"
+    }
+    response = requests.get(url, headers=headers, params=params)
     if response.status_code == 200:
-        return response.json().get('response', [])
+        return response.json()["response"]
     else:
-        print(f"Błąd: {response.status_code}, {response.text}")
-    return []
+        print(f"Error: {response.status_code}, {response.text}")
+        return []
 
-@app.route('/')
-def index():
-    test_data = [
-        {
-            "fixture": {"date": "2025-01-09T20:00:00Z"},
-            "teams": {"home": {"name": "Team A"}, "away": {"name": "Team B"}},
-            "goals": {"home": 2, "away": 1}
-        },
-        {
-            "fixture": {"date": "2025-01-09T18:00:00Z"},
-            "teams": {"home": {"name": "Team C"}, "away": {"name": "Team D"}},
-            "goals": {"home": 0, "away": 0}
-        }
-    ]
+@app.route("/", methods=["GET", "POST"])
+def home():
+    matches = []
+    selected_date = None
 
-    return render_template('index.html', daily_matches=test_data, season_matches=test_data)
+    if request.method == "POST":
+        option = request.form.get("date_option")
+        if option == "today":
+            selected_date = datetime.now().strftime("%Y-%m-%d")
+        elif option == "tomorrow":
+            selected_date = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+        elif option == "specific":
+            selected_date = request.form.get("specific_date")
 
+        if selected_date:
+            matches = fetch_matches(selected_date)
 
-if __name__ == '__main__':
-    app.run(host="0.0.0.0",port=int(os.environ.get("PORT",10000)))
+    return render_template("index.html", matches=matches, selected_date=selected_date)
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))

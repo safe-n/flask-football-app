@@ -1,59 +1,40 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Analiza meczów</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>La Liga Fixtures</title>
 </head>
 <body>
-<h1>Mecze z dzisiejszego dnia</h1>
-{% if daily_matches %}
-<table border="1">
-<tr>
-<th>Data</th>
-<th>Gospodarze</th>
-<th>Goście</th>
-<th>Wynik</th>
-</tr>
-{% for match in daily_matches %}
-<tr>
-<td>{{ match.fixture.date }}</td>
-<td>{{ match.teams.home.name }}</td>
-<td>{{ match.teams.away.name }}</td>
-<td>
-{% if match.goals.home is not none and match.goals.away is not none %}
-{{ match.goals.home }} - {{ match.goals.away }}
-{% else %}
-W trakcie
-{% endif %}
-</td>
-</tr>
-{% endfor %}
-</table>
-{% else %}
-<p>Brak meczów na dzisiejszy dzień.</p>
-{% endif %}
+    <h1>La Liga Fixtures</h1>
+    <form method="get" action="/">
+        <label for="date">Choose Date:</label>
+        <select name="date" id="date">
+            <option value="today" {% if selected_date == "today" %}selected{% endif %}>Today</option>
+            <option value="tomorrow" {% if selected_date == "tomorrow" %}selected{% endif %}>Tomorrow</option>
+        </select>
+        <label for="custom_date">Or choose specific date:</label>
+        <input type="date" id="custom_date" name="date" value="{{ selected_date if selected_date not in ['today', 'tomorrow'] else '' }}">
+        <button type="submit">Get Fixtures</button>
+    </form>
 
-<h1>Wszystkie zakończone mecze z sezonu</h1>
-{% if season_matches %}
-<table border="1">
-<tr>
-<th>Data</th>
-<th>Gospodarze</th>
-<th>Goście</th>
-<th>Wynik</th>
-</tr>
-{% for match in season_matches %}
-<tr>
-<td>{{ match.fixture.date }}</td>
-<td>{{ match.teams.home.name }}</td>
-<td>{{ match.teams.away.name }}</td>
-<td>{{ match.goals.home }} - {{ match.goals.away }}</td>
-</tr>
-{% endfor %}
-</table>
-{% else %}
-<p>Brak danych o zakończonych meczach z sezonu.</p>
-{% endif %}
+    <hr>
+
+    {% if matches %}
+        <h2>Fixtures for {{ selected_date }}</h2>
+        <ul>
+            {% for match in matches %}
+                <li>
+                    <strong>{{ match.teams.home.name }} vs {{ match.teams.away.name }}</strong>
+                    <br>
+                    Date: {{ match.fixture.date }}
+                    <br>
+                    <a href="/statistics/{{ match.fixture.id }}">View Statistics</a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No fixtures found for the selected date.</p>
+    {% endif %}
 </body>
 </html>
