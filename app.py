@@ -1,6 +1,5 @@
 from flask import Flask, render_template, request
 import requests
-import pandas as pd
 import os
 from datetime import datetime, timedelta
 
@@ -8,13 +7,13 @@ app = Flask(__name__)
 
 # RapidAPI configuration
 API_HOST = "api-football-v1.p.rapidapi.com"
-API_KEY = "your_api_key"  # Replace this with your API key
+API_KEY = "40027c6adcmshfb4e864cb9e7855p12d50cjsn6eb6ef9031a6"  # Replace this with your API key
 
-# Function to fetch matches for a given date
+# Function to fetch statistics for a specific match
 def fetch_match_statistics(fixture_id):
     url = f"https://{API_HOST}/v3/fixtures/statistics"
     headers = {
-        "X-RapidAPI-Key": "40027c6adcmshfb4e864cb9e7855p12d50cjsn6eb6ef9031a6",
+        "X-RapidAPI-Key": API_KEY,
         "X-RapidAPI-Host": "api-football-v1.p.rapidapi.com"
     }
     params = {"fixture": fixture_id}
@@ -25,10 +24,11 @@ def fetch_match_statistics(fixture_id):
         print(f"Error fetching stats for fixture {fixture_id}: {response.status_code}, {response.text}")
         return None
 
+# Function to fetch matches for a given date
 def fetch_matches(date):
     url = f"https://{API_HOST}/v3/fixtures"
     headers = {
-        "X-RapidAPI-Key": "40027c6adcmshfb4e864cb9e7855p12d50cjsn6eb6ef9031a6",
+        "X-RapidAPI-Key": API_KEY,
         "X-RapidAPI-Host": "api-football-v1.p.rapidapi.com"
     }
     params = {
