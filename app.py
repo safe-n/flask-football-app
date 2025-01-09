@@ -12,7 +12,7 @@ API_KEY = "your_api_key"  # Replace this with your API key
 
 # Function to fetch matches for a given date
 def fetch_matches(date):
-    url = f"https://{API_HOST}/fixtures"
+    url = f"https://{API_HOST}/v3/fixtures"
     headers = {
        "X-RapidAPI-Key": "40027c6adcmshfb4e864cb9e7855p12d50cjsn6eb6ef9031a6",
        "X-RapidAPI-Host": "api-football-v1.p.rapidapi.com"

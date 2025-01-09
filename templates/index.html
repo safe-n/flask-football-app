@@ -7,34 +7,39 @@
 </head>
 <body>
     <h1>La Liga Fixtures</h1>
-    <form method="get" action="/">
-        <label for="date">Choose Date:</label>
-        <select name="date" id="date">
-            <option value="today" {% if selected_date == "today" %}selected{% endif %}>Today</option>
-            <option value="tomorrow" {% if selected_date == "tomorrow" %}selected{% endif %}>Tomorrow</option>
+    <form method="POST">
+        <label for="date_option">Select Date:</label>
+        <select name="date_option" id="date_option">
+            <option value="today">Today</option>
+            <option value="tomorrow">Tomorrow</option>
+            <option value="specific">Specific Date</option>
         </select>
-        <label for="custom_date">Or choose specific date:</label>
-        <input type="date" id="custom_date" name="date" value="{{ selected_date if selected_date not in ['today', 'tomorrow'] else '' }}">
-        <button type="submit">Get Fixtures</button>
+        <input type="date" name="specific_date">
+        <button type="submit">Show Fixtures</button>
     </form>
 
-    <hr>
-
     {% if matches %}
-        <h2>Fixtures for {{ selected_date }}</h2>
-        <ul>
-            {% for match in matches %}
-                <li>
-                    <strong>{{ match.teams.home.name }} vs {{ match.teams.away.name }}</strong>
-                    <br>
-                    Date: {{ match.fixture.date }}
-                    <br>
-                    <a href="/statistics/{{ match.fixture.id }}">View Statistics</a>
-                </li>
-            {% endfor %}
-        </ul>
-    {% else %}
-        <p>No fixtures found for the selected date.</p>
+        <h2>Matches on {{ selected_date }}</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Home Team</th>
+                    <th>Away Team</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for match in matches %}
+                    <tr>
+                        <td>{{ match['teams']['home']['name'] }}</td>
+                        <td>{{ match['teams']['away']['name'] }}</td>
+                        <td>{{ match['fixture']['date'] }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% elif selected_date %}
+        <p>No matches found for {{ selected_date }}</p>
     {% endif %}
 </body>
 </html>
