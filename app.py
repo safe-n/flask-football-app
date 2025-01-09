@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 app = Flask(__name__)
 
 # RapidAPI configuration
-API_HOST = "v3.football.api-sports.io"
+API_HOST = "api-football-v1.p.rapidapi.com"
 API_KEY = "your_api_key"  # Replace this with your API key
 
 # Function to fetch matches for a given date
