@@ -7,23 +7,26 @@ app = Flask(__name__)
 
 # RapidAPI configuration
 API_HOST = "api-football-v1.p.rapidapi.com"
-API_KEY = "40027c6adcmshfb4e864cb9e7855p12d50cjsn6eb6ef9031a6"  # Replace this with your API key
+API_KEY = "your_api_key"  # Replace this with your API key
 
-# Function to fetch matches for a given date
-def fetch_match_statistics(fixture_id):
-    url = f"https://{API_HOST}/v3/fixtures/statistics"
+# Function to fetch team statistics
+def fetch_team_stats(team_id):
+    url = f"https://{API_HOST}/v3/teams/statistics"
     headers = {
         "X-RapidAPI-Key": "40027c6adcmshfb4e864cb9e7855p12d50cjsn6eb6ef9031a6",
         "X-RapidAPI-Host": "api-football-v1.p.rapidapi.com"
     }
-    params = {"fixture": fixture_id}
+    params = {"team": team_id}
     response = requests.get(url, headers=headers, params=params)
+    
     if response.status_code == 200:
-        return response.json()["response"]
+        stats = response.json()["response"]
+        return stats
     else:
-        print(f"Error fetching stats for fixture {fixture_id}: {response.status_code}, {response.text}")
+        print(f"Error fetching stats for team {team_id}: {response.status_code}, {response.text}")
         return None
 
+# Function to fetch matches for a given date
 def fetch_matches(date):
     url = f"https://{API_HOST}/v3/fixtures"
     headers = {
@@ -36,16 +39,26 @@ def fetch_matches(date):
         "season": "2024"
     }
     response = requests.get(url, headers=headers, params=params)
+    
     if response.status_code == 200:
         matches = response.json()["response"]
-        # Fetch statistics for each match
+        
+        # Fetch team statistics for each match
         for match in matches:
-            fixture_id = match["fixture"]["id"]
-            stats = fetch_match_statistics(fixture_id)
-            match["statistics"] = stats
+            home_team_id = match["teams"]["home"]["id"]
+            away_team_id = match["teams"]["away"]["id"]
+            
+            # Get team stats
+            home_team_stats = fetch_team_stats(home_team_id)
+            away_team_stats = fetch_team_stats(away_team_id)
+            
+            # Add stats to match
+            match["home_team_stats"] = home_team_stats
+            match["away_team_stats"] = away_team_stats
+        
         return matches
     else:
-        print(f"Error: {response.status_code}, {response.text}")
+        print(f"Error fetching matches: {response.status_code}, {response.text}")
         return []
 
 @app.route("/", methods=["GET", "POST"])
