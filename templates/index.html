@@ -35,11 +35,7 @@
                     <td>{{ match.teams.home.name }}</td>
                     <td>{{ match.teams.away.name }}</td>
                     <td>
-                        {% if match.fixture.date %}
-                            {{ match.fixture.date | date('%H:%M') }}
-                        {% else %}
-                            {{ match.fixture.date }}
-                        {% endif %}
+                        {{ match.fixture.date }}  <!-- Displaying the date as a string -->
                     </td>
                     <td>
                         {% if match.statistics %}
