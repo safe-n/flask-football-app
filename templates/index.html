@@ -40,12 +40,12 @@
                     <td>{{ match.teams.home.name }}</td>
                     <td>{{ match.teams.away.name }}</td>
                     <td>{{ match.fixture.date[:16] }}</td>
-                    <td>{{ match.home_team_stats.league.position if match.home_team_stats else "N/A" }}</td>
-                    <td>{{ match.away_team_stats.league.position if match.away_team_stats else "N/A" }}</td>
-                    <td>{{ match.home_team_stats.fixtures.played if match.home_team_stats else "N/A" }}</td>
-                    <td>{{ match.away_team_stats.fixtures.played if match.away_team_stats else "N/A" }}</td>
-                    <td>{{ match.home_team_stats.goals.total if match.home_team_stats else "N/A" }}</td>
-                    <td>{{ match.away_team_stats.goals.total if match.away_team_stats else "N/A" }}</td>
+                    <td>{{ match.home_team_stats.position }}</td>
+                    <td>{{ match.away_team_stats.position }}</td>
+                    <td>{{ match.home_team_stats.matches_played }}</td>
+                    <td>{{ match.away_team_stats.matches_played }}</td>
+                    <td>{{ match.home_team_stats.goals_scored }}</td>
+                    <td>{{ match.away_team_stats.goals_scored }}</td>
                 </tr>
                 {% endfor %}
             </tbody>

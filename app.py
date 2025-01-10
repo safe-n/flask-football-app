@@ -7,20 +7,24 @@ app = Flask(__name__)
 
 # RapidAPI configuration
 API_HOST = "api-football-v1.p.rapidapi.com"
-API_KEY = "your_api_key"  # Replace this with your API key
+API_KEY = "40027c6adcmshfb4e864cb9e7855p12d50cjsn6eb6ef9031a6"  # Replace this with your API key
 
 # Function to fetch team statistics
-def fetch_team_stats(team_id):
+def fetch_team_stats(team_id, league_id, season):
     url = f"https://{API_HOST}/v3/teams/statistics"
     headers = {
-        "X-RapidAPI-Key": "40027c6adcmshfb4e864cb9e7855p12d50cjsn6eb6ef9031a6",
-        "X-RapidAPI-Host": "api-football-v1.p.rapidapi.com"
+        "X-RapidAPI-Key": API_KEY,
+        "X-RapidAPI-Host": API_HOST
     }
-    params = {"team": team_id}
+    params = {
+        "team": team_id,
+        "league": league_id,
+        "season": season
+    }
     response = requests.get(url, headers=headers, params=params)
     
     if response.status_code == 200:
-        stats = response.json()["response"]
+        stats = response.json().get("response", {})
         return stats
     else:
         print(f"Error fetching stats for team {team_id}: {response.status_code}, {response.text}")
@@ -30,8 +34,8 @@ def fetch_team_stats(team_id):
 def fetch_matches(date):
     url = f"https://{API_HOST}/v3/fixtures"
     headers = {
-        "X-RapidAPI-Key": "40027c6adcmshfb4e864cb9e7855p12d50cjsn6eb6ef9031a6",
-        "X-RapidAPI-Host": "api-football-v1.p.rapidapi.com"
+        "X-RapidAPI-Key": API_KEY,
+        "X-RapidAPI-Host": API_HOST
     }
     params = {
         "date": date,
@@ -47,14 +51,25 @@ def fetch_matches(date):
         for match in matches:
             home_team_id = match["teams"]["home"]["id"]
             away_team_id = match["teams"]["away"]["id"]
+            league_id = 140  # La Liga ID
+            season = "2024"
             
             # Get team stats
-            home_team_stats = fetch_team_stats(home_team_id)
-            away_team_stats = fetch_team_stats(away_team_id)
+            home_team_stats = fetch_team_stats(home_team_id, league_id, season)
+            away_team_stats = fetch_team_stats(away_team_id, league_id, season)
             
             # Add stats to match
-            match["home_team_stats"] = home_team_stats
-            match["away_team_stats"] = away_team_stats
+            match["home_team_stats"] = {
+                "position": home_team_stats.get("league", {}).get("position", "N/A"),
+                "matches_played": home_team_stats.get("fixtures", {}).get("played", {}).get("total", "N/A"),
+                "goals_scored": home_team_stats.get("goals", {}).get("for", {}).get("total", {}).get("total", "N/A")
+            } if home_team_stats else None
+            
+            match["away_team_stats"] = {
+                "position": away_team_stats.get("league", {}).get("position", "N/A"),
+                "matches_played": away_team_stats.get("fixtures", {}).get("played", {}).get("total", "N/A"),
+                "goals_scored": away_team_stats.get("goals", {}).get("for", {}).get("total", {}).get("total", "N/A")
+            } if away_team_stats else None
         
         return matches
     else:
