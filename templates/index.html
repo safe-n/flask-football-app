@@ -6,7 +6,7 @@
     <title>La Liga Fixtures</title>
 </head>
 <body>
-    <h1>La Liga Fixtures</h1>
+    <h1>La Liga - statystyki</h1>
     <form method="POST">
         <label for="date_option">Select Date:</label>
         <select name="date_option" id="date_option">
@@ -32,12 +32,8 @@
                     <th>D2 Matches Played</th>
                     <th>D1 Goals Scored</th>
                     <th>D2 Goals Scored</th>
-                    <th>D1 Goals Conceded</th>
-                    <th>D2 Goals Conceded</th>
-                    <th>D1 Avg Goals per Match</th>
-                    <th>D2 Avg Goals per Match</th>
-                    <th>D1 Avg Goals Conceded per Match</th>
-                    <th>D2 Avg Goals Conceded per Match</th>
+                    <th>D1 Goals Against</th>
+                    <th>D2 Goals Against</th>
                 </tr>
             </thead>
             <tbody>
@@ -52,12 +48,8 @@
                     <td>{{ match.away_team_stats.fixtures.played if match.away_team_stats else "N/A" }}</td>
                     <td>{{ match.home_team_stats.goals.total if match.home_team_stats else "N/A" }}</td>
                     <td>{{ match.away_team_stats.goals.total if match.away_team_stats else "N/A" }}</td>
-                    <td>{{ match.home_team_stats.goals.against.total if match.home_team_stats else "N/A" }}</td>
-                    <td>{{ match.away_team_stats.goals.against.total if match.away_team_stats else "N/A" }}</td>
-                    <td>{{ (match.home_team_stats.goals.total / match.home_team_stats.fixtures.played) if match.home_team_stats else "N/A" }}</td>
-                    <td>{{ (match.away_team_stats.goals.total / match.away_team_stats.fixtures.played) if match.away_team_stats else "N/A" }}</td>
-                    <td>{{ (match.home_team_stats.goals.against.total / match.home_team_stats.fixtures.played) if match.home_team_stats else "N/A" }}</td>
-                    <td>{{ (match.away_team_stats.goals.against.total / match.away_team_stats.fixtures.played) if match.away_team_stats else "N/A" }}</td>
+                    <td>{{ match.home_team_stats.goals_against.total if match.home_team_stats else "N/A" }}</td>
+                    <td>{{ match.away_team_stats.goals_against.total if match.away_team_stats else "N/A" }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
