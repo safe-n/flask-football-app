@@ -7,7 +7,7 @@ app = Flask(__name__)
 
 # RapidAPI configuration
 API_HOST = "api-football-v1.p.rapidapi.com"
-API_KEY = "40027c6adcmshfb4e864cb9e7855p12d50cjsn6eb6ef9031a6"  # Replace this with your API key
+API_KEY = "40027c6adcmshfb4e864cb9e7855p12d50cjsn6eb6ef9031a6"
 
 # Function to fetch team statistics
 def fetch_team_stats(team_id, league_id, season):
