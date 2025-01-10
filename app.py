@@ -62,16 +62,14 @@ def fetch_matches(date):
             match["home_team_stats"] = {
                 "position": home_team_stats.get("league", {}).get("position", "N/A"),
                 "matches_played": home_team_stats.get("fixtures", {}).get("played", {}).get("total", "N/A"),
-                                "goals_scored": home_team_stats.get("goals", {}).get("for", {}).get("total", {}).get("total", "N/A"),
-                "goals_against": home_team_stats.get("goals", {}).get("against", {}).get("total", {}).get("total", "N/A")
+                "goals_scored": home_team_stats.get("goals", {}).get("for", {}).get("total", {}).get("total", "N/A")
             } if home_team_stats else None
             
             match["away_team_stats"] = {
                 "position": away_team_stats.get("league", {}).get("position", "N/A"),
                 "matches_played": away_team_stats.get("fixtures", {}).get("played", {}).get("total", "N/A"),
-                                "goals_scored": away_team_stats.get("goals", {}).get("for", {}).get("total", {}).get("total", "N/A"),
-                "goals_against": away_team_stats.get("goals", {}).get("against", {}).get("total", {}).get("total", "N/A")
-             } if away_team_stats else None
+                "goals_scored": away_team_stats.get("goals", {}).get("for", {}).get("total", {}).get("total", "N/A")
+            } if away_team_stats else None
         
         return matches
     else:
