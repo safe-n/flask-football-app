@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: my-flask-app
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: DATABASE_URL
+        value: postgres://<username>:<password>@<host>:<port>/<dbname>

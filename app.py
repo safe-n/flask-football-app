@@ -1,200 +1,136 @@
-<<<<<<< HEAD
-from flask import Flask, render_template, request
-import requests
+from flask import Flask, request, jsonify, render_template
+from flask_sqlalchemy import SQLAlchemy
 import os
-from datetime import datetime, timedelta
+from dotenv import load_dotenv
+
+# Załaduj zmienne środowiskowe z pliku .env
+load_dotenv()
 
 app = Flask(__name__)
 
-# RapidAPI configuration
-API_HOST = "api-football-v1.p.rapidapi.com"
-API_KEY = "40027c6adcmshfb4e864cb9e7855p12d50cjsn6eb6ef9031a6"
+# Uzyskaj wartość zmiennej środowiskowej DATABASE_URL
+database_url = os.getenv('DATABASE_URL')
 
-# Function to fetch team statistics
-def fetch_team_stats(team_id, league_id, season):
-    url = f"https://{API_HOST}/v3/teams/statistics"
-    headers = {
-        "X-RapidAPI-Key": API_KEY,
-        "X-RapidAPI-Host": API_HOST
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
+
+# reszta twojego kodu...
+
+# Załaduj model językowy spaCy
+nlp = spacy.load('en_core_web_sm')
+
+class Match(db.Model):
+    """
+    Model reprezentujący mecz piłkarski.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.Date, nullable=False)
+    home_team = db.Column(db.String(50), nullable=False)
+    away_team = db.Column(db.String(50), nullable=False)
+    home_goals = db.Column(db.Integer)
+    away_goals = db.Column(db.Integer)
+    home_shots = db.Column(db.Integer)
+    away_shots = db.Column(db.Integer)
+    home_corners = db.Column(db.Integer)
+    away_corners = db.Column(db.Integer)
+    home_yellow = db.Column(db.Integer)
+    away_yellow = db.Column(db.Integer)
+
+def calculate_statistics(matches):
+    """
+    Funkcja do obliczania statystyk na podstawie danych meczowych.
+    """
+    df = pd.DataFrame([{
+        'date': match.date,
+        'home_team': match.home_team,
+        'away_team': match.away_team,
+        'home_goals': match.home_goals,
+        'away_goals': match.away_goals,
+        'home_shots': match.home_shots,
+        'away_shots': match.away_shots,
+        'home_corners': match.home_corners,
+        'away_corners': match.away_corners,
+        'home_yellow': match.home_yellow,
+        'away_yellow': match.away_yellow
+    } for match in matches])
+
+    stats = {
+        'goals_scored_avg': df['home_goals'].mean(),
+        'goals_conceded_avg': df['away_goals'].mean(),
+        'shots_off_target_avg': df['home_shots'].mean(),
+        'shots_on_target_avg': df['away_shots'].mean(),
+        'corners_avg': df['home_corners'].mean(),
+        'cards_avg': df['home_yellow'].mean(),
+        'matches_won': len(df[df['home_goals'] > df['away_goals']]),
+        'both_teams_scored': len(df[(df['home_goals'] > 0) & (df['away_goals'] > 0)]),
+        'over_1_5_goals': len(df[(df['home_goals'] + df['away_goals']) > 1.5]),
+        'over_2_5_goals': len(df[(df['home_goals'] + df['away_goals']) > 2.5]),
+        'form': 'WWDLD'  # Przykładowa forma drużyny
     }
-    params = {
-        "team": team_id,
-        "league": league_id,
-        "season": season
-    }
-    response = requests.get(url, headers=headers, params=params)
+    return stats
+
+def interpret_query(query):
+    """
+    Funkcja do interpretacji zapytań użytkowników.
+    """
+    doc = nlp(query.lower())
     
-    if response.status_code == 200:
-        stats = response.json().get("response", {})
-        return stats
+    # Proste słowa kluczowe do interpretacji zapytań
+    if "average goals" in query or "average number of goals" in query:
+        return "average_goals"
+    elif "average corners" in query or "corners on average" in query:
+        return "average_corners"
+    elif "average yellow cards" in query or "yellow cards per match" in query:
+        return "average_yellow_cards"
+    elif "average shots" in query or "shots on target" in query:
+        return "average_shots"
     else:
-        print(f"Error fetching stats for team {team_id}: {response.status_code}, {response.text}")
-        return None
+        return "unknown_query"
 
-# Function to fetch matches for a given date
-def fetch_matches(date):
-    url = f"https://{API_HOST}/v3/fixtures"
-    headers = {
-        "X-RapidAPI-Key": API_KEY,
-        "X-RapidAPI-Host": API_HOST
-    }
-    params = {
-        "date": date,
-        "league": "140",  # La Liga ID
-        "season": "2024"
-    }
-    response = requests.get(url, headers=headers, params=params)
+@app.route('/')
+def index():
+    """
+    Strona główna aplikacji.
+    """
+    return render_template('index.html')
+
+@app.route('/matches', methods=['POST'])
+def matches():
+    """
+    Trasa obsługująca wybór ligi i daty.
+    """
+    league = request.form.get('league')
+    date = request.form.get('date')
+    # Tu dodaj logikę do przetwarzania wybranej ligi i daty
+    return f"Wybrana liga: {league}, Wybrana data: {date}"
+
+@app.route('/api/query', methods=['POST'])
+def query():
+    """
+    API do obsługi zapytań użytkowników.
+    """
+    data = request.get_json()
+    query = data['query']
+    interpreted_query = interpret_query(query)
     
-    if response.status_code == 200:
-        matches = response.json()["response"]
-        
-        # Fetch team statistics for each match
-        for match in matches:
-            home_team_id = match["teams"]["home"]["id"]
-            away_team_id = match["teams"]["away"]["id"]
-            league_id = 140  # La Liga ID
-            season = "2024"
-            
-            # Get team stats
-            home_team_stats = fetch_team_stats(home_team_id, league_id, season)
-            away_team_stats = fetch_team_stats(away_team_id, league_id, season)
-            
-            # Add stats to match
-            match["home_team_stats"] = {
-                "position": home_team_stats.get("league", {}).get("position", "N/A"),
-                "matches_played": home_team_stats.get("fixtures", {}).get("played", {}).get("total", "N/A"),
-                "goals_scored": home_team_stats.get("goals", {}).get("for", {}).get("total", {}).get("total", "N/A")
-            } if home_team_stats else None
-            
-            match["away_team_stats"] = {
-                "position": away_team_stats.get("league", {}).get("position", "N/A"),
-                "matches_played": away_team_stats.get("fixtures", {}).get("played", {}).get("total", "N/A"),
-                "goals_scored": away_team_stats.get("goals", {}).get("for", {}).get("total", {}).get("total", "N/A")
-            } if away_team_stats else None
-        
-        return matches
-    else:
-        print(f"Error fetching matches: {response.status_code}, {response.text}")
-        return []
-
-@app.route("/", methods=["GET", "POST"])
-def home():
-    matches = []
-    selected_date = None
-
-    if request.method == "POST":
-        option = request.form.get("date_option")
-        if option == "today":
-            selected_date = datetime.now().strftime("%Y-%m-%d")
-        elif option == "tomorrow":
-            selected_date = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
-        elif option == "specific":
-            selected_date = request.form.get("specific_date")
-
-        if selected_date:
-            matches = fetch_matches(selected_date)
-
-    return render_template("index.html", matches=matches, selected_date=selected_date)
-
-if __name__ == "__main__":
-=======
-from flask import Flask, render_template, request
-import requests
-import os
-from datetime import datetime, timedelta
-
-app = Flask(__name__)
-
-# RapidAPI configuration
-API_HOST = "api-football-v1.p.rapidapi.com"
-API_KEY = "40027c6adcmshfb4e864cb9e7855p12d50cjsn6eb6ef9031a6"  # Replace this with your API key
-
-# Function to fetch team statistics
-def fetch_team_stats(team_id, league_id, season):
-    url = f"https://{API_HOST}/v3/teams/statistics"
-    headers = {
-        "X-RapidAPI-Key": API_KEY,
-        "X-RapidAPI-Host": API_HOST
-    }
-    params = {
-        "team": team_id,
-        "league": league_id,
-        "season": season
-    }
-    response = requests.get(url, headers=headers, params=params)
+    matches = Match.query.all()
+    stats = calculate_statistics(matches)
     
-    if response.status_code == 200:
-        stats = response.json().get("response", {})
-        return stats
+    if interpreted_query == "average_goals":
+        result = {'average_goals': stats['goals_scored_avg']}
+    elif interpreted_query == "average_corners":
+        result = {'average_corners': stats['corners_avg']}
+    elif interpreted_query == "average_yellow_cards":
+        result = {'average_yellow_cards': stats['cards_avg']}
+    elif interpreted_query == "average_shots":
+        result = {'average_shots': stats['shots_on_target_avg']}
     else:
-        print(f"Error fetching stats for team {team_id}: {response.status_code}, {response.text}")
-        return None
-
-# Function to fetch matches for a given date
-def fetch_matches(date):
-    url = f"https://{API_HOST}/v3/fixtures"
-    headers = {
-        "X-RapidAPI-Key": API_KEY,
-        "X-RapidAPI-Host": API_HOST
-    }
-    params = {
-        "date": date,
-        "league": "140",  # La Liga ID
-        "season": "2024"
-    }
-    response = requests.get(url, headers=headers, params=params)
+        result = {'error': 'Query not understood'}
     
-    if response.status_code == 200:
-        matches = response.json()["response"]
-        
-        # Fetch team statistics for each match
-        for match in matches:
-            home_team_id = match["teams"]["home"]["id"]
-            away_team_id = match["teams"]["away"]["id"]
-            league_id = 140  # La Liga ID
-            season = "2024"
-            
-            # Get team stats
-            home_team_stats = fetch_team_stats(home_team_id, league_id, season)
-            away_team_stats = fetch_team_stats(away_team_id, league_id, season)
-            
-            # Add stats to match
-            match["home_team_stats"] = {
-                "position": home_team_stats.get("league", {}).get("position", "N/A"),
-                "matches_played": home_team_stats.get("fixtures", {}).get("played", {}).get("total", "N/A"),
-                "goals_scored": home_team_stats.get("goals", {}).get("for", {}).get("total", {}).get("total", "N/A")
-            } if home_team_stats else None
-            
-            match["away_team_stats"] = {
-                "position": away_team_stats.get("league", {}).get("position", "N/A"),
-                "matches_played": away_team_stats.get("fixtures", {}).get("played", {}).get("total", "N/A"),
-                "goals_scored": away_team_stats.get("goals", {}).get("for", {}).get("total", {}).get("total", "N/A")
-            } if away_team_stats else None
-        
-        return matches
-    else:
-        print(f"Error fetching matches: {response.status_code}, {response.text}")
-        return []
+    return jsonify(result)
 
-@app.route("/", methods=["GET", "POST"])
-def home():
-    matches = []
-    selected_date = None
-
-    if request.method == "POST":
-        option = request.form.get("date_option")
-        if option == "today":
-            selected_date = datetime.now().strftime("%Y-%m-%d")
-        elif option == "tomorrow":
-            selected_date = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
-        elif option == "specific":
-            selected_date = request.form.get("specific_date")
-
-        if selected_date:
-            matches = fetch_matches(selected_date)
-
-    return render_template("index.html", matches=matches, selected_date=selected_date)
-
-if __name__ == "__main__":
->>>>>>> f93745f4271f686cd9fbede01aee17cfdf0d19e1
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
+    app.run(debug=True)
