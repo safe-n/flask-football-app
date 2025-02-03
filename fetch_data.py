@@ -32,9 +32,11 @@ class Match(db.Model):
     home_yellow = db.Column(db.Integer)
     away_yellow = db.Column(db.Integer)
 
-# Ładowanie zmiennych środowiskowych z pliku .env
+# Ładowanie zmiennych środowiskowych z pliku .env w lokalnym środowisku
 load_dotenv()
 
+# Pobieranie zmiennych środowiskowych
+DATABASE_URL = os.getenv('DATABASE_URL')
 API_KEY = os.getenv('API_KEY')
 API_HOST = os.getenv('API_HOST')
 
