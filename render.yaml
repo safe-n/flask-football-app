@@ -6,4 +6,4 @@ services:
     startCommand: python app.py
     envVars:
       - key: DATABASE_URL
-        value: postgres://<username>:<password>@<host>:<port>/<dbname>
+        value: ${DATABASE_URL}
