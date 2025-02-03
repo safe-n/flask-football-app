@@ -3,6 +3,7 @@ services:
     name: flask-football-app
     env: python
     buildCommand: |
+      apt-get update && apt-get install -y build-essential gcc
       pip install --upgrade pip
       pip install numpy==1.21.0 pandas==1.3.3
       pip install -r requirements.txt
