@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -55,62 +54,4 @@
         <p>No matches found for {{ selected_date }}</p>
     {% endif %}
 </body>
-=======
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>La Liga Fixtures</title>
-</head>
-<body>
-    <h1>La Liga v2</h1>
-    <form method="POST">
-        <label for="date_option">Select Date:</label>
-        <select name="date_option" id="date_option">
-            <option value="today">Today</option>
-            <option value="tomorrow">Tomorrow</option>
-            <option value="specific">Specific Date</option>
-        </select>
-        <input type="date" name="specific_date">
-        <button type="submit">Show Fixtures</button>
-    </form>
-
-    {% if matches %}
-        <h2>Matches on {{ selected_date }}</h2>
-        <table border="1">
-            <thead>
-                <tr>
-                    <th>Home Team</th>
-                    <th>Away Team</th>
-                    <th>Time</th>
-                    <th>D1 Position</th>
-                    <th>D2 Position</th>
-                    <th>D1 Matches Played</th>
-                    <th>D2 Matches Played</th>
-                    <th>D1 Goals Scored</th>
-                    <th>D2 Goals Scored</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for match in matches %}
-                <tr>
-                    <td>{{ match.teams.home.name }}</td>
-                    <td>{{ match.teams.away.name }}</td>
-                    <td>{{ match.fixture.date[:16] }}</td>
-                    <td>{{ match.home_team_stats.position }}</td>
-                    <td>{{ match.away_team_stats.position }}</td>
-                    <td>{{ match.home_team_stats.matches_played }}</td>
-                    <td>{{ match.away_team_stats.matches_played }}</td>
-                    <td>{{ match.home_team_stats.goals_scored }}</td>
-                    <td>{{ match.away_team_stats.goals_scored }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    {% elif selected_date %}
-        <p>No matches found for {{ selected_date }}</p>
-    {% endif %}
-</body>
->>>>>>> f93745f4271f686cd9fbede01aee17cfdf0d19e1
 </html>
