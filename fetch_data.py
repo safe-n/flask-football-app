@@ -1,13 +1,10 @@
-# API_KEY = '40027c6adcmshfb4e864cb9e7855p12d50cjsn6eb6ef9031a6'
-
-
-
 import requests
 import time
 from datetime import datetime
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 import os
+from dotenv import load_dotenv
 
 app = Flask(__name__)
 
@@ -35,8 +32,11 @@ class Match(db.Model):
     home_yellow = db.Column(db.Integer)
     away_yellow = db.Column(db.Integer)
 
-API_KEY = '40027c6adcmshfb4e864cb9e7855p12d50cjsn6eb6ef9031a6'
-API_HOST = 'api-football-v1.p.rapidapi.com'
+# Ładowanie zmiennych środowiskowych z pliku .env
+load_dotenv()
+
+API_KEY = os.getenv('API_KEY')
+API_HOST = os.getenv('API_HOST')
 
 def fetch_statistics(fixture_id):
     url = f"https://{API_HOST}/v3/fixtures/statistics"
