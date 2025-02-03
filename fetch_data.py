@@ -70,7 +70,14 @@ def fetch_and_save_data():
     response = requests.get(url, headers=headers, params=params)
     data = response.json().get("response", [])
     
+    max_requests = 50  # Maksymalna liczba zapytań do API
+    request_count = 0
+    
     for match in data:
+        if request_count >= max_requests:
+            print("Reached maximum number of API requests.")
+            break
+        
         fixture_id = match['fixture']['id']
         statistics = fetch_statistics(fixture_id)
         
@@ -95,7 +102,7 @@ def fetch_and_save_data():
         print(f"Home Corners: {home_corners}, Away Corners: {away_corners}")
         print(f"Home Yellow Cards: {home_yellow}, Away Yellow Cards: {away_yellow}")
         print("------")
-
+        
         # Sprawdź, czy mecz już istnieje w bazie danych
         existing_match = Match.query.filter_by(fixture_id=fixture_id).first()
         if existing_match:
@@ -124,7 +131,10 @@ def fetch_and_save_data():
                 away_yellow=away_yellow
             )
             db.session.add(new_match)
+        
+        request_count += 1
         time.sleep(2)  # Opóźnienie 2 sekund między zapytaniami, aby uniknąć przekroczenia limitu
+    
     db.session.commit()
 
 if __name__ == '__main__':
