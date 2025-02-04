@@ -4,7 +4,6 @@ from datetime import datetime
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 import os
-from dotenv import load_dotenv
 
 app = Flask(__name__)
 
@@ -32,13 +31,9 @@ class Match(db.Model):
     home_yellow = db.Column(db.Integer)
     away_yellow = db.Column(db.Integer)
 
-# Ładowanie zmiennych środowiskowych z pliku .env w lokalnym środowisku
-load_dotenv()
-
-# Pobieranie zmiennych środowiskowych
-DATABASE_URL = os.getenv('DATABASE_URL')
-API_KEY = os.getenv('API_KEY')
-API_HOST = os.getenv('API_HOST')
+# Bezpośrednio wpisane dane dotyczące API
+API_KEY = '40027c6adcmshfb4e864cb9e7855p12d50cjsn6eb6ef9031a6'
+API_HOST = 'api-football-v1.p.rapidapi.com'
 
 def fetch_statistics(fixture_id):
     url = f"https://{API_HOST}/v3/fixtures/statistics"
