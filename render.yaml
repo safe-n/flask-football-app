@@ -2,6 +2,7 @@ services:
   - type: web
     name: flask-football-app
     env: python
+    pythonVersion: 3.10
     buildCommand: |
       apt-get update && apt-get install -y build-essential gcc gfortran libblas-dev liblapack-dev
       pip install --upgrade pip
