@@ -10,7 +10,7 @@ services:
     startCommand: python fetch_data.py
     envVars:
       - key: DATABASE_URL
-        value: postgresql://username:password@hostname:port/database_name
+        value: postgresql+psycopg2://baza_stats_user:wxjFNiRghDeh2JFqZE0yOZeWMNXvlaYud@dpg-cug746a3esus73enkhg0-a:5432/baza_stats
       - key: API_KEY
         value: <your_api_key>
       - key: API_HOST
