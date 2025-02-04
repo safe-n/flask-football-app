@@ -3,46 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wybierz Ligę</title>
-    <style>
-        form {
-            max-width: 300px;
-            margin: auto;
-        }
-        select, input[type="date"] {
-            width: 100%;
-            padding: 8px;
-            margin: 8px 0;
-            box-sizing: border-box;
-        }
-        button {
-            width: 100%;
-            padding: 10px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-    </style>
+    <title>Mecze</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
 </head>
 <body>
-    <h1>Wybierz Ligę</h1>
-    <form action="{{ url_for('matches') }}" method="post">
-        <label for="league">Liga:</label>
-        <select name="league" id="league" required>
-            <option value="premier_league">Premier League</option>
-            <option value="la_liga">La Liga</option>
-            <option value="serie_a">Serie A</option>
-            <option value="bundesliga">Bundesliga</option>
-            <option value="ligue_1">Ligue 1</option>
-            <!-- Dodaj więcej lig -->
-        </select>
-        <label for="date">Data:</label>
-        <input type="date" name="date" id="date" required>
-        <button type="submit">Pokaż Mecze</button>
-    </form>
-</body>
-</html>
+    <div class="container mt-5">
+        <h1 class="text-center">Mecze</h1>
+        <form action="{{ url_for('query') }}" method="post" class="mb-4">
+            <div class="mb-3">
+                <label for="query" class="form-label">Zadaj pytanie:</label>
+                <input type="text" id="query" name="query" class="form-control" placeholder="Wpisz swoje pytanie" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Wyślij</button>
+        </form>
+        {% if result %}
+        <div class="alert alert-info">
+            {{ result }}
+        </div>
+        {% endif %}
+        <form action="{{ url_for('fetch') }}" method="post" class="mb-2">
+            <button type="submit" class="btn btn-success">Pobierz dane</button>
+        </form>
+        <form action="{{ url_for('update') }}" method="post" class="mb-2">
+            <button type="submit" class="btn btn-warning">Aktualizuj dane</button>
+        </form>
+        <form action="{{ url_for('report') }}" method="post" class="mb-4">
+            <button type="submit" class="btn btn-info">Generuj raport PDF</button>
+        </form>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>ID
