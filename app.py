@@ -30,10 +30,12 @@ db = SQLAlchemy(app)
 # Załaduj model językowy spaCy
 nlp = spacy.load('en_core_web_sm')
 
-# Reszta kodu aplikacji...
-
+# Definicja modelu bazy danych
 class Match(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    # Dodaj inne kolumny zgodnie z potrzebami
+
+# Reszta kodu aplikacji...
     fixture_id = db.Column(db.Integer, unique=True, nullable=False)
     date = db.Column(db.Date, nullable=False)
     league = db.Column(db.String(50), nullable=False)
