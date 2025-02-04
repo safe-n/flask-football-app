@@ -1,21 +1,19 @@
 from flask import Flask, request, jsonify, render_template
 from flask_sqlalchemy import SQLAlchemy
-import os
-from dotenv import load_dotenv
-
-# Załaduj zmienne środowiskowe z pliku .env
-load_dotenv()
+import spacy
+import pandas as pd
 
 app = Flask(__name__)
 
-# Uzyskaj wartość zmiennej środowiskowej DATABASE_URL
-database_url = os.getenv('DATABASE_URL')
-
-app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+# Bezpośrednio wpisane dane dotyczące bazy danych
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql+psycopg2://baza_stats_user:wxjFNiRghDeh2JFqZE0yOZeWMNXvlaYud@dpg-cug746a3esus73enkhg0-a:5432/baza_stats'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
 
-# reszta twojego kodu...
+# Inne konfiguracje, jeśli są potrzebne
+app.config['API_HOST'] = 'api-football-v1.p.rapidapi.com'
+app.config['API_KEY'] = '40027c6adcmshfb4e864cb9e7855p12d50cjsn6eb6ef9031a6'
+
+db = SQLAlchemy(app)
 
 # Załaduj model językowy spaCy
 nlp = spacy.load('en_core_web_sm')
