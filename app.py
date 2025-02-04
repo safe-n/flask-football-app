@@ -9,9 +9,15 @@ from fpdf import FPDF
 from datetime import datetime
 from dotenv import load_dotenv
 
+# Instalacja modelu spaCy
+os.system('python -m spacy download en_core_web_sm')
+
+# Ładowanie zmiennych środowiskowych z pliku .env, jeśli używasz pliku .env
+load_dotenv()
+
 app = Flask(__name__)
 
-# Bezpośrednio wpisane dane dotyczące bazy danych
+# Konfiguracja bazy danych
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql+psycopg2://baza_stats_user:wxjFNiRghDeh2JFqZE0yOZeWMNXvlaYud@dpg-cug746a3esus73enkhg0-a:5432/baza_stats'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -23,6 +29,8 @@ db = SQLAlchemy(app)
 
 # Załaduj model językowy spaCy
 nlp = spacy.load('en_core_web_sm')
+
+# Reszta kodu aplikacji...
 
 class Match(db.Model):
     id = db.Column(db.Integer, primary_key=True)
