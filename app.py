@@ -9,6 +9,7 @@ from fpdf import FPDF
 from datetime import datetime
 from dotenv import load_dotenv
 from fuzzywuzzy import fuzz, process
+import openai
 
 # Ładowanie zmiennych środowiskowych z pliku .env, jeśli używasz pliku .env
 load_dotenv()
@@ -22,6 +23,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # Inne konfiguracje, jeśli są potrzebne
 app.config['API_HOST'] = 'api-football-v1.p.rapidapi.com'
 app.config['API_KEY'] = '40027c6adcmshfb4e864cb9e7855p12d50cjsn6eb6ef9031a6'
+app.config['OPENAI_API_KEY'] = os.getenv('OPENAI_API_KEY')  # Klucz API OpenAI
 
 db = SQLAlchemy(app)
 
@@ -64,6 +66,15 @@ def interpret_query(query):
             return key
     
     return "unknown_query"
+
+def generate_ai_response(prompt):
+    openai.api_key = app.config['OPENAI_API_KEY']
+    response = openai.Completion.create(
+        engine="davinci-codex",
+        prompt=prompt,
+        max_tokens=150
+    )
+    return response.choices[0].text.strip()
 
 def calculate_statistics(matches):
     df = pd.DataFrame([{
@@ -340,16 +351,20 @@ def query():
     matches = Match.query.all()
     stats = calculate_statistics(matches)
     
-    if interpreted_query == "average_goals":
-        result = {'average_goals': stats['goals_scored_avg']}
-    elif interpreted_query == "average_corners":
-        result = {'average_corners': stats['corners_avg']}
-    elif interpreted_query == "average_yellow_cards":
-        result = {'average_yellow_cards': stats['cards_avg']}
-    elif interpreted_query == "average_shots":
-        result = {'average_shots': stats['shots_on_target_avg']}
+    if interpreted_query == "unknown_query":
+        prompt = f"User asked: {user_query}\nBased on the stored football data, provide a detailed response."
+        result = generate_ai_response(prompt)
     else:
-        result = {'error': 'Query not understood'}
+        if interpreted_query == "average_goals":
+            result = {'average_goals': stats['goals_scored_avg']}
+        elif interpreted_query == "average_corners":
+            result = {'average_corners': stats['corners_avg']}
+        elif interpreted_query == "average_yellow_cards":
+            result = {'average_yellow_cards': stats['cards_avg']}
+        elif interpreted_query == "average_shots":
+            result = {'average_shots': stats['shots_on_target_avg']}
+        else:
+            result = {'error': 'Query not understood'}
     
     return jsonify(result)
 
