@@ -7,18 +7,11 @@ import time
 import requests
 from fpdf import FPDF
 from datetime import datetime
-from dotenv import load_dotenv
-
-# Instalacja modelu spaCy
-os.system('python -m spacy download en_core_web_sm')
-
-# Ładowanie zmiennych środowiskowych z pliku .env, jeśli używasz pliku .env
-load_dotenv()
 
 app = Flask(__name__)
 
-# Konfiguracja bazy danych
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql+psycopg2://baza_stats_user:wxjFNiRghDeh2JFqZE0yOZeWMNXvlaYud@dpg-cug746a3esus73enkhg0-a:5432/baza_stats'
+# Bezpośrednio wpisane dane dotyczące bazy danych
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql+psycopg2://baza_stats_user:wxjFNiRghDeh2JFqZE0yOZeWMNXvlaYu@dpg-cug746a3esus73enkhg0-a:5432/baza_stats'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Inne konfiguracje, jeśli są potrzebne
@@ -27,7 +20,8 @@ app.config['API_KEY'] = '40027c6adcmshfb4e864cb9e7855p12d50cjsn6eb6ef9031a6'
 
 db = SQLAlchemy(app)
 
-# Załaduj model językowy spaCy
+# Instalacja modelu spaCy
+os.system('python -m spacy download en_core_web_sm')
 nlp = spacy.load('en_core_web_sm')
 
 # Definicja modelu bazy danych
@@ -37,7 +31,6 @@ class Match(db.Model):
 
 # Reszta kodu aplikacji...
 
-# Reszta kodu aplikacji...
     fixture_id = db.Column(db.Integer, unique=True, nullable=False)
     date = db.Column(db.Date, nullable=False)
     league = db.Column(db.String(50), nullable=False)
