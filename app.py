@@ -8,6 +8,7 @@ import requests
 from fpdf import FPDF
 from datetime import datetime
 from dotenv import load_dotenv
+from fuzzywuzzy import fuzz, process
 
 # Ładowanie zmiennych środowiskowych z pliku .env, jeśli używasz pliku .env
 load_dotenv()
@@ -50,17 +51,19 @@ class Match(db.Model):
     away_yellow = db.Column(db.Integer)
 
 def interpret_query(query):
-    doc = nlp(query.lower())
-    if "average goals" in query or "average number of goals" in query:
-        return "average_goals"
-    elif "average corners" in query or "corners on average" in query:
-        return "average_corners"
-    elif "average yellow cards" in query or "yellow cards per match" in query:
-        return "average_yellow_cards"
-    elif "average shots" in query or "shots on target" in query:
-        return "average_shots"
-    else:
-        return "unknown_query"
+    query = query.lower()
+    choices = {
+        "average_goals": ["average goals", "average number of goals", "średnia liczba goli", "średnia goli"],
+        "average_corners": ["average corners", "corners on average", "średnia liczba rzutów rożnych", "średnia rzutów rożnych"],
+        "average_yellow_cards": ["average yellow cards", "yellow cards per match", "średnia liczba żółtych kartek", "średnia żółtych kartek"],
+        "average_shots": ["average shots", "shots on target", "średnia liczba strzałów", "średnia strzałów"]
+    }
+    
+    for key, variations in choices.items():
+        if any(fuzz.partial_ratio(query, variation) > 80 for variation in variations):
+            return key
+    
+    return "unknown_query"
 
 def calculate_statistics(matches):
     df = pd.DataFrame([{
@@ -254,68 +257,75 @@ class PDF(FPDF):
         self.chapter_title(title)
         self.chapter_body(body)
 
+# Definicja basedir
+basedir = os.path.abspath(os.path.dirname(__file__))
+
 def generate_pdf_report():
     with app.app_context():
-        pdf = PDF()
+        try:
+            pdf = PDF()
 
-        total_goals = 0
-        total_matches = Match.query.count()
-        matches = Match.query.all()
-        
-        for match in matches:
-            total_goals += match.home_goals + match.away_goals
-        
-        average_goals_per_match = total_goals / total_matches if total_matches != 0 else 0
-        pdf.add_chapter('Średnia liczba goli na mecz', f"{average_goals_per_match:.2f}")
-
-        team_goals = {}
-        
-        for match in matches:
-            if match.home_team not in team_goals:
-                team_goals[match.home_team] = 0
-            if match.away_team not in team_goals:
-                team_goals[match.away_team] = 0
+            total_goals = 0
+            total_matches = Match.query.count()
+            matches = Match.query.all()
             
-            team_goals[match.home_team] += match.home_goals
-            team_goals[match.away_team] += match.away_goals
-        
-        sorted_teams = sorted(team_goals.items(), key=lambda x: x[1], reverse=True)
-        body = "\n".join([f"{team}: {goals} goli" for team, goals in sorted_teams])
-        pdf.add_chapter('Drużyny z największą liczbą strzelonych goli', body)
-
-        total_corners = 0
-        
-        for match in matches:
-            if match.home_corners is not None:
-                total_corners += match.home_corners
-            if match.away_corners is not None:
-                total_corners += match.away_corners
-        
-        average_corners_per_match = total_corners / total_matches if total_matches != 0 else 0
-        pdf.add_chapter('Średnia liczba rzutów rożnych na mecz', f"{average_corners_per_match:.2f}")
-
-        team_defense = {}
-        
-        for match in matches:
-            if match.home_team not in team_defense:
-                team_defense[match.home_team] = 0
-            if match.away_team not in team_defense:
-                team_defense[match.away_team] = 0
+            for match in matches:
+                total_goals += match.home_goals + match.away_goals
             
-            team_defense[match.home_team] += match.away_goals
-            team_defense[match.away_team] += match.home_goals
-        
-        best_defense = sorted(team_defense.items(), key=lambda x: x[1])
-        
-        best_defense_body = "\n".join([f"{team}: {goals_conceded} straconych goli" for team, goals_conceded in best_defense[:5]])
-        worst_defense_body = "\n".join([f"{team}: {goals_conceded} straconych goli" for team, goals_conceded in best_defense[-5:]])
-        
-        pdf.add_chapter('Drużyny z najlepszą defensywą', best_defense_body)
-        pdf.add_chapter('Drużyny z najgorszą defensywą', worst_defense_body)
+            average_goals_per_match = total_goals / total_matches if total_matches != 0 else 0
+            pdf.add_chapter('Średnia liczba goli na mecz', f"{average_goals_per_match:.2f}")
 
-        output_path = os.path.join(basedir, 'Football_Data_Analysis_Report.pdf')
-        pdf.output(output_path)
-        print(f"Raport PDF został wygenerowany pomyślnie w {output_path}!")
+            team_goals = {}
+            
+            for match in matches:
+                if match.home_team not in team_goals:
+                    team_goals[match.home_team] = 0
+                if match.away_team not in team_goals:
+                    team_goals[match.away_team] = 0
+                
+                team_goals[match.home_team] += match.home_goals
+                team_goals[match.away_team] += match.away_goals
+            
+            sorted_teams = sorted(team_goals.items(), key=lambda x: x[1], reverse=True)
+            body = "\n".join([f"{team}: {goals} goli" for team, goals in sorted_teams])
+            pdf.add_chapter('Drużyny z największą liczbą strzelonych goli', body)
+
+            total_corners = 0
+            
+            for match in matches:
+                if match.home_corners is not None:
+                    total_corners += match.home_corners
+                if match.away_corners is not None:
+                    total_corners += match.away_corners
+            
+            average_corners_per_match = total_corners / total_matches if total_matches != 0 else 0
+            pdf.add_chapter('Średnia liczba rzutów rożnych na mecz', f"{average_corners_per_match:.2f}")
+
+            team_defense = {}
+            
+            for match in matches:
+                if match.home_team not in team_defense:
+                    team_defense[match.home_team] = 0
+                if match.away_team not in team_defense:
+                    team_defense[match.away_team] = 0
+                
+                team_defense[match.home_team] += match.away_goals
+                team_defense[match.away_team] += match.home_goals
+            
+            best_defense = sorted(team_defense.items(), key=lambda x: x[1])
+            
+            best_defense_body = "\n".join([f"{team}: {goals_conceded} straconych goli" for team, goals_conceded in best_defense[:5]])
+            worst_defense_body = "\n".join([f"{team}: {goals_conceded} straconych goli" for team, goals_conceded in best_defense[-5:]])
+            
+            pdf.add_chapter('Drużyny z najlepszą defensywą', best_defense_body)
+            pdf.add_chapter('Drużyny z najgorszą defensywą', worst_defense_body)
+
+            output_path = os.path.join(basedir, 'Football_Data_Analysis_Report.pdf')
+            pdf.output(output_path)
+            print(f"Raport PDF został wygenerowany pomyślnie w {output_path}!")
+        except Exception as e:
+            print(f"Błąd podczas generowania raportu PDF: {e}")
+            raise
 
 @app.route('/')
 def index():
