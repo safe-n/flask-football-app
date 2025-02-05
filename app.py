@@ -36,6 +36,8 @@ class Match(db.Model):
     # Dodaj inne kolumny zgodnie z potrzebami
 
 # Reszta kodu aplikacji...
+
+# Reszta kodu aplikacji...
     fixture_id = db.Column(db.Integer, unique=True, nullable=False)
     date = db.Column(db.Date, nullable=False)
     league = db.Column(db.String(50), nullable=False)
