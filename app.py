@@ -120,6 +120,11 @@ def fetch_and_save_data():
         'status': 'FT'  # Tylko zakończone mecze
     }
     response = requests.get(url, headers=headers, params=params)
+    
+    if response.status_code != 200:
+        print(f"Error fetching data: {response.status_code} {response.text}")
+        return "Error fetching data"
+
     data = response.json().get("response", [])
     
     max_requests = 50  # Maksymalna liczba zapytań do API
@@ -185,6 +190,8 @@ def fetch_and_save_data():
         time.sleep(2)
     
     db.session.commit()
+    print("Data fetched and saved successfully.")
+    return "Data fetched and saved successfully!"
 
 def update_existing_records():
     matches = Match.query.filter(
@@ -338,8 +345,8 @@ def query():
 
 @app.route('/fetch', methods=['POST'])
 def fetch():
-    fetch_and_save_data()
-    return "Data fetched and saved successfully!"
+    result = fetch_and_save_data()
+    return result
 
 @app.route('/update', methods=['POST'])
 def update():
