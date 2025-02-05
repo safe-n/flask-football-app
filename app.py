@@ -7,6 +7,10 @@ import time
 import requests
 from fpdf import FPDF
 from datetime import datetime
+from dotenv import load_dotenv
+
+# Ładowanie zmiennych środowiskowych z pliku .env, jeśli używasz pliku .env
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -22,15 +26,15 @@ db = SQLAlchemy(app)
 
 # Instalacja modelu spaCy
 os.system('python -m spacy download en_core_web_sm')
-nlp = spacy.load('en_core_web_sm')
+try:
+    nlp = spacy.load('en_core_web_sm')
+    print("Model spaCy załadowany poprawnie.")
+except Exception as e:
+    print(f"Błąd podczas ładowania modelu spaCy: {e}")
 
 # Definicja modelu bazy danych
 class Match(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    # Dodaj inne kolumny zgodnie z potrzebami
-
-# Reszta kodu aplikacji...
-
     fixture_id = db.Column(db.Integer, unique=True, nullable=False)
     date = db.Column(db.Date, nullable=False)
     league = db.Column(db.String(50), nullable=False)
@@ -350,4 +354,5 @@ def report():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)
