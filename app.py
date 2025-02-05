@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, send_file
 from flask_sqlalchemy import SQLAlchemy
 import spacy
 import pandas as pd
@@ -10,6 +10,8 @@ from datetime import datetime
 from dotenv import load_dotenv
 from fuzzywuzzy import fuzz, process
 import openai
+import io
+import csv
 
 # Ładowanie zmiennych środowiskowych z pliku .env, jeśli używasz pliku .env
 load_dotenv()
@@ -69,6 +71,9 @@ def interpret_query(query):
 
 def generate_ai_response(prompt):
     openai.api_key = app.config['OPENAI_API_KEY']
+    if not openai.api_key:
+        raise ValueError("No API key provided. Set the OPENAI_API_KEY environment variable.")
+    
     response = openai.Completion.create(
         engine="davinci-codex",
         prompt=prompt,
@@ -334,6 +339,7 @@ def generate_pdf_report():
             output_path = os.path.join(basedir, 'Football_Data_Analysis_Report.pdf')
             pdf.output(output_path)
             print(f"Raport PDF został wygenerowany pomyślnie w {output_path}!")
+            return output_path
         except Exception as e:
             print(f"Błąd podczas generowania raportu PDF: {e}")
             raise
@@ -380,8 +386,21 @@ def update():
 
 @app.route('/report', methods=['POST'])
 def report():
-    generate_pdf_report()
-    return "PDF report generated successfully!"
+    report_path = generate_pdf_report()
+    return send_file(report_path, as_attachment=True)
+
+@app.route('/export', methods=['GET'])
+def export_csv():
+    matches = Match.query.all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['fixture_id', 'date', 'league', 'home_team', 'away_team', 'home_goals', 'away_goals', 'home_shots', 'away_shots', 'home_corners', 'away_corners', 'home_yellow', 'away_yellow'])
+    
+    for match in matches:
+        writer.writerow([match.fixture_id, match.date, match.league, match.home_team, match.away_team, match.home_goals, match.away_goals, match.home_shots, match.away_shots, match.home_corners, match.away_corners, match.home_yellow, match.away_yellow])
+    
+    output.seek(0)
+    return send_file(io.BytesIO(output.getvalue().encode()), mimetype='text/csv', attachment_filename='matches.csv', as_attachment=True)
 
 if __name__ == '__main__':
     with app.app_context():
