@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template, send_file
+from flask import Flask, request, jsonify, render_template, send_file, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 import spacy
 import pandas as pd
@@ -32,7 +32,6 @@ try:
     print("Model spaCy załadowany poprawnie.")
 except Exception as e:
     print(f"Błąd podczas ładowania modelu spaCy: {e}")
-
 # Definicja modelu bazy danych
 class Match(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -107,6 +106,51 @@ def calculate_statistics(matches):
     }
     return stats
 
+def calculate_team_statistics(matches, team_name):
+    team_matches = [match for match in matches if match.home_team == team_name or match.away_team == team_name]
+    
+    goals_scored = sum(match.home_goals for match in team_matches if match.home_team == team_name) + \
+                   sum(match.away_goals for match in team_matches if match.away_team == team_name)
+    
+    goals_conceded = sum(match.away_goals for match in team_matches if match.home_team == team_name) + \
+                     sum(match.home_goals for match in team_matches if match.away_team == team_name)
+    
+    shots = sum(match.home_shots for match in team_matches if match.home_team == team_name) + \
+            sum(match.away_shots for match in team_matches if match.away_team == team_name)
+    
+    corners = sum(match.home_corners for match in team_matches if match.home_team == team_name) + \
+              sum(match.away_corners for match in team_matches if match.away_team == team_name)
+    
+    yellow_cards = sum(match.home_yellow for match in team_matches if match.home_team == team_name) + \
+                   sum(match.away_yellow for match in team_matches if match.away_team == team_name)
+    
+    matches_won = sum(1 for match in team_matches if (match.home_team == team_name and match.home_goals > match.away_goals) or
+                      (match.away_team == team_name and match.away_goals > match.home_goals))
+    
+    matches_lost = sum(1 for match in team_matches if (match.home_team == team_name and match.home_goals < match.away_goals) or
+                       (match.away_team == team_name and match.away_goals < match.home_goals))
+    
+    matches_drawn = sum(1 for match in team_matches if match.home_goals == match.away_goals)
+    
+    total_matches = len(team_matches)
+    
+    return {
+        "team_name": team_name,
+        "total_matches": total_matches,
+        "goals_scored": goals_scored,
+        "goals_conceded": goals_conceded,
+        "shots": shots,
+        "corners": corners,
+        "yellow_cards": yellow_cards,
+        "matches_won": matches_won,
+        "matches_lost": matches_lost,
+        "matches_drawn": matches_drawn,
+        "average_goals_scored_per_match": goals_scored / total_matches if total_matches else 0,
+        "average_goals_conceded_per_match": goals_conceded / total_matches if total_matches else 0,
+        "average_shots_per_match": shots / total_matches if total_matches else 0,
+        "average_corners_per_match": corners / total_matches if total_matches else 0,
+        "average_yellow_cards_per_match": yellow_cards / total_matches if total_matches else 0
+    }
 def fetch_statistics(fixture_id):
     url = f"https://{app.config['API_HOST']}/v3/fixtures/statistics"
     headers = {
@@ -130,7 +174,7 @@ def fetch_and_save_data():
         "X-RapidAPI-Host": app.config['API_HOST']
     }
     params = {
-        'league': '140',  # Przykład: Premier League
+        'league': '39',  # Przykład: Premier League
         'season': '2024',  # Przykład: sezon 2024/25
         'status': 'FT'  # Tylko zakończone mecze
     }
@@ -399,6 +443,15 @@ def export_csv():
     
     output.seek(0)
     return send_file(output, mimetype='text/csv', attachment_filename='matches.csv', as_attachment=True)
+
+@app.route('/team_stats/<team_name>', methods=['GET'])
+def get_team_stats(team_name):
+    matches = Match.query.filter((Match.home_team == team_name) | (Match.away_team == team_name)).all()
+    if not matches:
+        return jsonify({"error": "Team not found"}), 404
+    
+    team_stats = calculate_team_statistics(matches, team_name)
+    return jsonify(team_stats)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
