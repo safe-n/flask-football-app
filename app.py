@@ -7,14 +7,10 @@ import time
 import requests
 from fpdf import FPDF
 from datetime import datetime
-from dotenv import load_dotenv
 from fuzzywuzzy import fuzz, process
 import openai
 import io
 import csv
-
-# Ładowanie zmiennych środowiskowych z pliku .env, jeśli używasz pliku .env
-load_dotenv()
 
 app = Flask(__name__)
 
@@ -36,7 +32,6 @@ try:
     print("Model spaCy załadowany poprawnie.")
 except Exception as e:
     print(f"Błąd podczas ładowania modelu spaCy: {e}")
-
 # Definicja modelu bazy danych
 class Match(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -68,7 +63,6 @@ def interpret_query(query):
             return key
     
     return "unknown_query"
-
 def generate_ai_response(prompt):
     openai.api_key = app.config['OPENAI_API_KEY']
     if not openai.api_key:
@@ -110,7 +104,6 @@ def calculate_statistics(matches):
         'form': 'WWDLD'  # Przykładowa forma drużyny
     }
     return stats
-
 def fetch_statistics(fixture_id):
     url = f"https://{app.config['API_HOST']}/v3/fixtures/statistics"
     headers = {
@@ -211,7 +204,6 @@ def fetch_and_save_data():
     db.session.commit()
     print("Data fetched and saved successfully.")
     return "Data fetched and saved successfully!"
-
 def update_existing_records():
     matches = Match.query.filter(
         (Match.home_shots == None) | 
@@ -251,8 +243,7 @@ def update_existing_records():
         
         db.session.commit()
         time.sleep(2)
-
-class PDF(FPDF):
+    class PDF(FPDF):
     def header(self):
         self.set_font('Arial', 'B', 12)
         self.cell(0, 10, 'Football Data Analysis Report', 0, 1, 'C')
@@ -343,6 +334,9 @@ def generate_pdf_report():
         except Exception as e:
             print(f"Błąd podczas generowania raportu PDF: {e}")
             raise
+        @app.route('/healthz')
+def health_check():
+    return "OK", 200
 
 @app.route('/')
 def index():
@@ -373,7 +367,6 @@ def query():
             result = {'error': 'Query not understood'}
     
     return jsonify(result)
-
 @app.route('/fetch', methods=['POST'])
 def fetch():
     result = fetch_and_save_data()
@@ -400,10 +393,7 @@ def export_csv():
         writer.writerow([match.fixture_id, match.date, match.league, match.home_team, match.away_team, match.home_goals, match.away_goals, match.home_shots, match.away_shots, match.home_corners, match.away_corners, match.home_yellow, match.away_yellow])
     
     output.seek(0)
-    return send_file(io.BytesIO(output.getvalue().encode()), mimetype='text/csv', attachment_filename='matches.csv', as_attachment=True)
+    return send_file(output, mimetype='text/csv', attachment_filename='matches.csv', as_attachment=True)
 
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
