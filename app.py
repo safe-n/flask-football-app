@@ -32,6 +32,7 @@ try:
     print("Model spaCy załadowany poprawnie.")
 except Exception as e:
     print(f"Błąd podczas ładowania modelu spaCy: {e}")
+
 # Definicja modelu bazy danych
 class Match(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -63,6 +64,7 @@ def interpret_query(query):
             return key
     
     return "unknown_query"
+
 def generate_ai_response(prompt):
     openai.api_key = app.config['OPENAI_API_KEY']
     if not openai.api_key:
@@ -104,6 +106,7 @@ def calculate_statistics(matches):
         'form': 'WWDLD'  # Przykładowa forma drużyny
     }
     return stats
+
 def fetch_statistics(fixture_id):
     url = f"https://{app.config['API_HOST']}/v3/fixtures/statistics"
     headers = {
@@ -127,7 +130,7 @@ def fetch_and_save_data():
         "X-RapidAPI-Host": app.config['API_HOST']
     }
     params = {
-        'league': '39',  # Przykład: Premier League
+        'league': '140',  # Przykład: Premier League
         'season': '2024',  # Przykład: sezon 2024/25
         'status': 'FT'  # Tylko zakończone mecze
     }
@@ -204,6 +207,7 @@ def fetch_and_save_data():
     db.session.commit()
     print("Data fetched and saved successfully.")
     return "Data fetched and saved successfully!"
+
 def update_existing_records():
     matches = Match.query.filter(
         (Match.home_shots == None) | 
@@ -334,7 +338,7 @@ def generate_pdf_report():
         except Exception as e:
             print(f"Błąd podczas generowania raportu PDF: {e}")
             raise
-        @app.route('/healthz')
+@app.route('/healthz')
 def health_check():
     return "OK", 200
 
@@ -367,6 +371,7 @@ def query():
             result = {'error': 'Query not understood'}
     
     return jsonify(result)
+
 @app.route('/fetch', methods=['POST'])
 def fetch():
     result = fetch_and_save_data()
@@ -389,7 +394,7 @@ def export_csv():
     writer = csv.writer(output)
     writer.writerow(['fixture_id', 'date', 'league', 'home_team', 'away_team', 'home_goals', 'away_goals', 'home_shots', 'away_shots', 'home_corners', 'away_corners', 'home_yellow', 'away_yellow'])
     
-    for match in matches:
+  for match in matches:
         writer.writerow([match.fixture_id, match.date, match.league, match.home_team, match.away_team, match.home_goals, match.away_goals, match.home_shots, match.away_shots, match.home_corners, match.away_corners, match.home_yellow, match.away_yellow])
     
     output.seek(0)
