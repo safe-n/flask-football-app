@@ -243,7 +243,7 @@ def update_existing_records():
         
         db.session.commit()
         time.sleep(2)
-    class PDF(FPDF):
+class PDF(FPDF):
     def header(self):
         self.set_font('Arial', 'B', 12)
         self.cell(0, 10, 'Football Data Analysis Report', 0, 1, 'C')
