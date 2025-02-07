@@ -16,7 +16,7 @@ import logging
 app = Flask(__name__)
 
 # Konfiguracja logowania
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 # Bezpośrednio wpisane dane dotyczące bazy danych
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql+psycopg2://baza_stats_user:wxjFNiRghDeh2JFqZE0yOZeWMNXvlaYu@dpg-cug746a3esus73enkhg0-a:5432/baza_stats'
@@ -91,9 +91,11 @@ def fetch_today_matches():
     }
     params = {
         'date': datetime.now().strftime('%Y-%m-%d'),  # Dzisiejsza data
-        'league': '39,140',  # Przykład: Premier League, La Liga
+        'league': '39,140, 135, 61, 78',  # Przykład: Popularne ligi Europejskie
         'status': 'NS'  # Nadchodzące mecze
     }
+    logging.debug(f"Fetching today's matches with params: {params}")
+
     response = requests.get(url, headers=headers, params=params)
     
     if response.status_code != 200:
@@ -106,6 +108,7 @@ def fetch_today_matches():
 def save_match_data(match):
     existing_match = Match.query.filter_by(fixture_id=match['fixture']['id']).first()
     if existing_match:
+        logging.debug(f"Match with fixture_id {match['fixture']['id']} already exists in the database.")
         return existing_match
     
     new_match = Match(
@@ -119,6 +122,7 @@ def save_match_data(match):
     )
     db.session.add(new_match)
     db.session.commit()
+    logging.debug(f"New match with fixture_id {match['fixture']['id']} added to the database.")
     return new_match
 
 def fetch_and_save_match_data():
@@ -142,11 +146,14 @@ def health_check():
 @app.route('/')
 def index():
     matches = fetch_today_matches()
+    if not matches:
+        logging.warning("No matches fetched for today.")
     return render_template('index.html', matches=matches)
 
 @app.route('/query', methods=['POST'])
 def query():
     user_query = request.json.get('query')
+    logging.debug(f"Received query: {user_query}")
     interpreted_query = interpret_query(user_query)
     
     matches = Match.query.all()
@@ -210,6 +217,7 @@ def export_csv():
 def get_team_stats(team_name):
     matches = Match.query.filter((Match.home_team == team_name) | (Match.away_team == team_name)).all()
     if not matches:
+        logging.warning(f"No matches found for team {team_name}.")
         return jsonify({"error": "Team not found"}), 404
     
     team_stats = calculate_team_statistics(matches, team_name)
