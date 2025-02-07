@@ -86,6 +86,10 @@
         .then(response => response.json())
         .then(data => {
             alert(data.message);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while fetching data.');
         });
     }
 
@@ -94,6 +98,10 @@
         .then(response => response.text())
         .then(data => {
             alert(data);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while updating data.');
         });
     }
 
@@ -108,6 +116,10 @@
             document.body.appendChild(a);
             a.click();
             a.remove();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while generating the report.');
         });
     }
 
@@ -122,6 +134,10 @@
             document.body.appendChild(a);
             a.click();
             a.remove();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while exporting the CSV.');
         });
     }
 
@@ -130,6 +146,10 @@
         .then(response => response.json())
         .then(data => {
             alert(JSON.stringify(data));
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while fetching stats.');
         });
     }
 </script>
