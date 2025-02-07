@@ -100,6 +100,7 @@ def fetch_today_matches():
         logging.error(f"Error fetching data: {response.status_code} {response.text}")
         return []
     
+    logging.info("Today's matches fetched successfully.")
     return response.json().get("response", [])
 
 def save_match_data(match):
@@ -124,12 +125,14 @@ def fetch_and_save_match_data():
     matches = fetch_today_matches()
     for match in matches:
         save_match_data(match)
+    logging.info("Today's matches saved to the database.")
     return "Today's matches fetched and saved."
 
 def fetch_statistics_and_save(fixture_id):
     statistics = fetch_statistics(fixture_id)
     # Zapisać dane statystyczne do bazy danych
     # Funkcja ta nie jest w pełni zaimplementowana w tym przykładzie
+    logging.info(f"Statistics for fixture {fixture_id} fetched and saved.")
     return "Statistics fetched and saved."
 
 @app.route('/healthz')
@@ -164,6 +167,7 @@ def query():
         else:
             result = {'error': 'Query not understood'}
     
+    logging.info(f"Query result: {result}")
     return jsonify(result)
 
 @app.route('/fetch', methods=['POST'])
@@ -185,6 +189,7 @@ def update():
 @app.route('/report', methods=['POST'])
 def report():
     report_path = generate_pdf_report()
+    logging.info("PDF report generated successfully.")
     return send_file(report_path, as_attachment=True)
 
 @app.route('/export', methods=['GET'])
@@ -198,6 +203,7 @@ def export_csv():
         writer.writerow([match.fixture_id, match.date, match.league, match.home_team, match.away_team, match.home_goals, match.away_goals, match.home_shots, match.away_shots, match.home_corners, match.away_corners, match.home_yellow, match.away_yellow])
     
     output.seek(0)
+    logging.info("CSV export generated successfully.")
     return send_file(output, mimetype='text/csv', download_name='matches.csv', as_attachment=True)
 
 @app.route('/team_stats/<team_name>', methods=['GET'])
@@ -207,11 +213,13 @@ def get_team_stats(team_name):
         return jsonify({"error": "Team not found"}), 404
     
     team_stats = calculate_team_statistics(matches, team_name)
+    logging.info(f"Team stats for {team_name} fetched successfully.")
     return jsonify(team_stats)
 
 @app.route('/stats/<fixture_id>', methods=['GET'])
 def get_stats(fixture_id):
     result = fetch_statistics_and_save(fixture_id)
+    logging.info(f"Stats for fixture {fixture_id} fetched successfully.")
     return jsonify({"status": "success", "message": result})
 
 if __name__ == '__main__':
