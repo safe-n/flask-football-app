@@ -83,9 +83,9 @@
 
     function fetchData() {
         fetch('/fetch', { method: 'POST' })
-        .then(response => response.text())
+        .then(response => response.json())
         .then(data => {
-            alert(data);
+            alert(data.message);
         });
     }
 
