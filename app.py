@@ -91,7 +91,7 @@ def fetch_today_matches():
     }
     params = {
         'date': datetime.now().strftime('%Y-%m-%d'),  # Dzisiejsza data
-        'league': '39,140, 135, 61, 78',  # Przykład: Popularne ligi Europejskie
+        'league': '39,140,135,61,78',  # Przykład: Premier League, La Liga, Serie A, Bundesliga, Ligue 1
         'status': 'NS'  # Nadchodzące mecze
     }
     logging.debug(f"Fetching today's matches with params: {params}")
@@ -133,11 +133,28 @@ def fetch_and_save_match_data():
     return "Today's matches fetched and saved."
 
 def fetch_statistics_and_save(fixture_id):
-    statistics = fetch_statistics(fixture_id)
-    # Zapisać dane statystyczne do bazy danych
-    # Funkcja ta nie jest w pełni zaimplementowana w tym przykładzie
-    logging.info(f"Statistics for fixture {fixture_id} fetched and saved.")
-    return "Statistics fetched and saved."
+    url = f"https://{app.config['API_HOST']}/v3/fixtures/statistics"
+    headers = {
+        "X-RapidAPI-Key": app.config['API_KEY'],
+        "X-RapidAPI-Host": app.config['API_HOST']
+    }
+    params = {
+        'fixture': fixture_id
+    }
+    logging.debug(f"Fetching statistics for fixture {fixture_id} with params: {params}")
+
+    response = requests.get(url, headers=headers, params=params)
+    
+    if response.status_code != 200:
+        logging.error(f"Error fetching statistics: {response.status_code} {response.text}")
+        return []
+    
+    logging.info(f"Statistics for fixture {fixture_id} fetched successfully.")
+    return response.json().get("response", [])
+
+def update_existing_records():
+    # Implementacja aktualizacji istniejących rekordów
+    logging.info("Updating existing records...")
 
 @app.route('/healthz')
 def health_check():
@@ -202,7 +219,7 @@ def report():
 @app.route('/export', methods=['GET'])
 def export_csv():
     matches = Match.query.all()
-    output = io.StringIO()
+    output = io.BytesIO()
     writer = csv.writer(output)
     writer.writerow(['fixture_id', 'date', 'league', 'home_team', 'away_team', 'home_goals', 'away_goals', 'home_shots', 'away_shots', 'home_corners', 'away_corners', 'home_yellow', 'away_yellow'])
     
