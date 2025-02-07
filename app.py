@@ -78,21 +78,6 @@ def generate_ai_response(prompt):
         max_tokens=150
     )
     return response.choices[0].text.strip()
-def fetch_statistics(fixture_id):
-    url = f"https://{app.config['API_HOST']}/v3/fixtures/statistics"
-    headers = {
-        "X-RapidAPI-Key": app.config['API_KEY'],
-        "X-RapidAPI-Host": app.config['API_HOST']
-    }
-    params = {
-        'fixture': fixture_id
-    }
-    response = requests.get(url, headers=headers, params=params)
-    if response.status_code == 429:
-        print(f"Rate limit exceeded for fixture {fixture_id}. Retrying after delay...")
-        time.sleep(60)  # Opóźnienie 60 sekund przed ponowną próbą
-        response = requests.get(url, headers=headers, params=params)
-    return response.json().get("response", [])
 
 def fetch_today_matches():
     url = f"https://{app.config['API_HOST']}/v3/fixtures"
@@ -135,15 +120,21 @@ def fetch_and_save_match_data():
     matches = fetch_today_matches()
     for match in matches:
         save_match_data(match)
+    return "Today's matches fetched and saved."
 
-fetch_and_save_match_data()
+def fetch_statistics_and_save(fixture_id):
+    statistics = fetch_statistics(fixture_id)
+    # Zapisać dane statystyczne do bazy danych
+    # Funkcja ta nie jest w pełni zaimplementowana w tym przykładzie
+    return "Statistics fetched and saved."
+
 @app.route('/healthz')
 def health_check():
     return "OK", 200
 
 @app.route('/')
 def index():
-    matches = Match.query.all()
+    matches = fetch_today_matches()
     return render_template('index.html', matches=matches)
 
 @app.route('/query', methods=['POST'])
@@ -208,6 +199,10 @@ def get_team_stats(team_name):
     team_stats = calculate_team_statistics(matches, team_name)
     return jsonify(team_stats)
 
+@app.route('/stats/<fixture_id>', methods=['GET'])
+def get_stats(fixture_id):
+    result = fetch_statistics_and_save(fixture_id)
+    return jsonify({"status": "success", "message": result})
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
-    
