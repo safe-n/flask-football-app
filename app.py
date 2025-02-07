@@ -11,8 +11,12 @@ from fuzzywuzzy import fuzz, process
 import openai
 import io
 import csv
+import logging
 
 app = Flask(__name__)
+
+# Konfiguracja logowania
+logging.basicConfig(level=logging.INFO)
 
 # Bezpośrednio wpisane dane dotyczące bazy danych
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql+psycopg2://baza_stats_user:wxjFNiRghDeh2JFqZE0yOZeWMNXvlaYu@dpg-cug746a3esus73enkhg0-a:5432/baza_stats'
@@ -29,9 +33,9 @@ db = SQLAlchemy(app)
 os.system('python -m spacy download en_core_web_sm')
 try:
     nlp = spacy.load('en_core_web_sm')
-    print("Model spaCy załadowany poprawnie.")
+    logging.info("Model spaCy załadowany poprawnie.")
 except Exception as e:
-    print(f"Błąd podczas ładowania modelu spaCy: {e}")
+    logging.error(f"Błąd podczas ładowania modelu spaCy: {e}")
 
 # Definicja modelu bazy danych
 class Match(db.Model):
@@ -93,7 +97,7 @@ def fetch_today_matches():
     response = requests.get(url, headers=headers, params=params)
     
     if response.status_code != 200:
-        print(f"Error fetching data: {response.status_code} {response.text}")
+        logging.error(f"Error fetching data: {response.status_code} {response.text}")
         return []
     
     return response.json().get("response", [])
@@ -165,12 +169,18 @@ def query():
 @app.route('/fetch', methods=['POST'])
 def fetch():
     result = fetch_and_save_match_data()
+    logging.info(result)
     return jsonify({"status": "success", "message": result})
 
 @app.route('/update', methods=['POST'])
 def update():
-    update_existing_records()
-    return "Data updated successfully!"
+    try:
+        update_existing_records()
+        logging.info("Data updated successfully!")
+        return "Data updated successfully!"
+    except Exception as e:
+        logging.error(f"Error updating data: {e}")
+        return "Error updating data.", 500
 
 @app.route('/report', methods=['POST'])
 def report():
