@@ -34,18 +34,7 @@
                     <th>Akcje</th>
                 </tr>
                 </thead>
-                <tbody>
-                {% for match in matches %}
-                <tr>
-                    <td>{{ match.date }}</td>
-                    <td>{{ match.league }}</td>
-                    <td>{{ match.home_team }}</td>
-                    <td>{{ match.away_team }}</td>
-                    <td>{{ match.home_goals }}</td>
-                    <td>{{ match.away_goals }}</td>
-                    <td><button class="btn btn-info" onclick="fetchStats({{ match.fixture_id }})">Statystyki</button></td>
-                </tr>
-                {% endfor %}
+                <tbody id="matchesTableBody">
                 </tbody>
             </table>
         </div>
@@ -86,6 +75,7 @@
         .then(response => response.json())
         .then(data => {
             alert(data.message);
+            updateMatchesTable();
         })
         .catch(error => {
             console.error('Error:', error);
@@ -152,6 +142,34 @@
             alert('An error occurred while fetching stats.');
         });
     }
+
+    function updateMatchesTable() {
+        fetch('/')
+        .then(response => response.json())
+        .then(data => {
+            const matchesTableBody = document.getElementById('matchesTableBody');
+            matchesTableBody.innerHTML = '';
+            data.matches.forEach(match => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${match.date}</td>
+                    <td>${match.league}</td>
+                    <td>${match.home_team}</td>
+                    <td>${match.away_team}</td>
+                    <td>${match.home_goals}</td>
+                    <td>${match.away_goals}</td>
+                    <td><button class="btn btn-info" onclick="fetchStats(${match.fixture_id})">Statystyki</button></td>
+                `;
+                matchesTableBody.appendChild(row);
+            });
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while updating the matches table.');
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', updateMatchesTable);
 </script>
 
 </body>
