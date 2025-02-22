@@ -103,7 +103,9 @@ def fetch_today_matches():
         return []
     
     logging.info("Today's matches fetched successfully.")
-    return response.json().get("response", [])
+    matches = response.json().get("response", [])
+    logging.debug(f"Fetched matches: {matches}")
+    return matches
 
 def save_match_data(match):
     existing_match = Match.query.filter_by(fixture_id=match['fixture']['id']).first()
@@ -127,6 +129,9 @@ def save_match_data(match):
 
 def fetch_and_save_match_data():
     matches = fetch_today_matches()
+    if not matches:
+        logging.warning("No matches fetched for today.")
+        return "No matches fetched for today."
     for match in matches:
         save_match_data(match)
     logging.info("Today's matches saved to the database.")
