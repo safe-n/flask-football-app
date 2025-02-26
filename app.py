@@ -98,6 +98,11 @@ def fetch_today_matches():
 
     response = requests.get(url, headers=headers, params=params)
     
+    if response.status_code == 429:
+        logging.error(f"Error fetching data: {response.status_code} {response.text}")
+        time.sleep(60)  # Poczekaj minutę przed ponowną próbą
+        response = requests.get(url, headers=headers, params=params)
+    
     if response.status_code != 200:
         logging.error(f"Error fetching data: {response.status_code} {response.text}")
         return []
