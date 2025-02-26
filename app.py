@@ -39,7 +39,7 @@ except Exception as e:
 
 # Definicja modelu bazy danych
 class Match(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.Integer, primary key=True)
     fixture_id = db.Column(db.Integer, unique=True, nullable=False)
     date = db.Column(db.Date, nullable=False)
     league = db.Column(db.String(50), nullable=False)
@@ -108,6 +108,7 @@ def fetch_today_matches():
         return []
     
     logging.info("Today's matches fetched successfully.")
+    logging.debug(f"API response: {response.json()}")
     matches = response.json().get("response", [])
     logging.debug(f"Fetched matches: {matches}")
     return matches
