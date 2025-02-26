@@ -1,61 +1,183 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>La Liga Fixtures</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>Football Data Analysis</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
 </head>
 <body>
-    <h1>La Liga - statystyki</h1>
-    <form method="POST">
-        <label for="date_option">Select Date:</label>
-        <select name="date_option" id="date_option">
-            <option value="today">Today</option>
-            <option value="tomorrow">Tomorrow</option>
-            <option value="specific">Specific Date</option>
-        </select>
-        <input type="date" name="specific_date">
-        <button type="submit">Show Fixtures</button>
-    </form>
+<div class="container mt-5">
+    <h1 class="mb-4">Football Data Analysis</h1>
+    
+    <div class="row mb-4">
+        <div class="col">
+            <button class="btn btn-primary" onclick="fetchData()">Pobierz dane</button>
+            <button class="btn btn-secondary" onclick="updateData()">Aktualizuj dane</button>
+            <button class="btn btn-success" onclick="generateReport()">Generuj raport PDF</button>
+            <button class="btn btn-info" onclick="exportCSV()">Eksportuj CSV</button>
+        </div>
+    </div>
 
-    {% if matches %}
-        <h2>Matches on {{ selected_date }}</h2>
-        <table border="1">
-            <thead>
+    <div class="row mb-4">
+        <div class="col">
+            <h2>Mecze</h2>
+            <table class="table table-striped">
+                <thead>
                 <tr>
-                    <th>Home Team</th>
-                    <th>Away Team</th>
-                    <th>Time</th>
-                    <th>D1 Position</th>
-                    <th>D2 Position</th>
-                    <th>D1 Matches Played</th>
-                    <th>D2 Matches Played</th>
-                    <th>D1 Goals Scored</th>
-                    <th>D2 Goals Scored</th>
-                    <th>D1 Goals Against</th>
-                    <th>D2 Goals Against</th>
+                    <th>Data</th>
+                    <th>Liga</th>
+                    <th>Gospodarze</th>
+                    <th>Goście</th>
+                    <th>Gole Gospodarzy</th>
+                    <th>Gole Gości</th>
+                    <th>Akcje</th>
                 </tr>
-            </thead>
-            <tbody>
-                {% for match in matches %}
-                <tr>
-                    <td>{{ match.teams.home.name }}</td>
-                    <td>{{ match.teams.away.name }}</td>
-                    <td>{{ match.fixture.date[:16] }}</td>
-                    <td>{{ match.home_team_stats.league.position if match.home_team_stats else "N/A" }}</td>
-                    <td>{{ match.away_team_stats.league.position if match.away_team_stats else "N/A" }}</td>
-                    <td>{{ match.home_team_stats.fixtures.played if match.home_team_stats else "N/A" }}</td>
-                    <td>{{ match.away_team_stats.fixtures.played if match.away_team_stats else "N/A" }}</td>
-                    <td>{{ match.home_team_stats.goals.total if match.home_team_stats else "N/A" }}</td>
-                    <td>{{ match.away_team_stats.goals.total if match.away_team_stats else "N/A" }}</td>
-                    <td>{{ match.home_team_stats.goals_against.total if match.home_team_stats else "N/A" }}</td>
-                    <td>{{ match.away_team_stats.goals_against.total if match.away_team_stats else "N/A" }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    {% elif selected_date %}
-        <p>No matches found for {{ selected_date }}</p>
-    {% endif %}
+                </thead>
+                <tbody id="matchesTableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col">
+            <h2>Zadaj pytanie</h2>
+            <form id="queryForm">
+                <div class="form-group">
+                    <input type="text" class="form-control" id="queryInput" placeholder="Jakie masz dane?">
+                </div>
+                <button type="submit" class="btn btn-primary">Wyślij</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('queryForm').addEventListener('submit', function(event) {
+        event.preventDefault();
+        const query = document.getElementById('queryInput').value;
+        fetch('/query', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ query: query })
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert(JSON.stringify(data));
+        });
+    });
+
+    function fetchData() {
+        fetch('/fetch', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            alert(data.message);
+            updateMatchesTable();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while fetching data.');
+        });
+    }
+
+    function updateData() {
+        fetch('/update', { method: 'POST' })
+        .then(response => response.text())
+        .then(data => {
+            alert(data);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while updating data.');
+        });
+    }
+
+    function generateReport() {
+        fetch('/report', { method: 'POST' })
+        .then(response => response.blob())
+        .then(blob => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'Football_Data_Analysis_Report.pdf';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while generating the report.');
+        });
+    }
+
+    function exportCSV() {
+        fetch('/export', { method: 'GET' })
+        .then(response => response.blob())
+        .then(blob => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'matches.csv';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while exporting the CSV.');
+        });
+    }
+
+    function fetchStats(fixture_id) {
+        fetch(`/stats/${fixture_id}`, { method: 'GET' })
+        .then(response => response.json())
+        .then(data => {
+            alert(JSON.stringify(data));
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while fetching stats.');
+        });
+    }
+
+    function updateMatchesTable() {
+        fetch('/')
+        .then(response => response.json())
+        .then(data => {
+            const matchesTableBody = document.getElementById('matchesTableBody');
+            matchesTableBody.innerHTML = '';
+            if (data.matches.length === 0) {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td colspan="7" class="text-center">No matches available for today.</td>`;
+                matchesTableBody.appendChild(row);
+            } else {
+                data.matches.forEach(match => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${match.date}</td>
+                        <td>${match.league}</td>
+                        <td>${match.home_team}</td>
+                        <td>${match.away_team}</td>
+                        <td>${match.home_goals}</td>
+                        <td>${match.away_goals}</td>
+                        <td><button class="btn btn-info" onclick="fetchStats(${match.fixture_id})">Statystyki</button></td>
+                    `;
+                    matchesTableBody.appendChild(row);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while updating the matches table.');
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', updateMatchesTable);
+</script>
+
 </body>
 </html>
+``` ▋
