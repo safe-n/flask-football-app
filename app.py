@@ -39,7 +39,7 @@ except Exception as e:
 
 # Definicja modelu bazy danych
 class Match(db.Model):
-    id = db.Column(db.Integer, primary key=True)
+    id = db.Column(db.Integer, primary_key=True)
     fixture_id = db.Column(db.Integer, unique=True, nullable=False)
     date = db.Column(db.Date, nullable=False)
     league = db.Column(db.String(50), nullable=False)
