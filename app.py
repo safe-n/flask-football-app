@@ -24,8 +24,8 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Inne konfiguracje, jeśli są potrzebne
 app.config['API_HOST'] = 'api-football-v1.p.rapidapi.com'
-app.config['API_KEY'] = '40027c6adcmshfb4e864cb9e7855p12d50cjsn6eb6ef9031a6'
-app.config['OPENAI_API_KEY'] = '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'  # Klucz API OpenAI
+app.config['API_KEY'] = 'xxxxxxxxxxxxxxxxxxxxxxxxxx'
+app.config['OPENAI_API_KEY'] = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxx'  # Klucz API OpenAI
 
 db = SQLAlchemy(app)
 
