@@ -32,7 +32,7 @@ class Match(db.Model):
     away_yellow = db.Column(db.Integer)
 
 # Bezpośrednio wpisane dane dotyczące API
-API_KEY = '40027c6adcmshfb4e864cb9e7855p12d50cjsn6eb6ef9031a6'
+API_KEY = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
 API_HOST = 'api-football-v1.p.rapidapi.com'
 
 def fetch_statistics(fixture_id):
