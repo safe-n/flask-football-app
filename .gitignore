@@ -1,21 +1,10 @@
-# .gitignore
-
-# Ignorowanie plików środowiska wirtualnego Python
-venv/
-env/
-
-# Ignorowanie plików konfiguracyjnych
+.env
 *.env
-
-# Ignorowanie plików tymczasowych
-*.pyc
+data/
 __pycache__/
-
-# Ignorowanie plików logów
-*.log
-
-# Ignorowanie plików baz danych SQLite
+*.pyc
+.venv/
+venv/
+*.db
 *.sqlite3
-
-# Ignorowanie plików tokenów
-Baza/Token.txt
+.pytest_cache/

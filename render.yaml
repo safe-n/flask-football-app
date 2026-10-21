@@ -1,17 +1,14 @@
+# Deploy na Render. Klucze ustaw w panelu Render (Environment) - NIE w tym pliku.
 services:
   - type: web
-    name: flask-football-app
-    env: python
-    buildCommand: |
-      apt-get update && apt-get install -y build-essential gcc gfortran libblas-dev liblapack-dev
-      pip install --upgrade pip
-      pip install -r requirements.txt
-      python -m spacy download en_core_web_sm
-    startCommand: python fetch_data.py
+    name: football-predictor
+    runtime: python
+    buildCommand: pip install -r requirements.txt && pip install gunicorn
+    startCommand: gunicorn fbpred.web:app
     envVars:
-      - key: DATABASE_URL
-        value: postgresql+psycopg2://baza_stats_user:wxjFNiRghDeh2JFqZE0yOZeWMNXvlaYud@dpg-cug746a3esus73enkhg0-a:5432/baza_stats
+      - key: DB_PATH
+        value: data/football.db
+      - key: DEFAULT_LEAGUE
+        value: E0
       - key: API_KEY
-        value: <your_api_key>
-      - key: API_HOST
-        value: <your_api_host>
+        sync: false

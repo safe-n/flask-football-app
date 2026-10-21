@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }}</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--fg:#1b1f24;--mut:#5b6672;--acc:#0b7a4b;--bar:#e3e9ef}
+@media (prefers-color-scheme:dark){:root{--bg:#10151a;--card:#182028;--fg:#e8edf2;--mut:#9aa7b4;--acc:#3ecf8e;--bar:#2a3642}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.4 system-ui,sans-serif;padding:12px;max-width:900px;margin-inline:auto}
+h1{font-size:20px;margin:6px 0 10px}nav{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px}nav a{color:var(--acc);text-decoration:none;font-weight:600}
+.card{background:var(--card);border-radius:12px;padding:12px;margin:10px 0;overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:5px 8px;text-align:right;border-bottom:1px solid var(--bar);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}.m{color:var(--mut);font-size:13px}select{font-size:15px;padding:4px}
+</style>
+</head>
+<body>
+<h1>{{ title }}</h1>
+<nav><a href="/?league={{ league }}">Mecze</a><a href="/table?league={{ league }}">Tabela</a>
+<a href="/strengths?league={{ league }}">Siła drużyn</a><a href="/track?league={{ league }}">Dziennik</a></nav>
+<form method="get"><select name="league" onchange="this.form.submit()">
+{% for l in leagues %}<option value="{{ l }}" {{ 'selected' if l == league }}>{{ l }}</option>{% endfor %}
+</select></form>
+{% for kind, val in blocks %}
+  {% if kind == 'p' %}<p class="m">{{ val }}</p>
+  {% else %}<div class="card">{{ val.to_html(index=False, border=0, na_rep='–', float_format='%.2f')|safe }}</div>{% endif %}
+{% endfor %}
+</body></html>

@@ -1,1 +1,0 @@
-https://github.com/safe-n/flask-football-app.git
