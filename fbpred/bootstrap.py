@@ -6,11 +6,17 @@ dociąga dane przy starcie (kilka plików CSV, to kilka sekund) i odświeża je 
 """
 from __future__ import annotations
 
+import os
 import threading
 import time
+from pathlib import Path
 from datetime import date, datetime
 
 from . import config, csvdata, db, history
+
+def _log(msg: str) -> None:
+    print(msg, flush=True)   # flush: bez tego logi z wątku mogą nie pojawić się w panelu Rendera
+
 
 STATUS = {"state": "idle", "message": "Dane nie zostały jeszcze załadowane.", "updated": None}
 _started = False
@@ -31,7 +37,31 @@ def count_finished(conn, league: str) -> int:
     return conn.execute("SELECT COUNT(*) FROM matches WHERE league=? AND hg IS NOT NULL", (league,)).fetchone()[0]
 
 
-def ensure_data(leagues: list[str], years: int = 4, min_matches: int = 200, log=print) -> dict[str, int]:
+def describe() -> dict:
+    """Konfiguracja widoczna w logach i na stronie /data (do diagnozy 'czemu nie ładuje')."""
+    hd = Path(config.HISTORY_DIR)
+    return {"AUTO_BOOTSTRAP": config.AUTO_BOOTSTRAP, "RENDER": os.getenv("RENDER", "-"),
+            "ligi": ",".join(config.BOOTSTRAP_LEAGUES), "REFRESH_HOURS": config.REFRESH_HOURS,
+            "HISTORY_DIR": str(hd), "pliki_historii": len(list(hd.glob("*.csv"))) if hd.exists() else 0,
+            "DB_PATH": str(config.DB_PATH)}
+
+
+def load_local(leagues: list[str] | None = None, log=_log) -> int:
+    """Wczytuje historię z CSV do SQLite OD RAZU i OFFLINE (bez sieci, bez wątku). Zwraca liczbę meczów w bazie."""
+    leagues = leagues or config.BOOTSTRAP_LEAGUES
+    conn = db.connect(config.DB_PATH)
+    history.load_into_db(conn, config.HISTORY_DIR, leagues)
+    from . import ledger
+    ledger.import_csv(conn, config.LEDGER_CSV)
+    total = sum(count_finished(conn, lg) for lg in leagues)
+    if total:
+        _set("ready", f"Wczytano {total} meczów z historii (CSV). Odświeżanie z internetu: "
+                      f"{'w tle' if config.AUTO_BOOTSTRAP else 'wyłączone (AUTO_BOOTSTRAP)'}.")
+    log(f"[bootstrap] start: {describe()} | w bazie: {total} meczów")
+    return total
+
+
+def ensure_data(leagues: list[str], years: int = 4, min_matches: int = 200, log=_log) -> dict[str, int]:
     """Jeśli w bazie brakuje danych ligi - pobiera ostatnie `years` sezonów (idempotentne)."""
     conn = db.connect(config.DB_PATH)
     out: dict[str, int] = {}
@@ -55,7 +85,7 @@ def ensure_data(leagues: list[str], years: int = 4, min_matches: int = 200, log=
     return out
 
 
-def refresh(leagues: list[str], log_predictions: bool = True, log=print) -> None:
+def refresh(leagues: list[str], log_predictions: bool = True, log=_log) -> None:
     """Bieżący sezon + nadchodzące mecze z kursami, sprzątanie, opcjonalnie zapis prognoz do dziennika."""
     conn = db.connect(config.DB_PATH)
     for lg in leagues:
@@ -85,12 +115,13 @@ def refresh(leagues: list[str], log_predictions: bool = True, log=print) -> None
                 log(f"[refresh] dziennik {lg}: {e}")
 
 
-def run_once(leagues: list[str] | None = None, years: int | None = None, log=print,
+def run_once(leagues: list[str] | None = None, years: int | None = None, log=_log,
              export_ledger: bool = False) -> None:
     leagues = leagues or config.BOOTSTRAP_LEAGUES
     with _work_lock:
         try:
-            _set("loading", f"Pobieram dane ({', '.join(leagues)}) - to potrwa kilka sekund, odśwież stronę.")
+            if STATUS["state"] != "ready":
+                _set("loading", f"Pobieram dane ({', '.join(leagues)}) - to potrwa kilka sekund, odśwież stronę.")
             ensure_data(leagues, years or config.BOOTSTRAP_YEARS, log=log)
             from . import ledger
             conn = db.connect(config.DB_PATH)
@@ -133,5 +164,6 @@ def start_background() -> None:
                 except Exception as e:  # noqa: BLE001
                     print(f"[refresh] błąd: {e}")
 
-    _set("loading", "Start aplikacji - zasilanie bazy w toku.")
+    if STATUS["state"] != "ready":
+        _set("loading", "Start aplikacji - zasilanie bazy w toku.")
     threading.Thread(target=loop, name="fbpred-bootstrap", daemon=True).start()

@@ -182,3 +182,16 @@ W workflowach zmień `LEAGUES: "E0"` na np. `"E0,D1,SP1"` (kody football-data.co
 `tune` ma etap 2: sprawdza, czy mieszanie prognozy bramek z modelem celnych strzałów (stabilniejszy sygnał, bo zdarzeń
 jest ~3x więcej) poprawia log-loss, i zapisuje `shot_weight`. Ręcznie: `backtest --shot-weight 0.5`.
 Uwaga: na danych syntetycznych to działa z konstrukcji generatora - wiarygodna jest dopiero ocena na prawdziwych meczach.
+
+
+## Rozwiązywanie problemów: Render pokazuje "idle" / pustą bazę
+
+Od 0.3.1 historia z `history/` jest wczytywana do SQLite **przy każdym starcie, offline** (bez wątku i bez sieci),
+więc strona działa od razu. `AUTO_BOOTSTRAP` włącza tylko odświeżanie z internetu (bieżący sezon, kursy, dziennik) i na
+Renderze jest domyślnie włączone (wykrywane przez `RENDER=true`). Zmienną możesz zapisać jako `1`, `true`, `yes` lub `on`.
+
+Jeśli mimo to coś nie działa, sprawdź w logach Rendera linię `[bootstrap] start: {...}` (pokazuje wartości konfiguracji
+i liczbę meczów w bazie) oraz stronę `/data`, która pisze wprost, co jest wyłączone i dlaczego.
+Pamiętaj: `render.yaml` stosuje się tylko do usług utworzonych z Blueprintu. Jeśli usługę tworzyłeś ręcznie w panelu,
+zmienne ustawiaj w *Render → usługa → Environment*.
+Nie wrzucaj do `history/` sztucznej ligi DEMO (`history-export` pomija ją domyślnie); usuń ją: `git rm history/DEMO_*.csv`.

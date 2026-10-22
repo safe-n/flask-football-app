@@ -74,3 +74,50 @@ class TestBootstrap(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestStartupRobustness(unittest.TestCase):
+    """Regresja: 'idle' na Renderze mimo wdrożonej historii (zmienna nieustawiona / zapisana jako 'true')."""
+
+    def test_auto_bootstrap_parsing(self):
+        f = config.auto_bootstrap_default
+        self.assertTrue(f({"AUTO_BOOTSTRAP": "1"}))
+        self.assertTrue(f({"AUTO_BOOTSTRAP": "true"}))      # wcześniej tylko "1" działało
+        self.assertTrue(f({"AUTO_BOOTSTRAP": " Yes "}))
+        self.assertFalse(f({"AUTO_BOOTSTRAP": "0", "RENDER": "true"}))  # jawne wyłączenie wygrywa
+        self.assertFalse(f({"AUTO_BOOTSTRAP": "off"}))
+        self.assertTrue(f({"RENDER": "true"}))              # na Renderze domyślnie włączone
+        self.assertTrue(f({"AUTO_BOOTSTRAP": "", "RENDER": "true"}))
+        self.assertFalse(f({}))
+
+    def test_history_loads_at_startup_even_when_bootstrap_disabled(self):
+        from fbpred import history
+        with tempfile.TemporaryDirectory() as tmp:
+            old = (config.DB_PATH, config.HISTORY_DIR, config.AUTO_BOOTSTRAP, config.BOOTSTRAP_LEAGUES)
+            config.DB_PATH, config.HISTORY_DIR = Path(tmp) / "x.db", Path(tmp) / "history"
+            config.AUTO_BOOTSTRAP, config.BOOTSTRAP_LEAGUES = False, ["E0"]
+            bootstrap.STATUS.update(state="idle", message="Dane nie zostały jeszcze załadowane.")
+            try:
+                sy = bootstrap.season_now()
+                history.save_matches(csvdata.parse_csv(fd_csv(sy - 1), "E0", sy - 1), config.HISTORY_DIR)
+                with mock.patch.object(csvdata, "download", side_effect=OSError("brak sieci")):
+                    client = create_app().test_client()   # bez wątku, bez sieci
+                self.assertEqual(bootstrap.STATUS["state"], "ready")
+                self.assertEqual(client.get("/strengths?league=E0").status_code, 200)
+                page = client.get("/data?league=E0").data.decode()
+                self.assertIn("WYŁĄCZONE", page)            # czytelna podpowiedź zamiast cichego 'idle'
+                self.assertIn("AUTO_BOOTSTRAP=False", page)
+            finally:
+                config.DB_PATH, config.HISTORY_DIR, config.AUTO_BOOTSTRAP, config.BOOTSTRAP_LEAGUES = old
+
+    def test_export_skips_demo_league(self):
+        from fbpred import history
+        from fbpred.synthetic import generate
+        d = generate(n_seasons=1, seed=2, with_upcoming=False)
+        d["date"] = d["date"].dt.strftime("%Y-%m-%d")
+        cols = [c for c in db.COLUMNS if c in d.columns]
+        conn = db.connect(":memory:")
+        db.upsert_matches(conn, d[cols].astype(object).where(d[cols].notna(), None).to_dict("records"))
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(history.export_from_db(conn, tmp)["files"], {})              # DEMO pominięte
+            self.assertEqual(len(history.export_from_db(conn, tmp, include_demo=True)["files"]), 1)

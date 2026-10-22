@@ -16,8 +16,14 @@ TTL = 3600
 
 def create_app() -> Flask:
     app = Flask(__name__, template_folder=str(config.ROOT / "templates"))
+    try:
+        bootstrap.load_local()        # historia z CSV -> SQLite od razu (offline), niezależnie od AUTO_BOOTSTRAP
+    except Exception as e:  # noqa: BLE001 - błąd odczytu historii nie może zablokować startu serwera
+        print(f"[bootstrap] load_local nie powiodło się: {e}", flush=True)
     if config.AUTO_BOOTSTRAP:
         bootstrap.start_background()
+    else:
+        print("[bootstrap] AUTO_BOOTSTRAP wyłączony - brak odświeżania z internetu (dane z history/ wczytane)", flush=True)
     cache: dict[tuple, tuple[float, object]] = {}
 
     def cached(key: tuple, build):
@@ -126,7 +132,11 @@ def create_app() -> Flask:
             "FROM matches GROUP BY league, season ORDER BY league, season", conn)
         hist = history.status(config.HISTORY_DIR)
         blocks = [("p", f"Stan zasilania: {bootstrap.STATUS['state']} - {bootstrap.STATUS['message']}"),
+                  ("p", "Konfiguracja: " + ", ".join(f"{k}={v}" for k, v in bootstrap.describe().items())),
                   ("p", "Baza w pamięci serwisu (SQLite):"), ("t", q)]
+        if not config.AUTO_BOOTSTRAP:
+            blocks.insert(2, ("p", "Odświeżanie z internetu jest WYŁĄCZONE. Ustaw AUTO_BOOTSTRAP=1 w Render → Environment "
+                                   "(render.yaml działa tylko dla usług utworzonych z Blueprintu). Dane z history/ i tak działają."))
         if not hist.empty:
             blocks += [("p", f"Historia w repo ({config.HISTORY_DIR}):"), ("t", hist)]
         return page("Dane", league, *blocks)

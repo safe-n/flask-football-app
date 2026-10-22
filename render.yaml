@@ -20,6 +20,8 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.3
+      - key: PYTHONUNBUFFERED
+        value: "1"
       - key: AUTO_BOOTSTRAP
         value: "1"
       - key: BOOTSTRAP_LEAGUES

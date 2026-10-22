@@ -175,11 +175,13 @@ def load_into_db(conn, hist=None, leagues: list[str] | None = None) -> int:
     return n
 
 
-def export_from_db(conn, hist=None, leagues: list[str] | None = None) -> dict:
-    """Jednorazowa migracja: zapisuje wszystkie zakończone mecze z bazy SQLite do plików historii."""
+def export_from_db(conn, hist=None, leagues: list[str] | None = None, include_demo: bool = False) -> dict:
+    """Jednorazowa migracja: zapisuje zakończone mecze z bazy SQLite do plików historii (bez sztucznej ligi DEMO)."""
     df = db.load_matches(conn)
     if leagues:
         df = df[df["league"].isin(leagues)]
+    elif not include_demo:
+        df = df[df["league"] != "DEMO"]
     df = df.copy()
     df["date"] = df["date"].dt.strftime("%Y-%m-%d")
     return save_matches(to_rows(df), hist)

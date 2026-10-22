@@ -29,7 +29,16 @@ CACHE_DIR = _path("CACHE_DIR", "data/cache")
 DEFAULT_LEAGUE = os.getenv("DEFAULT_LEAGUE", "E0")
 
 # --- automatyczne zasilanie bazy przy starcie aplikacji (Render itp.)
-AUTO_BOOTSTRAP = os.getenv("AUTO_BOOTSTRAP", "0") == "1"
+def auto_bootstrap_default(env=None) -> bool:
+    """AUTO_BOOTSTRAP: akceptuje 1/true/yes/on (i 0/false/no/off). Bez ustawienia: włączone na Render (RENDER=true)."""
+    env = os.environ if env is None else env
+    v = (env.get("AUTO_BOOTSTRAP") or "").strip().lower()
+    if v:
+        return v in ("1", "true", "yes", "on", "tak")
+    return env.get("RENDER") == "true"
+
+
+AUTO_BOOTSTRAP = auto_bootstrap_default()
 BOOTSTRAP_LEAGUES = [x.strip() for x in os.getenv("BOOTSTRAP_LEAGUES", DEFAULT_LEAGUE).split(",") if x.strip()]
 BOOTSTRAP_YEARS = int(os.getenv("BOOTSTRAP_YEARS", "4"))   # ile ostatnich sezonów pobrać
 REFRESH_HOURS = float(os.getenv("REFRESH_HOURS", "24"))     # co ile godzin odświeżać (0 = wyłączone)

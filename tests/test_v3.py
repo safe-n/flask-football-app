@@ -92,7 +92,7 @@ class TestHistory(unittest.TestCase):
     def test_export_from_db(self):
         conn = db.connect(":memory:")
         db.upsert_matches(conn, rows_of(DF))
-        res = history.export_from_db(conn, self.h)
+        res = history.export_from_db(conn, self.h, include_demo=True)
         self.assertEqual(sum(v["dodane"] for v in res["files"].values()), len(DF))
         self.assertFalse(history.status(self.h).empty)
 

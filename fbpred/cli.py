@@ -310,7 +310,7 @@ def cmd_history_update(a):
 
 def cmd_history_export(a):
     conn = db.connect(config.DB_PATH)
-    res = history.export_from_db(conn, config.HISTORY_DIR, a.leagues.split(",") if a.leagues else None)
+    res = history.export_from_db(conn, config.HISTORY_DIR, a.leagues.split(",") if a.leagues else None, a.include_demo)
     for name, st in res["files"].items():
         print(f"  {name}: +{st['dodane']} (razem {st['razem']})")
     print(f"Odrzucono: {len(res['rejected'])}, naprawiono usterek: {res['sanitized']}. Zacommituj katalog history/.")
@@ -447,7 +447,8 @@ def main(argv=None):
     s.add_argument("--leagues", default=config.DEFAULT_LEAGUE)
     s.add_argument("--seasons", help="domyślnie bieżący i poprzedni sezon")
     s = add("history-export", cmd_history_export, "zapisz mecze z lokalnej bazy SQLite do history/*.csv", league=False)
-    s.add_argument("--leagues", help="np. E0 (domyślnie wszystkie)")
+    s.add_argument("--leagues", help="np. E0 (domyślnie wszystkie oprócz DEMO)")
+    s.add_argument("--include-demo", action="store_true", help="uwzględnij sztuczną ligę DEMO (nie zalecane)")
     add("history-status", cmd_history_status, "pokrycie danych w history/", league=False)
     s = add("report", cmd_report, "raport dziennika w markdown (CI)", league=False)
     s.add_argument("--leagues", default=config.DEFAULT_LEAGUE)
