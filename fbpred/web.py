@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from flask import Flask, abort, jsonify, render_template, request
 
-from . import config, db, ledger, params as prm
+from . import bootstrap, config, db, history, ledger, params as prm
 from .odds import apply_blend, value_picks
 from .simulate import simulate_table
 
@@ -16,6 +16,8 @@ TTL = 3600
 
 def create_app() -> Flask:
     app = Flask(__name__, template_folder=str(config.ROOT / "templates"))
+    if config.AUTO_BOOTSTRAP:
+        bootstrap.start_background()
     cache: dict[tuple, tuple[float, object]] = {}
 
     def cached(key: tuple, build):
@@ -34,7 +36,9 @@ def create_app() -> Flask:
             conn = db.connect(config.DB_PATH)
             df = db.load_matches(conn, league)
             if df.empty:
-                abort(404, f"Brak danych dla ligi {league}")
+                if config.AUTO_BOOTSTRAP and bootstrap.STATUS["state"] in ("idle", "loading"):
+                    abort(503, bootstrap.STATUS["message"])
+                abort(404, f"Brak danych dla ligi {league}. Uruchom: python -m fbpred fetch-csv --league {league}")
             P, p = prm.build_predictor(df, league)
             return P, p, df
         return cached(("model", league), build)
@@ -43,13 +47,26 @@ def create_app() -> Flask:
         conn = db.connect(config.DB_PATH)
         return [r[0] for r in conn.execute("SELECT DISTINCT league FROM matches ORDER BY 1")]
 
-    def page(title, league, *blocks):
-        return render_template("page.html", title=title, league=league, leagues=leagues(), blocks=blocks)
+    def page(title, league, *blocks, refresh=False):
+        return render_template("page.html", title=title, league=league, leagues=leagues(), blocks=blocks,
+                               refresh=refresh)
+
+    @app.errorhandler(503)
+    @app.errorhandler(404)
+    def friendly(e):
+        return page("Dane niedostępne" if e.code == 404 else "Ładowanie danych", league_arg(),
+                    ("p", getattr(e, "description", str(e))), refresh=e.code == 503), e.code
 
     @app.get("/")
     def index():
         league = league_arg()
         conn = db.connect(config.DB_PATH)
+        if config.AUTO_BOOTSTRAP and bootstrap.count_finished(conn, league) == 0:
+            st = bootstrap.STATUS["state"]
+            if st in ("idle", "loading"):
+                return page("Ładowanie danych", league, ("p", bootstrap.STATUS["message"]), refresh=True), 503
+            if st == "error":
+                return page("Brak danych", league, ("p", bootstrap.STATUS["message"] + " Ponowię próbę za kilka minut.")), 503
         up = db.load_upcoming(conn, league)
         items = []
         if not up.empty:
@@ -95,6 +112,25 @@ def create_app() -> Flask:
                     ("p", f"Rozliczone: {len(s)}, oczekujące: {ledger.pending(conn, league)}. Log-loss: mniej = lepiej."),
                     ("t", tab), ("p", f"Symulacja typów: {sim}"))
 
+    @app.get("/data")
+    def data_page():
+        league = league_arg()
+        conn = db.connect(config.DB_PATH)
+        q = pd.read_sql_query(
+            "SELECT league AS liga, season AS sezon, COUNT(*) AS mecze, "
+            "SUM(hg IS NOT NULL) AS rozegrane, MIN(date) AS od, MAX(date) AS do, "
+            "ROUND(100.0*SUM(hg_ht IS NOT NULL)/COUNT(*)) AS 'HT_%', "
+            "ROUND(100.0*SUM(h_yellow IS NOT NULL)/COUNT(*)) AS 'kartki_%', "
+            "ROUND(100.0*SUM(h_sot IS NOT NULL)/COUNT(*)) AS 'sot_%', "
+            "ROUND(100.0*SUM(o_home IS NOT NULL)/COUNT(*)) AS 'kursy_%' "
+            "FROM matches GROUP BY league, season ORDER BY league, season", conn)
+        hist = history.status(config.HISTORY_DIR)
+        blocks = [("p", f"Stan zasilania: {bootstrap.STATUS['state']} - {bootstrap.STATUS['message']}"),
+                  ("p", "Baza w pamięci serwisu (SQLite):"), ("t", q)]
+        if not hist.empty:
+            blocks += [("p", f"Historia w repo ({config.HISTORY_DIR}):"), ("t", hist)]
+        return page("Dane", league, *blocks)
+
     @app.get("/api/predict")
     def api_predict():
         league = league_arg()
@@ -106,7 +142,7 @@ def create_app() -> Flask:
 
     @app.get("/healthz")
     def health():
-        return {"ok": True}
+        return {"ok": True, "dane": bootstrap.STATUS}
 
     return app
 

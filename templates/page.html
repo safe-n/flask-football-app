@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+{% if refresh %}<meta http-equiv="refresh" content="8">{% endif %}
 <title>{{ title }}</title>
 <style>
 :root{--bg:#f6f7f9;--card:#fff;--fg:#1b1f24;--mut:#5b6672;--acc:#0b7a4b;--bar:#e3e9ef}
@@ -17,7 +18,7 @@ th:first-child,td:first-child{text-align:left}.m{color:var(--mut);font-size:13px
 <body>
 <h1>{{ title }}</h1>
 <nav><a href="/?league={{ league }}">Mecze</a><a href="/table?league={{ league }}">Tabela</a>
-<a href="/strengths?league={{ league }}">Siła drużyn</a><a href="/track?league={{ league }}">Dziennik</a></nav>
+<a href="/strengths?league={{ league }}">Siła drużyn</a><a href="/track?league={{ league }}">Dziennik</a><a href="/data?league={{ league }}">Dane</a></nav>
 <form method="get"><select name="league" onchange="this.form.submit()">
 {% for l in leagues %}<option value="{{ l }}" {{ 'selected' if l == league }}>{{ l }}</option>{% endfor %}
 </select></form>

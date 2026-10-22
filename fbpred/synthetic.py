@@ -69,6 +69,8 @@ def generate(n_seasons: int = 3, seed: int = 7, league: str = "DEMO", start_year
                 ma_c = 4.5 * np.exp(att[j] * 0.8 + corner_t[j] - 0.4 * de[i])
                 row.update(
                     hg=hg, ag=ag, hg_ht=hg_ht, ag_ht=ag_ht,
+                    h_sot=int(rng.negative_binomial(25, 25 / (25 + lh / 0.30))),
+                    a_sot=int(rng.negative_binomial(25, 25 / (25 + la / 0.30))),
                     h_yellow=int(rng.negative_binomial(8, 8 / (8 + mh_y))),
                     a_yellow=int(rng.negative_binomial(8, 8 / (8 + ma_y))),
                     h_corners=int(rng.negative_binomial(12, 12 / (12 + mh_c))),

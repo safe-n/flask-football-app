@@ -55,7 +55,7 @@ def simulate_table(df: pd.DataFrame, P: MatchPredictor, upcoming: pd.DataFrame |
     gf = np.tile(gf0, (n, 1))
     G = MAX_GOALS + 1
     for h, a in rem:
-        cdf = np.cumsum(P.goals.matrix(h, a).ravel())
+        cdf = np.cumsum(P.matrix(h, a).ravel())
         cdf[-1] = 1.0
         k = np.searchsorted(cdf, rng.random(n))
         i, j = np.divmod(k, G)

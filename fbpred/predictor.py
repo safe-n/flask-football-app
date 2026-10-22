@@ -6,7 +6,7 @@ import pandas as pd
 
 from .models import markets as mk
 from .models.counts import CountModel, to_long
-from .models.goals import DixonColes
+from .models.goals import DixonColes, score_matrix
 
 GOAL_LINES = (1.5, 2.5, 3.5)
 YELLOW_LINES = (2.5, 3.5, 4.5, 5.5)
@@ -25,15 +25,22 @@ class MatchPredictor:
     """
 
     def __init__(self, df: pd.DataFrame, as_of=None, min_rows: int = 80,
-                 xi: float = 0.0019, ridge: float = 10.0):
+                 xi: float = 0.0019, ridge: float = 10.0, shot_weight: float = 0.0):
         self.as_of = pd.Timestamp(as_of) if as_of is not None else df["date"].max()
         self.n_matches = len(df)
         self.goals = DixonColes(xi=xi, ridge=ridge).fit(df, self.as_of)
-        self.ht = self.h2 = self.yellow = self.corners = None
+        self.ht = self.h2 = self.yellow = self.corners = self.sot = None
+        self.shot_weight = float(shot_weight)
+        self.conv = (0.3, 0.3)
 
         def ok(cols):
             return all(c in df.columns for c in cols) and df[cols].notna().all(axis=1).sum() >= min_rows
 
+        if self.shot_weight > 0 and ok(["h_sot", "a_sot"]):
+            # drugi, mniej zaszumiony sygnał siły: celne strzały -> gole przez ligową skuteczność
+            self.sot = CountModel(xi=xi, ridge=ridge, kmax=30).fit(to_long(df, "h_sot", "a_sot"), self.as_of)
+            d = df.dropna(subset=["h_sot", "a_sot"])
+            self.conv = (float(d["hg"].sum() / max(d["h_sot"].sum(), 1)), float(d["ag"].sum() / max(d["a_sot"].sum(), 1)))
         if ok(["hg_ht", "ag_ht"]):
             d = df.copy()
             d["hg_2h"] = d["hg"] - d["hg_ht"]
@@ -52,11 +59,27 @@ class MatchPredictor:
     def teams(self) -> list[str]:
         return self.goals.teams
 
+    # ------------------------------------------------------------ lambdy i macierz wyników
+    def lambdas(self, home: str, away: str) -> tuple[float, float]:
+        """Oczekiwane gole; z celnymi strzałami: średnia geometryczna (1-w)*gole + w*strzały."""
+        lh, la = self.goals.lambdas(home, away)
+        if self.sot is not None:
+            b = self.shot_weight
+            sh = max(self.sot.mean(home, away, 1) * self.conv[0], 0.05)
+            sa = max(self.sot.mean(away, home, 0) * self.conv[1], 0.05)
+            lh = float(np.exp((1 - b) * np.log(lh) + b * np.log(sh)))
+            la = float(np.exp((1 - b) * np.log(la) + b * np.log(sa)))
+        return lh, la
+
+    def matrix(self, home: str, away: str) -> np.ndarray:
+        lh, la = self.lambdas(home, away)
+        return score_matrix(lh, la, self.goals.rho)
+
     # ------------------------------------------------------------ predict
     def predict(self, home: str, away: str, referee: str | None = None) -> dict:
         g = self.goals
-        lh, la = g.lambdas(home, away)
-        m = g.matrix(home, away)
+        lh, la = self.lambdas(home, away)
+        m = self.matrix(home, away)
         tot = mk.total_pmf(m)
         out: dict = {
             "home": home, "away": away, "referee": referee,

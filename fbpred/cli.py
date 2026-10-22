@@ -9,7 +9,7 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
-from . import config, csvdata, db, ledger, params as prm, quality
+from . import config, csvdata, db, history, ledger, notify, params as prm, quality, report
 from .backtest import (best_blend, betting_sim, calibration, compare_report, summarize, walk_forward)
 from .odds import apply_blend, value_picks
 from .predictor import format_prediction
@@ -59,7 +59,7 @@ def cmd_fetch_csv(a):
     conn = db.connect(config.DB_PATH)
     for y in _years(a.seasons):
         try:
-            rows = csvdata.parse_csv(csvdata.download(a.league, y), a.league, y)
+            rows = history.apply_aliases(csvdata.parse_csv(csvdata.download(a.league, y), a.league, y))
         except Exception as e:  # noqa: BLE001
             print(f"  {a.league} {y}: błąd ({e})")
             continue
@@ -70,15 +70,17 @@ def cmd_fetch_csv(a):
 def cmd_import_csv(a):
     conn = db.connect(config.DB_PATH)
     text = open(a.file, encoding="utf-8-sig", errors="replace").read()
-    rows = csvdata.parse_csv(text, a.league, a.season)
+    rows = history.apply_aliases(csvdata.parse_csv(text, a.league, a.season))
     db.upsert_matches(conn, rows)
     print(f"Zaimportowano {len(rows)} meczów ({a.league} {a.season}).")
 
 
 def cmd_fetch_fixtures(a):
     conn = db.connect(config.DB_PATH)
-    rows = csvdata.parse_csv(csvdata.download_fixtures(), a.league, None, only_div=True)
+    rows = history.apply_aliases(csvdata.parse_csv(csvdata.download_fixtures(), a.league, None, only_div=True))
     db.upsert_matches(conn, rows)
+    if config.ARCHIVE_ODDS:
+        print(f"  archiwum kursów: +{history.archive_odds(rows, config.HISTORY_DIR)}")
     print(f"  nadchodzące mecze ({a.league}): {len(rows)} (z kursami, jeśli udostępnione)")
 
 
@@ -173,9 +175,11 @@ def cmd_simulate(a):
 # ------------------------------------------------------------------ ocena i strojenie
 def cmd_backtest(a):
     df = _load(a)
-    p = {**prm.load(a.league), **{k: v for k, v in (("ridge", a.ridge), ("xi", a.xi)) if v is not None}}
-    print(f"Backtest: {len(df)} meczów, trening min. {a.min_train}, krok {a.step} dni, ridge={p['ridge']}, xi={p['xi']}")
-    res = walk_forward(df, a.min_train, a.step, ridge=p["ridge"], xi=p["xi"])
+    p = {**prm.load(a.league), **{k: v for k, v in (("ridge", a.ridge), ("xi", a.xi), ("shot_weight", a.shot_weight))
+                                  if v is not None}}
+    print(f"Backtest: {len(df)} meczów, trening min. {a.min_train}, krok {a.step} dni, ridge={p['ridge']}, "
+          f"xi={p['xi']}, shot_weight={p['shot_weight']}")
+    res = walk_forward(df, a.min_train, a.step, ridge=p["ridge"], xi=p["xi"], shot_weight=p["shot_weight"])
     print("\nLog-loss (mniej = lepiej). 'vs_baseline_%' > 0: model lepszy od średniej ligowej.\n")
     print(summarize(res).to_string(index=False))
     print()
@@ -208,9 +212,21 @@ def cmd_tune(a):
         if best is None or ll < best[0]:
             best = (ll, r, x, bl["w"] if bl else None)
     print("\n" + pd.DataFrame(rows).round(4).sort_values("logloss_1X2").to_string(index=False))
-    _, r, x, w = best
-    f = prm.save(a.league, {"ridge": r, "xi": x, "blend_w": w})
-    print(f"\nNajlepsze: ridge={r}, xi={x}, waga modelu w miksie z rynkiem={w}  → zapisano {f}")
+    ll0, r, x, w = best
+    sw = 0.0
+    if df[["h_sot", "a_sot"]].notna().all(axis=1).sum() >= 200:
+        print("\nEtap 2: waga celnych strzałów (stabilniejszy sygnał niż same gole)")
+        best_sw = (ll0, 0.0, w)
+        for cand in a.shot_weights:
+            res = walk_forward(df, a.min_train, a.step, progress=False, ridge=r, xi=x, shot_weight=cand)
+            ll = float(summarize(res).set_index("rynek").loc["1X2", "model"])
+            bl = best_blend(res)
+            print(f"  shot_weight={cand:<4} 1X2={ll:.4f}")
+            if ll < best_sw[0] - 1e-6:
+                best_sw = (ll, cand, bl["w"] if bl else w)
+        _, sw, w = best_sw
+    f = prm.save(a.league, {"ridge": r, "xi": x, "blend_w": w, "shot_weight": sw})
+    print(f"\nNajlepsze: ridge={r}, xi={x}, shot_weight={sw}, waga modelu w miksie z rynkiem={w}  → zapisano {f}")
     print("Uwaga: strojenie na tych samych danych co ocena zawyża wynik - traktuj jako wskazówkę.")
 
 
@@ -280,6 +296,79 @@ def cmd_demo(a):
           "\n  python -m fbpred simulate --league DEMO\n  python -m fbpred log --league DEMO")
 
 
+def cmd_history_init(a):
+    res = history.update_from_source(a.league.split(","), _years(a.seasons))
+    print(f"Gotowe: {len(res)} plików w {config.HISTORY_DIR}. Zacommituj katalog history/.")
+
+
+def cmd_history_update(a):
+    seasons = _years(a.seasons) if a.seasons else None
+    res = history.update_from_source([x.strip() for x in a.leagues.split(",")], seasons)
+    print(f"Zaktualizowano {len(res)} plików; nowych meczów: {sum(r['dodane'] for r in res)}, "
+          f"poprawionych: {sum(r['zmienione'] for r in res)}.")
+
+
+def cmd_history_export(a):
+    conn = db.connect(config.DB_PATH)
+    res = history.export_from_db(conn, config.HISTORY_DIR, a.leagues.split(",") if a.leagues else None)
+    for name, st in res["files"].items():
+        print(f"  {name}: +{st['dodane']} (razem {st['razem']})")
+    print(f"Odrzucono: {len(res['rejected'])}, naprawiono usterek: {res['sanitized']}. Zacommituj katalog history/.")
+
+
+def cmd_history_status(a):
+    t = history.status(config.HISTORY_DIR)
+    print(t.to_string(index=False) if not t.empty else f"Brak plików historii w {config.HISTORY_DIR}.")
+
+
+def cmd_report(a):
+    conn = db.connect(config.DB_PATH)
+    txt = "# Raport dziennika prognoz\n\n" + "\n".join(
+        report.ledger_report(conn, lg.strip(), a.min_edge) for lg in a.leagues.split(","))
+    if a.out:
+        from pathlib import Path
+        Path(a.out).parent.mkdir(parents=True, exist_ok=True)
+        Path(a.out).write_text(txt, encoding="utf-8")
+        print(f"Zapisano {a.out}")
+    else:
+        print(txt)
+
+
+def cmd_notify(a):
+    conn = db.connect(config.DB_PATH)
+    horizon = pd.Timestamp.today().normalize() + pd.Timedelta(days=a.days)
+    blocks = []
+    for lg in [x.strip() for x in a.leagues.split(",")]:
+        df, up = db.load_matches(conn, lg), db.load_upcoming(conn, lg)
+        up = up[up["date"] <= horizon]
+        if df.empty or up.empty:
+            continue
+        P, p = prm.build_predictor(df, lg)
+        blocks.append(f"⚽ Prognozy {lg} (model statystyczny, nie gwarancja)")
+        for r in up.head(a.limit).to_dict("records"):
+            pred = apply_blend(P.predict(r["home"], r["away"], r.get("referee")), r, p["blend_w"])
+            picks = [k for k in value_picks(pred, r, a.min_edge)]
+            blocks.append(notify.format_match(pred, r, picks))
+    if len(blocks) <= 1:
+        print("Brak meczów w zadanym horyzoncie - nic nie wysyłam.")
+        return
+    text = "\n\n".join(blocks)
+    if a.dry_run:
+        print(text)
+        return
+    if not (config.TELEGRAM_BOT_TOKEN and config.TELEGRAM_CHAT_ID):
+        print("Brak TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID - pomijam wysyłkę (użyj --dry-run, aby zobaczyć treść).")
+        return
+    print(f"Wysłano {notify.send_telegram(text)} wiadomość(i) na Telegram.")
+
+
+def cmd_bootstrap(a):
+    from . import bootstrap
+    leagues = [x.strip() for x in a.leagues.split(",")]
+    bootstrap.run_once(leagues, a.years, export_ledger=a.export_ledger)
+    print(bootstrap.STATUS["message"])
+
+
 def cmd_serve(a):
     from .web import create_app
     create_app().run(host=a.host, port=a.port, debug=False)
@@ -332,11 +421,13 @@ def main(argv=None):
     s.add_argument("--out", help="zapisz predykcje do CSV")
     s.add_argument("--ridge", type=float)
     s.add_argument("--xi", type=float)
+    s.add_argument("--shot-weight", type=float, help="waga celnych strzałów w bramkach (0-1)")
     s = add("tune", cmd_tune, "dobierz ridge/xi/miks z rynkiem i zapisz")
     s.add_argument("--min-train", type=int, default=300)
     s.add_argument("--step", type=int, default=28)
     s.add_argument("--ridges", type=float, nargs="+", default=[5, 10, 20])
     s.add_argument("--xis", type=float, nargs="+", default=[0.0007, 0.0019, 0.004])
+    s.add_argument("--shot-weights", type=float, nargs="+", default=[0.25, 0.5])
 
     s = add("log", cmd_log, "zapisz prognozy nadchodzących meczów do dziennika")
     s.add_argument("--ridge", type=float)
@@ -349,6 +440,30 @@ def main(argv=None):
     s.add_argument("--min-edge", type=float, default=0.03)
     s.add_argument("--ridge", type=float)
     s.add_argument("--xi", type=float)
+    s = add("history-init", cmd_history_init, "pobierz wiele sezonów do history/*.csv (jednorazowo)", league=False)
+    s.add_argument("--league", default=config.DEFAULT_LEAGUE, help="np. E0 lub E0,D1")
+    s.add_argument("--seasons", default="2018-2025")
+    s = add("history-update", cmd_history_update, "dopisz nowe mecze do history/*.csv (np. raz w tygodniu)", league=False)
+    s.add_argument("--leagues", default=config.DEFAULT_LEAGUE)
+    s.add_argument("--seasons", help="domyślnie bieżący i poprzedni sezon")
+    s = add("history-export", cmd_history_export, "zapisz mecze z lokalnej bazy SQLite do history/*.csv", league=False)
+    s.add_argument("--leagues", help="np. E0 (domyślnie wszystkie)")
+    add("history-status", cmd_history_status, "pokrycie danych w history/", league=False)
+    s = add("report", cmd_report, "raport dziennika w markdown (CI)", league=False)
+    s.add_argument("--leagues", default=config.DEFAULT_LEAGUE)
+    s.add_argument("--min-edge", type=float, default=0.03)
+    s.add_argument("--out")
+    s = add("notify", cmd_notify, "wyślij zestawienie prognoz na Telegram", league=False)
+    s.add_argument("--leagues", default=config.DEFAULT_LEAGUE)
+    s.add_argument("--days", type=int, default=3)
+    s.add_argument("--limit", type=int, default=10)
+    s.add_argument("--min-edge", type=float, default=0.05)
+    s.add_argument("--dry-run", action="store_true")
+    s = sp.add_parser("bootstrap", help="pierwsze zasilenie bazy (CSV) + prognozy do dziennika")
+    s.add_argument("--leagues", default=config.DEFAULT_LEAGUE, help="np. E0,D1,SP1")
+    s.add_argument("--years", type=int, default=4)
+    s.add_argument("--export-ledger", action="store_true", help="zapisz dziennik do ledger/predictions.csv (dla CI)")
+    s.set_defaults(fn=cmd_bootstrap)
     add("demo", cmd_demo, "wygeneruj sztuczną ligę (bez internetu)", league=False)
     s = add("serve", cmd_serve, "uruchom aplikację webową", league=False)
     s.add_argument("--host", default="127.0.0.1")

@@ -8,3 +8,5 @@ venv/
 *.db
 *.sqlite3
 .pytest_cache/
+*.db-wal
+*.db-shm

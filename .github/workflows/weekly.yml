@@ -1,0 +1,34 @@
+# Raz w tygodniu: dopisz nowe wyniki do history/*.csv (upsert - nic się nie kasuje, błędne wiersze są odrzucane).
+name: weekly-history
+on:
+  schedule:
+    - cron: "30 5 * * 1"      # poniedziałek 05:30 UTC
+  workflow_dispatch: {}
+env:
+  LEAGUES: "E0"
+permissions:
+  contents: write
+concurrency:
+  group: repo-write
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Dopisz nowe mecze do historii (bieżący i poprzedni sezon)
+        run: |
+          python -m fbpred history-update --leagues "$LEAGUES"
+          python -m fbpred history-status
+      - name: Zapisz zmiany w repo
+        run: |
+          git config user.name "fbpred-bot"
+          git config user.email "fbpred-bot@users.noreply.github.com"
+          git add history
+          git diff --cached --quiet || (git commit -m "history: nowe mecze $(date -u +%F)" && git pull --rebase && git push)

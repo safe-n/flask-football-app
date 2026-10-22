@@ -97,3 +97,88 @@ tests/           python -m unittest
 ## Pomysły na dalej
 Kilka lig w jednym modelu (siła lig, puchary europejskie), składy/absencje, xG, kalibracja izotoniczna,
 model na żywo (in-play), alerty (Telegram/e-mail) z `daily`.
+
+
+## Deploy na Render - skąd aplikacja bierze dane
+
+`.gitignore` celowo wyklucza `data/` i `*.db`, więc baza NIE jedzie na GitHuba. Zamiast tego aplikacja
+**sama zasila bazę** (`AUTO_BOOTSTRAP=1`): przy starcie pobiera ostatnie sezony z football-data.co.uk
+(w tle, strona pokazuje "Ładowanie danych" i sama się odświeża), a potem co `REFRESH_HOURS` dociąga bieżący
+sezon, nadchodzące mecze z kursami i zapisuje prognozy do dziennika.
+
+| Plan Rendera | Co się dzieje z bazą | Dziennik prognoz |
+|---|---|---|
+| **Darmowy** | znika przy każdym restarcie i uśpieniu (po 15 min bez ruchu); przy wybudzeniu ładuje się od nowa (kilka sekund) | nie przetrwa - do testów |
+| **Płatny + Persistent Disk** | trwała (`/var/data`), odświeżanie w tle co 24 h | trwały - tu ma sens `track` |
+
+Ważne ograniczenia Rendera (z dokumentacji): dysk działa tylko na płatnych serwisach, jest dostępny wyłącznie dla
+jednego serwisu (nie dla Cron Joba ani jednorazowych zadań), a Cron Job nie może mieć dysku. Dlatego odświeżanie działa
+**wewnątrz** serwisu WWW, a nie jako osobny Cron. Używaj jednego workera (`--workers 1`, jak w `render.yaml`).
+
+Ręcznie: `python -m fbpred bootstrap --leagues E0,D1 --years 4`. Zmienne: `AUTO_BOOTSTRAP`, `BOOTSTRAP_LEAGUES`,
+`BOOTSTRAP_YEARS`, `REFRESH_HOURS` (patrz `.env.example`).
+
+
+## Wersja w 100% darmowa z trwałym dziennikiem (Render Free + GitHub Actions)
+
+Render Free gubi pliki, ale dziennik prognoz może mieszkać w repo:
+
+1. **GitHub Actions** (`.github/workflows/daily.yml`) codziennie o 06:17 UTC: pobiera dane, zapisuje prognozy
+   nadchodzących meczów, rozlicza zakończone i zapisuje `ledger/predictions.csv` + `ledger/REPORT.txt` do repo.
+2. Commit uruchamia redeploy na Renderze, a aplikacja przy starcie wczytuje `ledger/predictions.csv`, więc strona
+   **Dziennik** (`/track`) ma pełną historię mimo tymczasowego dysku.
+3. Prognozy są **zamrażane w dniu meczu** (nie da się ich nadpisać po fakcie) - to uczciwy test.
+
+Uruchomienie: wrzuć projekt na GitHuba → zakładka *Actions* → workflow `daily` → *Run workflow* (pierwszy raz ręcznie).
+Jeśli push z workflow się nie uda: *Settings → Actions → General → Workflow permissions → Read and write*.
+
+Dobrze wiedzieć (z dokumentacji GitHub): Actions są darmowe dla publicznych repo (prywatne mają miesięczny limit minut),
+a harmonogram w publicznym repo wyłącza się po 60 dniach bez aktywności - wtedy włącz go ręcznie w zakładce Actions.
+Dziennik jest w publicznym repo widoczny dla wszystkich (nie ma tam kluczy, tylko prawdopodobieństwa i kursy).
+Każdy codzienny commit = redeploy na Renderze (zużywa darmowe minuty buildów, ale to rząd 1-2 min dziennie).
+
+
+## Architektura danych (od 0.3): historia w CSV jako źródło prawdy
+
+```
+history/E0_2024.csv, E0_2025.csv ...   zakończone mecze (1 plik = liga + sezon, małe diffy w gicie)
+history/odds/E0.csv                    archiwum kursów PRZEDMECZOWYCH (dopisywane codziennie)
+history/aliases.json                   opcjonalne ujednolicenie nazw drużyn
+history/UPDATES.log                    kto/kiedy/ile dopisał
+ledger/predictions.csv, REPORT.md      dziennik prognoz i raport (codziennie)
+```
+Aplikacja przy starcie wczytuje `history/` **offline** (sekundy, zero zależności od źródła), a dopiero potem odświeża
+bieżący sezon. SQLite jest tylko tymczasowym cache'em.
+
+**Jednorazowy start** (wybierz jedno):
+```bash
+python -m fbpred history-export                              # masz już lokalną bazę? przenieś ją do history/
+python -m fbpred history-init --league E0 --seasons 2018-2025   # albo pobierz sezony od zera
+git add history && git commit -m "historia" && git push
+```
+**Potem automatycznie:** workflow `weekly-history` (poniedziałek) dopisuje nowe mecze (upsert po `fixture_id`: nowe
+dochodzą, poprawione wyniki się aktualizują, **nic nie jest kasowane**, błędne wiersze są odrzucane i raportowane).
+Workflow `daily` zapisuje prognozy, kursy do archiwum i dziennik. Oba piszą do repo pojedynczo (wspólna kolejka).
+
+Komendy: `history-status` (pokrycie danych), `history-update`, `history-export`, `history-init`.
+
+## Powiadomienia Telegram (darmowe)
+
+1. W Telegramie napisz do **@BotFather** → `/newbot` → skopiuj token. Napisz cokolwiek do swojego bota.
+2. Chat id: otwórz `https://api.telegram.org/bot<TOKEN>/getUpdates` i odczytaj `chat.id`.
+3. W repo: *Settings → Secrets and variables → Actions* → dodaj `TELEGRAM_BOT_TOKEN` i `TELEGRAM_CHAT_ID`.
+
+Codzienny workflow wyśle zestawienie prognoz (1X2 z miksem z rynkiem, O2.5, BTTS, remis do przerwy, typy z przewagą).
+Bez sekretów krok po prostu się pomija. Podgląd bez wysyłki: `python -m fbpred notify --dry-run`. Token trzymaj
+wyłącznie w sekretach/zmiennych środowiskowych.
+
+## Wiele lig
+
+W workflowach zmień `LEAGUES: "E0"` na np. `"E0,D1,SP1"` (kody football-data.co.uk) i raz uruchom
+`history-init --league E0,D1,SP1`. Każda liga ma własny model i własne parametry (`tune --league D1`).
+
+## Celne strzały w modelu bramek
+
+`tune` ma etap 2: sprawdza, czy mieszanie prognozy bramek z modelem celnych strzałów (stabilniejszy sygnał, bo zdarzeń
+jest ~3x więcej) poprawia log-loss, i zapisuje `shot_weight`. Ręcznie: `backtest --shot-weight 0.5`.
+Uwaga: na danych syntetycznych to działa z konstrukcji generatora - wiarygodna jest dopiero ocena na prawdziwych meczach.

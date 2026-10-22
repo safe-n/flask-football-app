@@ -1,14 +1,34 @@
-# Deploy na Render. Klucze ustaw w panelu Render (Environment) - NIE w tym pliku.
+# Deploy na Render (Blueprint). Klucze ustawiaj w panelu Render -> Environment, NIE w tym pliku.
+#
+# PLAN DARMOWY: system plików jest tymczasowy (baza znika przy restarcie / uśpieniu po 15 min bez ruchu).
+# Dlatego AUTO_BOOTSTRAP=1: aplikacja sama pobiera dane z football-data.co.uk przy starcie (kilka sekund).
+# Dziennik prognoz (tabela predictions) NIE przetrwa restartu na planie darmowym.
+#
+# PLAN PŁATNY + DYSK (trwała baza i dziennik): odkomentuj blok `plan`/`disk` i zmień DB_PATH na /var/data/...
 services:
   - type: web
     name: football-predictor
     runtime: python
-    buildCommand: pip install -r requirements.txt && pip install gunicorn
-    startCommand: gunicorn fbpred.web:app
+    # plan: starter            # dysk wymaga płatnego planu
+    buildCommand: pip install -r requirements.txt gunicorn
+    startCommand: gunicorn fbpred.web:app --workers 1 --threads 4 --timeout 120
+    healthCheckPath: /healthz
+    # disk:
+    #   name: data
+    #   mountPath: /var/data
+    #   sizeGB: 1
     envVars:
-      - key: DB_PATH
-        value: data/football.db
-      - key: DEFAULT_LEAGUE
+      - key: PYTHON_VERSION
+        value: 3.12.3
+      - key: AUTO_BOOTSTRAP
+        value: "1"
+      - key: BOOTSTRAP_LEAGUES
         value: E0
-      - key: API_KEY
-        sync: false
+      - key: BOOTSTRAP_YEARS
+        value: "4"
+      - key: REFRESH_HOURS
+        value: "24"
+      - key: DB_PATH
+        value: data/football.db        # z dyskiem: /var/data/football.db
+      - key: CACHE_DIR
+        value: data/cache              # z dyskiem: /var/data/cache

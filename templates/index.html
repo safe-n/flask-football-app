@@ -19,7 +19,7 @@ h1{font-size:20px;margin:6px 0 10px}.card{background:var(--card);border-radius:1
 <body>
 <h1>Prognozy meczów</h1>
 <nav style="display:flex;gap:12px;margin-bottom:8px"><a href="/table?league={{ league }}">Tabela</a>
-<a href="/strengths?league={{ league }}">Siła drużyn</a><a href="/track?league={{ league }}">Dziennik</a></nav>
+<a href="/strengths?league={{ league }}">Siła drużyn</a><a href="/track?league={{ league }}">Dziennik</a><a href="/data?league={{ league }}">Dane</a></nav>
 <form method="get"><select name="league" onchange="this.form.submit()">
 {% for l in leagues %}<option value="{{ l }}" {{ 'selected' if l == league }}>{{ l }}</option>{% endfor %}
 </select></form>

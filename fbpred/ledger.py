@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import numpy as np
 import pandas as pd
@@ -34,8 +34,14 @@ def log_predictions(conn, predictor, upcoming: pd.DataFrame, league: str, versio
     from .odds import apply_blend
     ensure(conn)
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    today = date.today().isoformat()
     n = 0
     for r in upcoming.to_dict("records"):
+        mdate = pd.Timestamp(r["date"]).strftime("%Y-%m-%d")
+        # zamrożenie: w dniu meczu (i później) nie nadpisujemy istniejącej prognozy - zero podglądania
+        if mdate <= today and conn.execute("SELECT 1 FROM predictions WHERE fixture_id=?",
+                                           (int(r["fixture_id"]),)).fetchone():
+            continue
         p = apply_blend(predictor.predict(r["home"], r["away"], r.get("referee")), r, blend_w)
         h = p.get("halves", {})
         q = p.get("1x2_blend") or {}
@@ -140,3 +146,37 @@ def track_summary(df: pd.DataFrame, min_edge: float = 0.03, base: dict | None = 
            "zysk_kelly_%_bankrolla": round(100 * kelly_pnl, 2),
            "uwaga": "mała próba = wynik to głównie szum; patrz na log-loss i kalibrację"}
     return out, sim
+
+
+# ------------------------------------------------------------------ trwałość w repo (CSV)
+EXPORT_COLS = ["fixture_id", "league", "date", "home", "away", "logged_at", "model_version",
+               "p1", "px", "p2", "q1", "qx", "q2", "p_over25", "p_btts", "p_draw_ht", "p_draw_2h",
+               "o_home", "o_draw", "o_away", "o_over25", "o_under25"]
+
+
+def export_csv(conn, path) -> int:
+    """Zapisuje dziennik do CSV (bez ciężkiego payloadu) - plik trzymamy w repo."""
+    from pathlib import Path
+    ensure(conn)
+    df = pd.read_sql_query(f"SELECT {', '.join(EXPORT_COLS)} FROM predictions ORDER BY date, fixture_id", conn)
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(path, index=False)
+    return len(df)
+
+
+def import_csv(conn, path) -> int:
+    """Wczytuje dziennik z CSV. Istniejące wiersze mają pierwszeństwo (INSERT OR IGNORE)."""
+    from pathlib import Path
+    ensure(conn)
+    if not Path(path).exists():
+        return 0
+    df = pd.read_csv(path)
+    if df.empty:
+        return 0
+    df = df.astype(object).where(df.notna(), None)
+    cols = [c for c in EXPORT_COLS if c in df.columns]
+    before = conn.total_changes
+    conn.executemany(f"INSERT OR IGNORE INTO predictions ({', '.join(cols)}) VALUES ({', '.join('?' * len(cols))})",
+                     [tuple(r[c] for c in cols) for r in df.to_dict("records")])
+    conn.commit()
+    return conn.total_changes - before

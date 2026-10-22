@@ -39,7 +39,11 @@ CREATE INDEX IF NOT EXISTS idx_matches_league_date ON matches (league, date);
 def connect(path: str | Path) -> sqlite3.Connection:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(path)
+    conn = sqlite3.connect(path, timeout=30)
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+    except sqlite3.DatabaseError:
+        pass
     conn.executescript(SCHEMA)
     return conn
 

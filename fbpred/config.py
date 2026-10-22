@@ -27,3 +27,15 @@ REQUEST_RESERVE = int(os.getenv("REQUEST_RESERVE", "5"))
 DB_PATH = _path("DB_PATH", "data/football.db")
 CACHE_DIR = _path("CACHE_DIR", "data/cache")
 DEFAULT_LEAGUE = os.getenv("DEFAULT_LEAGUE", "E0")
+
+# --- automatyczne zasilanie bazy przy starcie aplikacji (Render itp.)
+AUTO_BOOTSTRAP = os.getenv("AUTO_BOOTSTRAP", "0") == "1"
+BOOTSTRAP_LEAGUES = [x.strip() for x in os.getenv("BOOTSTRAP_LEAGUES", DEFAULT_LEAGUE).split(",") if x.strip()]
+BOOTSTRAP_YEARS = int(os.getenv("BOOTSTRAP_YEARS", "4"))   # ile ostatnich sezonów pobrać
+REFRESH_HOURS = float(os.getenv("REFRESH_HOURS", "24"))     # co ile godzin odświeżać (0 = wyłączone)
+LEDGER_CSV = _path("LEDGER_CSV", "ledger/predictions.csv")   # dziennik trzymany w repo (trwały, za darmo)
+
+HISTORY_DIR = _path("HISTORY_DIR", "history")                # źródło prawdy: CSV w repo (1 plik = liga+sezon)
+ARCHIVE_ODDS = os.getenv("ARCHIVE_ODDS", "0") == "1"          # archiwizuj kursy przedmeczowe (włącza CI)
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")

@@ -9,7 +9,7 @@ import pandas as pd
 from . import config
 from .predictor import MatchPredictor
 
-DEFAULTS = {"ridge": 10.0, "xi": 0.0019, "blend_w": None}
+DEFAULTS = {"ridge": 10.0, "xi": 0.0019, "blend_w": None, "shot_weight": 0.0}
 
 
 def _file(league: str) -> Path:
@@ -33,4 +33,4 @@ def save(league: str, params: dict) -> Path:
 
 def build_predictor(df: pd.DataFrame, league: str, **override) -> tuple[MatchPredictor, dict]:
     p = {**load(league), **{k: v for k, v in override.items() if v is not None}}
-    return MatchPredictor(df, ridge=p["ridge"], xi=p["xi"]), p
+    return MatchPredictor(df, ridge=p["ridge"], xi=p["xi"], shot_weight=p.get("shot_weight", 0.0)), p

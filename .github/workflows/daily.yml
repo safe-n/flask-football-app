@@ -1,0 +1,41 @@
+# Codzienna rutyna ZA DARMO: historia (CSV) + świeże wyniki -> prognozy -> rozliczenie -> Telegram -> zapis do repo.
+name: daily
+on:
+  schedule:
+    - cron: "17 6 * * *"      # 06:17 UTC, codziennie
+  workflow_dispatch: {}
+env:
+  LEAGUES: "E0"                # kilka lig: "E0,D1,SP1"
+  ARCHIVE_ODDS: "1"            # archiwizuj kursy przedmeczowe do history/odds/
+permissions:
+  contents: write
+concurrency:
+  group: repo-write            # daily i weekly nie piszą do repo jednocześnie
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Dane -> prognozy -> rozliczenie
+        run: |
+          python -m fbpred bootstrap --leagues "$LEAGUES" --years 4 --export-ledger
+          python -m fbpred report --leagues "$LEAGUES" --out ledger/REPORT.md
+      - name: Powiadomienie Telegram (opcjonalne)
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python -m fbpred notify --leagues "$LEAGUES" --days 3
+      - name: Zapisz zmiany w repo
+        run: |
+          git config user.name "fbpred-bot"
+          git config user.email "fbpred-bot@users.noreply.github.com"
+          git add ledger history/odds
+          git diff --cached --quiet || (git commit -m "daily: dziennik i kursy $(date -u +%F)" && git pull --rebase && git push)
