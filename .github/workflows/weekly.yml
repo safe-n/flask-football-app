@@ -5,7 +5,7 @@ on:
     - cron: "30 5 * * 1"      # poniedziałek 05:30 UTC
   workflow_dispatch: {}
 env:
-  LEAGUES: "E0"
+  LEAGUES: "auto"              # auto = wszystkie ligi z history/
 permissions:
   contents: write
 concurrency:
@@ -23,6 +23,8 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - name: Dopisz nowe mecze do historii (bieżący i poprzedni sezon)
+        env:
+          FOOTBALL_DATA_ORG_TOKEN: ${{ secrets.FOOTBALL_DATA_ORG_TOKEN }}
         run: |
           python -m fbpred history-update --leagues "$LEAGUES"
           python -m fbpred history-status

@@ -10,7 +10,7 @@ services:
     name: football-predictor
     runtime: python
     # plan: starter            # dysk wymaga płatnego planu
-    buildCommand: pip install -r requirements.txt gunicorn
+    buildCommand: pip install -r requirements.txt
     startCommand: gunicorn fbpred.web:app --workers 1 --threads 4 --timeout 120
     healthCheckPath: /healthz
     # disk:
@@ -25,7 +25,9 @@ services:
       - key: AUTO_BOOTSTRAP
         value: "1"
       - key: BOOTSTRAP_LEAGUES
-        value: E0
+        value: auto                    # auto = wszystkie ligi z katalogu history/
+      - key: FOOTBALL_DATA_ORG_TOKEN
+        sync: false                    # darmowy token (Liga Mistrzów + zapasowy terminarz) - wpisz w panelu Render
       - key: BOOTSTRAP_YEARS
         value: "4"
       - key: REFRESH_HOURS

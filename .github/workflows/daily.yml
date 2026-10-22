@@ -5,7 +5,7 @@ on:
     - cron: "17 6 * * *"      # 06:17 UTC, codziennie
   workflow_dispatch: {}
 env:
-  LEAGUES: "E0"                # kilka lig: "E0,D1,SP1"
+  LEAGUES: "auto"              # auto = wszystkie ligi, które mają pliki w history/
   ARCHIVE_ODDS: "1"            # archiwizuj kursy przedmeczowe do history/odds/
 permissions:
   contents: write
@@ -24,6 +24,8 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - name: Dane -> prognozy -> rozliczenie
+        env:
+          FOOTBALL_DATA_ORG_TOKEN: ${{ secrets.FOOTBALL_DATA_ORG_TOKEN }}
         run: |
           python -m fbpred bootstrap --leagues "$LEAGUES" --years 4 --export-ledger
           python -m fbpred report --leagues "$LEAGUES" --out ledger/REPORT.md

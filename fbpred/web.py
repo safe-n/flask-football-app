@@ -1,4 +1,4 @@
-"""Aplikacja Flask: prognozy nadchodzących meczów, symulacja tabeli, dziennik, siła drużyn + JSON API."""
+"""Aplikacja Flask: mecze, podgląd meczu, statystyki sędziów/drużyn, tabela, siła drużyn, dziennik, dane + JSON API."""
 from __future__ import annotations
 
 import time
@@ -7,11 +7,50 @@ import numpy as np
 import pandas as pd
 from flask import Flask, abort, jsonify, render_template, request
 
-from . import bootstrap, config, db, history, ledger, params as prm
+from . import bootstrap, config, db, history, ledger, leagues as lg_cat, params as prm, stats
 from .odds import apply_blend, value_picks
 from .simulate import simulate_table
 
 TTL = 3600
+
+
+def _pct(x: float) -> str:
+    return f"{100 * x:.0f}%"
+
+
+def match_sections(p: dict) -> tuple[dict, list[tuple[str, list]], list[str]]:
+    """Przygotowuje podgląd meczu (nagłówek + sekcje tabelek) z prognozy - osobno od szablonu, żeby dało się testować."""
+    e, g = p["extra"], p["goals"]
+    head = {"title": f"{p['home']} – {p['away']}",
+            "sub": f"oczekiwane gole {p['xg']['home']}–{p['xg']['away']}" + (f" · sędzia {p['referee']}" if p.get("referee") else "")
+                   + (f" · brak historii: {', '.join(p['unknown_teams'])}" if p["unknown_teams"] else ""),
+            "x12": [(k, _pct(p["1x2"][k])) for k in "1X2"]}
+    S: list[tuple[str, list]] = [
+        ("Gole", [("Over 1.5", _pct(g["over_1.5"])), ("Over 2.5", _pct(g["over_2.5"])), ("Over 3.5", _pct(g["over_3.5"])),
+                  ("BTTS tak", _pct(g["btts_yes"]))] + [(f"wynik {s}", _pct(q)) for s, q in g["top_scores"][:3]]),
+        ("Podwójna szansa / DNB", [(k, _pct(v)) for k, v in e["double_chance"].items()] +
+         [("DNB gospodarz", _pct(e["dnb"]["home"])), ("DNB gość", _pct(e["dnb"]["away"]))]),
+        ("Czyste konto / do zera", [("Gospodarz czyste konto", _pct(e["clean_sheets"]["home_cs"])),
+                                    ("Gość czyste konto", _pct(e["clean_sheets"]["away_cs"])),
+                                    ("Gospodarz wygra do zera", _pct(e["clean_sheets"]["home_win_to_nil"])),
+                                    ("Gość wygra do zera", _pct(e["clean_sheets"]["away_win_to_nil"]))]),
+        ("Handicap gospodarzy (wygrana)", [(k, _pct(e["asian"][k]["win"])) for k in ("-1.5", "-0.5", "0.5", "1.5")]),
+    ]
+    if "halves" in p:
+        h = p["halves"]
+        best = sorted(h["htft"].items(), key=lambda kv: -kv[1])[:4]
+        S.append(("Połowy", [("Remis do przerwy", _pct(h["draw_ht"])), ("Remis w 2. połowie", _pct(h["draw_2h"])),
+                             ("Remis w którejkolwiek", _pct(h["draw_either_half"])), ("Remis w obu", _pct(h["draw_both_halves"])),
+                             ("Gol w 1. połowie", _pct(h["over_0.5_ht"]))]))
+        S.append(("Połowa/mecz (najczęstsze)", [(k, _pct(v)) for k, v in best]))
+    for key, title in (("yellow", "Żółte kartki"), ("corners", "Rzuty rożne")):
+        if key in p:
+            c = p[key]
+            S.append((f"{title} (śr. {c['total_mean']} = {c['home_mean']} + {c['away_mean']})",
+                      [(f"Over {k}", _pct(v)) for k, v in c["over"].items()] +
+                      [("Gospodarz więcej", _pct(c["more_than_opponent"]["home"])), ("Gość więcej", _pct(c["more_than_opponent"]["away"]))]))
+    notes = [] if "yellow" in p else ["Brak statystyk kartek/rożnych w danych tej ligi (np. Liga Mistrzów z darmowego źródła ich nie zawiera)."]
+    return head, S, notes
 
 
 def create_app() -> Flask:
@@ -49,13 +88,14 @@ def create_app() -> Flask:
             return P, p, df
         return cached(("model", league), build)
 
-    def leagues() -> list[str]:
+    def league_options() -> list[tuple[str, str]]:
         conn = db.connect(config.DB_PATH)
-        return [r[0] for r in conn.execute("SELECT DISTINCT league FROM matches ORDER BY 1")]
+        codes = [r[0] for r in conn.execute("SELECT DISTINCT league FROM matches ORDER BY 1")]
+        return [(c, lg_cat.label(c)) for c in codes]
 
     def page(title, league, *blocks, refresh=False):
-        return render_template("page.html", title=title, league=league, leagues=leagues(), blocks=blocks,
-                               refresh=refresh)
+        return render_template("page.html", title=title, league=league, leagues=league_options(), blocks=blocks,
+                               refresh=refresh, fmt=lambda x: f"{x:.2f}".rstrip("0").rstrip(".") if abs(x) < 1e6 else str(x))
 
     @app.errorhandler(503)
     @app.errorhandler(404)
@@ -80,7 +120,48 @@ def create_app() -> Flask:
             for r in up.head(40).to_dict("records"):
                 pred = apply_blend(P.predict(r["home"], r["away"], r.get("referee")), r, p["blend_w"])
                 items.append({"row": r, "p": pred, "picks": value_picks(pred, r)})
-        return render_template("index.html", items=items, league=league, leagues=leagues())
+        return render_template("index.html", items=items, league=league, leagues=league_options(),
+                               title=f"Mecze · {lg_cat.name(league)}")
+
+    @app.get("/match")
+    def match():
+        league = league_arg()
+        P, _, df = model(league)
+        teams = [t for t in stats.active_teams(df) if t in P.teams]
+        home = request.args.get("home") or (teams[0] if teams else "")
+        away = request.args.get("away") or (teams[1] if len(teams) > 1 else "")
+        referee = request.args.get("referee") or None
+        recent = stats.season_slice(df, 2)
+        refs = sorted(recent["referee"].dropna().unique()) if "referee" in recent else []
+        ctx = dict(title=f"Podgląd meczu · {lg_cat.name(league)}", league=league, leagues=league_options(), teams=teams,
+                   referees=refs, home=home, away=away, referee=referee, head=None, sections=[], notes=[])
+        if request.args.get("home") and request.args.get("away") and home != away:
+            if home not in P.teams or away not in P.teams:
+                abort(404, f"Nieznana drużyna: {home if home not in P.teams else away}")
+            head, sections, notes = match_sections(P.predict(home, away, referee))
+            ctx.update(head=head, sections=sections, notes=notes)
+        return render_template("match.html", **ctx)
+
+    @app.get("/stats")
+    def stats_page():
+        league = league_arg()
+        view = request.args.get("view", "referees")
+        seasons = max(1, min(int(request.args.get("seasons", 2 if view == "referees" else 1)), 6))
+        P, _, df = model(league)
+        base = f"/stats?league={league}"
+        tabs = ("tabs", [("Sędziowie", f"{base}&view=referees&seasons=2"), ("Drużyny: kartki i rożne", f"{base}&view=teams&seasons=1"),
+                         ("(więcej sezonów)", f"{base}&view={view}&seasons=3")])
+        if view == "teams":
+            t = stats.team_table(df, P, seasons)
+            note = ("p", f"Średnie na mecz z ostatnich {seasons} sezonów. kartki_x / rozne_x to mnożniki z modelu (1.0 = średnia ligi, "
+                         "skorygowane o rywali; większe = więcej kartek/rożnych).")
+        else:
+            t = stats.referee_table(df, P, seasons)
+            note = ("p", f"Sędziowie z min. 8 meczami w ostatnich {seasons} sezonach. mnoznik_model uwzględnia małą próbę "
+                         "(shrinkage), więc jest ostrożniejszy niż surowa średnia.")
+        if t.empty:
+            return page("Statystyki", league, tabs, ("p", "Brak statystyk kartek/rożnych/sędziów w danych tej ligi."))
+        return page(f"Statystyki · {lg_cat.name(league)}", league, tabs, note, ("t", t))
 
     @app.get("/table")
     def table():
@@ -88,19 +169,20 @@ def create_app() -> Flask:
         P, _, df = model(league)
         up = db.load_upcoming(db.connect(config.DB_PATH), league)
         tab, info = cached(("sim", league), lambda: simulate_table(df, P, up, n=4000))
-        return page("Symulacja tabeli", league,
-                    ("p", f"Sezon {info['sezon']}: zostało {info['pozostalo_meczow']} meczów ({info['metoda']}), "
-                          f"{info['symulacji']} symulacji Monte Carlo."),
-                    ("t", tab))
+        return page(f"Symulacja tabeli · {lg_cat.name(league)}", league,
+                    ("p", f"Sezon {lg_cat.season_label(info['sezon'])}: zostało {info['pozostalo_meczow']} meczów "
+                          f"({info['metoda']}), {info['symulacji']} symulacji Monte Carlo."), ("t", tab))
 
     @app.get("/strengths")
     def strengths():
         league = league_arg()
-        P, p, _ = model(league)
+        P, p, df = model(league)
         s = P.goals.strengths().reset_index().rename(columns={"index": "druzyna"})
-        return page("Siła drużyn", league,
-                    ("p", f"Przewaga domowa: {np.exp(P.goals.ha):.2f}x goli. ridge={p['ridge']}, xi={p['xi']}."),
-                    ("t", s))
+        active = set(stats.active_teams(df))
+        s = s[s["druzyna"].isin(active)]
+        return page(f"Siła drużyn · {lg_cat.name(league)}", league,
+                    ("p", f"Tylko drużyny z bieżącego sezonu. Przewaga domowa: {np.exp(P.goals.ha):.2f}x goli. "
+                          f"ridge={p['ridge']}, xi={p['xi']}, shot_weight={p.get('shot_weight', 0)}."), ("t", s))
 
     @app.get("/track")
     def track():
@@ -123,22 +205,23 @@ def create_app() -> Flask:
         league = league_arg()
         conn = db.connect(config.DB_PATH)
         q = pd.read_sql_query(
-            "SELECT league AS liga, season AS sezon, COUNT(*) AS mecze, "
-            "SUM(hg IS NOT NULL) AS rozegrane, MIN(date) AS od, MAX(date) AS do, "
-            "ROUND(100.0*SUM(hg_ht IS NOT NULL)/COUNT(*)) AS 'HT_%', "
-            "ROUND(100.0*SUM(h_yellow IS NOT NULL)/COUNT(*)) AS 'kartki_%', "
-            "ROUND(100.0*SUM(h_sot IS NOT NULL)/COUNT(*)) AS 'sot_%', "
-            "ROUND(100.0*SUM(o_home IS NOT NULL)/COUNT(*)) AS 'kursy_%' "
+            "SELECT league AS liga, season AS sezon, COUNT(*) AS mecze, SUM(hg IS NOT NULL) AS rozegrane, "
+            "SUM(hg IS NULL) AS nadchodzace, MIN(date) AS od, MAX(date) AS do, "
+            "ROUND(100.0*SUM(hg_ht IS NOT NULL)/COUNT(*)) AS 'HT_%', ROUND(100.0*SUM(h_yellow IS NOT NULL)/COUNT(*)) AS 'kartki_%', "
+            "ROUND(100.0*SUM(h_sot IS NOT NULL)/COUNT(*)) AS 'sot_%', ROUND(100.0*SUM(o_home IS NOT NULL)/COUNT(*)) AS 'kursy_%' "
             "FROM matches GROUP BY league, season ORDER BY league, season", conn)
+        diag = pd.DataFrame([{"liga": lg, "krok": k, "wynik": v} for lg, d in bootstrap.DIAG.items() for k, v in d.items()])
         hist = history.status(config.HISTORY_DIR)
         blocks = [("p", f"Stan zasilania: {bootstrap.STATUS['state']} - {bootstrap.STATUS['message']}"),
-                  ("p", "Konfiguracja: " + ", ".join(f"{k}={v}" for k, v in bootstrap.describe().items())),
-                  ("p", "Baza w pamięci serwisu (SQLite):"), ("t", q)]
+                  ("p", "Konfiguracja: " + ", ".join(f"{k}={v}" for k, v in bootstrap.describe().items()))]
         if not config.AUTO_BOOTSTRAP:
-            blocks.insert(2, ("p", "Odświeżanie z internetu jest WYŁĄCZONE. Ustaw AUTO_BOOTSTRAP=1 w Render → Environment "
-                                   "(render.yaml działa tylko dla usług utworzonych z Blueprintu). Dane z history/ i tak działają."))
+            blocks.append(("p", "Odświeżanie z internetu jest WYŁĄCZONE. Ustaw AUTO_BOOTSTRAP=1 w Render → Environment "
+                                "(render.yaml działa tylko dla usług utworzonych z Blueprintu). Dane z history/ i tak działają."))
+        if not diag.empty:
+            blocks += [("h", "Diagnostyka ostatniego odświeżenia (skąd bierze się terminarz)"), ("t", diag)]
+        blocks += [("h", "Baza w pamięci serwisu (SQLite)"), ("t", q)]
         if not hist.empty:
-            blocks += [("p", f"Historia w repo ({config.HISTORY_DIR}):"), ("t", hist)]
+            blocks += [("h", f"Historia w repo ({config.HISTORY_DIR})"), ("t", hist)]
         return page("Dane", league, *blocks)
 
     @app.get("/api/predict")

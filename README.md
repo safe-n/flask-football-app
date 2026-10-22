@@ -195,3 +195,34 @@ i liczbę meczów w bazie) oraz stronę `/data`, która pisze wprost, co jest wy
 Pamiętaj: `render.yaml` stosuje się tylko do usług utworzonych z Blueprintu. Jeśli usługę tworzyłeś ręcznie w panelu,
 zmienne ustawiaj w *Render → usługa → Environment*.
 Nie wrzucaj do `history/` sztucznej ligi DEMO (`history-export` pomija ją domyślnie); usuń ją: `git rm history/DEMO_*.csv`.
+
+
+## Wiele lig i Liga Mistrzów (od 0.4)
+
+**Ligi krajowe** (football-data.co.uk, bez klucza): `E0` Premier League, `E1` Championship, `D1` Bundesliga, `SP1` La Liga,
+`I1` Serie A, `F1` Ligue 1, `N1` Eredivisie, `P1` Primeira Liga, `B1`, `T1`, `G1`, `SC0` i inne z katalogu `fbpred/leagues.py`.
+1. GitHub → *Actions* → **init-history** → *Run workflow* (domyślnie `E0,D1,SP1,I1,F1,N1,P1,CL` i sezony `2020-2025`).
+2. Render → *Environment* → ustaw `BOOTSTRAP_LEAGUES=auto` (wszystkie ligi z `history/`; nic więcej nie trzeba wpisywać).
+Workflowy `daily` i `weekly-history` też działają w trybie `auto`, więc nowa liga dołącza się sama.
+
+**Liga Mistrzów** nie występuje w football-data.co.uk, więc dane idą z football-data.org (darmowy token, 10 zapytań/min):
+1. Zarejestruj się na football-data.org/client/register i skopiuj token.
+2. GitHub → *Settings → Secrets and variables → Actions* → sekret `FOOTBALL_DATA_ORG_TOKEN`; Render → *Environment* → ta sama zmienna.
+3. Uruchom `init-history` z `CL` na liście lig.
+
+Ograniczenia LM (uczciwie): darmowy plan nie daje kursów ani statystyk, więc dla LM są 1X2, gole, BTTS i remis do przerwy,
+**bez kartek i rożnych**; ok. 190 meczów na sezon i drużyny z różnych lig powodują, że model jest dużo mniej pewny niż dla
+ligi krajowej (bardziej "w stronę średniej"). Dodatkowo plan darmowy może nie udostępniać starszych sezonów (zobaczysz to w logu).
+
+## Statystyki sędziów, kartek i rożnych
+
+Strona **Statystyki** (`/stats`): sędziowie (średnie żółtych/czerwonych/rożnych, odchylenie od ligi, mnożnik z modelu, który
+uwzględnia małą próbę) oraz drużyny (kartki i rożne zdobyte/stracone, mnożniki `kartki_x` i `rozne_x`). Strona **Mecz** (`/match`):
+wybierasz gospodarza, gościa i sędziego, a dostajesz komplet rynków (1X2, gole, połowy, kartki, rożne, handicapy, czyste konto).
+W konsoli: `python -m fbpred stats --league E0 --view referees` / `--view teams`.
+
+## Dlaczego "Brak nadchodzących meczów"?
+
+Terminarz pochodzi z `fixtures.csv` (football-data.co.uk), a gdy tam nie ma meczów danej ligi - z football-data.org (jeśli ustawiono
+token). Strona **Dane** pokazuje teraz krok po kroku, co się udało, a co nie (np. "plik pobrany, ale bez nadchodzących meczów tej ligi"
+albo "zapas wyłączony: brak tokenu"). Bez tokenu i z pustym `fixtures.csv` terminarza po prostu nie ma skąd wziąć.

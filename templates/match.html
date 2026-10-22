@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block body %}
+<form method="get" class="card">
+  <input type="hidden" name="league" value="{{ league }}">
+  <select name="home">{% for t in teams %}<option {{ 'selected' if t == home }}>{{ t }}</option>{% endfor %}</select> –
+  <select name="away">{% for t in teams %}<option {{ 'selected' if t == away }}>{{ t }}</option>{% endfor %}</select><br><br>
+  <select name="referee"><option value="">(sędzia: dowolny)</option>{% for r in referees %}<option {{ 'selected' if r == referee }}>{{ r }}</option>{% endfor %}</select>
+  <button>Pokaż prognozę</button>
+</form>
+{% if head %}
+<div class="card"><div class="t">{{ head.title }}</div><div class="m">{{ head.sub }}</div>
+  <div class="row">{% for k, v in head.x12 %}<div class="b">{{ k }}<b>{{ v }}</b></div>{% endfor %}</div></div>
+<div class="grid">
+{% for title, rows in sections %}
+  <div class="card"><div class="t">{{ title }}</div><table>{% for k, v in rows %}<tr><td>{{ k }}</td><td>{{ v }}</td></tr>{% endfor %}</table></div>
+{% endfor %}
+</div>
+{% for note in notes %}<p class="m">{{ note }}</p>{% endfor %}
+{% endif %}
+{% endblock %}

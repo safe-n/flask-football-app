@@ -1,24 +1,28 @@
-"""Automatyczne zasilanie bazy: pierwsze pobranie danych + okresowe odświeżanie w tle.
+"""Zasilanie bazy: historia z CSV (offline) -> uzupełnienie brakujących sezonów -> bieżący sezon i terminarz.
 
-Po co: na Renderze (plan darmowy) system plików jest tymczasowy - baza SQLite znika przy każdym
-restarcie/uśpieniu, a Cron Job nie ma dostępu do plików serwisu WWW. Dlatego aplikacja sama
-dociąga dane przy starcie (kilka plików CSV, to kilka sekund) i odświeża je w tle.
+Na Renderze (plan darmowy) SQLite jest tymczasowy, więc przy każdym starcie odtwarzamy ją z `history/` (offline, sekundy),
+a sieć służy tylko do uzupełnień. Każdy krok zapisuje diagnostykę w DIAG (widoczną na stronie /data).
 """
 from __future__ import annotations
 
 import os
 import threading
 import time
+from datetime import date, datetime, timedelta
 from pathlib import Path
-from datetime import date, datetime
 
-from . import config, csvdata, db, history
+import pandas as pd
+
+from . import config, csvdata, db, fdorg, history, names
+from .leagues import NO_CSV
+
 
 def _log(msg: str) -> None:
     print(msg, flush=True)   # flush: bez tego logi z wątku mogą nie pojawić się w panelu Rendera
 
 
 STATUS = {"state": "idle", "message": "Dane nie zostały jeszcze załadowane.", "updated": None}
+DIAG: dict[str, dict[str, str]] = {}      # liga -> {krok: wynik}
 _started = False
 _start_lock = threading.Lock()
 _work_lock = threading.Lock()
@@ -33,27 +37,42 @@ def _set(state: str, message: str) -> None:
     STATUS.update(state=state, message=message, updated=datetime.now().isoformat(timespec="seconds"))
 
 
+def leagues() -> list[str]:
+    """Jawna lista z BOOTSTRAP_LEAGUES albo wszystkie ligi z history/ (tryb 'auto')."""
+    return list(config.BOOTSTRAP_LEAGUES) or history.discover_leagues(config.HISTORY_DIR) or [config.DEFAULT_LEAGUE]
+
+
+def describe() -> dict:
+    hd = Path(config.HISTORY_DIR)
+    return {"AUTO_BOOTSTRAP": config.AUTO_BOOTSTRAP, "RENDER": os.getenv("RENDER", "-"),
+            "ligi": ",".join(leagues()), "REFRESH_HOURS": config.REFRESH_HOURS,
+            "football-data.org": "token ustawiony" if fdorg.enabled() else "brak tokenu",
+            "pliki_historii": len(list(hd.glob("*.csv"))) if hd.exists() else 0, "DB_PATH": str(config.DB_PATH)}
+
+
 def count_finished(conn, league: str) -> int:
     return conn.execute("SELECT COUNT(*) FROM matches WHERE league=? AND hg IS NOT NULL", (league,)).fetchone()[0]
 
 
-def describe() -> dict:
-    """Konfiguracja widoczna w logach i na stronie /data (do diagnozy 'czemu nie ładuje')."""
-    hd = Path(config.HISTORY_DIR)
-    return {"AUTO_BOOTSTRAP": config.AUTO_BOOTSTRAP, "RENDER": os.getenv("RENDER", "-"),
-            "ligi": ",".join(config.BOOTSTRAP_LEAGUES), "REFRESH_HOURS": config.REFRESH_HOURS,
-            "HISTORY_DIR": str(hd), "pliki_historii": len(list(hd.glob("*.csv"))) if hd.exists() else 0,
-            "DB_PATH": str(config.DB_PATH)}
+def seasons_in_db(conn, league: str) -> set[int]:
+    return {r[0] for r in conn.execute(
+        "SELECT DISTINCT season FROM matches WHERE league=? AND hg IS NOT NULL AND season IS NOT NULL", (league,))}
 
 
-def load_local(leagues: list[str] | None = None, log=_log) -> int:
+def _known_teams(conn, league: str) -> list[str]:
+    rows = conn.execute("SELECT DISTINCT home FROM matches WHERE league=? AND season>=?",
+                        (league, season_now() - 2)).fetchall()
+    return [r[0] for r in rows]
+
+
+def load_local(leagues_: list[str] | None = None, log=_log) -> int:
     """Wczytuje historię z CSV do SQLite OD RAZU i OFFLINE (bez sieci, bez wątku). Zwraca liczbę meczów w bazie."""
-    leagues = leagues or config.BOOTSTRAP_LEAGUES
+    lgs = leagues_ or leagues()
     conn = db.connect(config.DB_PATH)
-    history.load_into_db(conn, config.HISTORY_DIR, leagues)
+    history.load_into_db(conn, config.HISTORY_DIR, lgs)
     from . import ledger
     ledger.import_csv(conn, config.LEDGER_CSV)
-    total = sum(count_finished(conn, lg) for lg in leagues)
+    total = sum(count_finished(conn, lg) for lg in lgs)
     if total:
         _set("ready", f"Wczytano {total} meczów z historii (CSV). Odświeżanie z internetu: "
                       f"{'w tle' if config.AUTO_BOOTSTRAP else 'wyłączone (AUTO_BOOTSTRAP)'}.")
@@ -61,52 +80,100 @@ def load_local(leagues: list[str] | None = None, log=_log) -> int:
     return total
 
 
-def ensure_data(leagues: list[str], years: int = 4, min_matches: int = 200, log=_log) -> dict[str, int]:
-    """Jeśli w bazie brakuje danych ligi - pobiera ostatnie `years` sezonów (idempotentne)."""
+def ensure_data(leagues_: list[str] | None = None, years: int = 4, min_matches: int = 200, log=_log) -> dict[str, int]:
+    """Historia z CSV, a potem dociągnięcie BRAKUJĄCYCH sezonów z ostatnich `years` (np. luka 2025 w E0)."""
     conn = db.connect(config.DB_PATH)
     out: dict[str, int] = {}
-    for lg in leagues:
-        n_hist = history.load_into_db(conn, config.HISTORY_DIR, [lg])  # 1. historia z CSV - offline i szybko
+    for lg in leagues_ or leagues():
+        d = DIAG.setdefault(lg, {})
+        n_hist = history.load_into_db(conn, config.HISTORY_DIR, [lg])
         if n_hist:
             log(f"[bootstrap] {lg}: wczytano {n_hist} meczów z historii (CSV)")
-        if count_finished(conn, lg) >= min_matches:
-            out[lg] = n_hist
-            continue
-        n = 0                                                          # 2. awaryjnie: pobierz ze źródła
-        for y in range(season_now() - years + 1, season_now() + 1):
+        have = seasons_in_db(conn, lg)
+        missing = [y for y in range(season_now() - years + 1, season_now() + 1) if y not in have]
+        n = 0
+        for y in missing:
             try:
-                rows = csvdata.parse_csv(csvdata.download(lg, y), lg, y)
+                if lg in NO_CSV:
+                    if not fdorg.enabled():
+                        d["sezony"] = "brak tokenu football-data.org - nie uzupełniam"
+                        break
+                    rows = fdorg.fetch_season(lg, y)
+                else:
+                    rows = history.apply_aliases(csvdata.parse_csv(csvdata.download(lg, y), lg, y))
                 db.upsert_matches(conn, rows)
                 n += len(rows)
             except Exception as e:  # noqa: BLE001 - jeden brakujący sezon nie może zatrzymać reszty
                 log(f"[bootstrap] {lg} {y}: {e}")
-        out[lg] = n
-        log(f"[bootstrap] {lg}: pobrano {n} meczów")
+        d.setdefault("sezony", f"w bazie {sorted(seasons_in_db(conn, lg))}; dociągnięto {n} meczów ({len(missing)} sezonów brakowało)")
+        out[lg] = n_hist + n
+        if n:
+            log(f"[bootstrap] {lg}: dociągnięto brakujące sezony {missing}: {n} meczów")
     return out
 
 
-def refresh(leagues: list[str], log_predictions: bool = True, log=_log) -> None:
-    """Bieżący sezon + nadchodzące mecze z kursami, sprzątanie, opcjonalnie zapis prognoz do dziennika."""
+def _fdorg_rows(conn, lg: str, fetch) -> list[dict]:
+    known = _known_teams(conn, lg)
+    resolver = (lambda c: names.resolve(c, known)) if known and lg not in NO_CSV else None
+    return fetch(resolver)
+
+
+def refresh(leagues_: list[str] | None = None, log_predictions: bool = True, log=_log) -> None:
+    """Bieżący sezon + terminarz (z kursami, jeśli są), sprzątanie, zapis prognoz do dziennika."""
+    lgs = leagues_ or leagues()
     conn = db.connect(config.DB_PATH)
-    for lg in leagues:
-        try:
-            y = season_now()
-            db.upsert_matches(conn, history.apply_aliases(csvdata.parse_csv(csvdata.download(lg, y), lg, y)))
-        except Exception as e:  # noqa: BLE001
-            log(f"[refresh] sezon {lg}: {e}")
-        try:
-            rows = history.apply_aliases(csvdata.parse_csv(csvdata.download_fixtures(), lg, None, only_div=True))
+    for lg in lgs:
+        d = DIAG.setdefault(lg, {})
+        y = season_now()
+        if lg in NO_CSV:
+            if not fdorg.enabled():
+                d["football-data.org"] = "brak tokenu FOOTBALL_DATA_ORG_TOKEN - brak odświeżania"
+                continue
+            try:
+                rows = fdorg.fetch_season(lg, y)
+                db.upsert_matches(conn, rows)
+                d["football-data.org"] = f"ok: {len(rows)} meczów sezonu {y} (wyniki + terminarz)"
+            except Exception as e:  # noqa: BLE001
+                d["football-data.org"] = f"błąd: {e}"
+                log(f"[refresh] {lg}: {e}")
+            continue
+        try:                                                                  # wyniki bieżącego sezonu
+            rows = history.apply_aliases(csvdata.parse_csv(csvdata.download(lg, y), lg, y))
             db.upsert_matches(conn, rows)
-            if config.ARCHIVE_ODDS:
-                log(f"[refresh] archiwum kursów {lg}: +{history.archive_odds(rows, config.HISTORY_DIR)}")
+            d["sezon_csv"] = f"ok: {len(rows)} meczów sezonu {y}"
         except Exception as e:  # noqa: BLE001
+            d["sezon_csv"] = f"błąd: {e}"
+            log(f"[refresh] sezon {lg}: {e}")
+        fixtures: list[dict] = []
+        try:                                                                  # terminarz + kursy (football-data.co.uk)
+            fixtures = history.apply_aliases(csvdata.parse_csv(csvdata.download_fixtures(), lg, None, only_div=True))
+            db.upsert_matches(conn, fixtures)
+            d["fixtures_csv"] = f"{len(fixtures)} nadchodzących meczów" if fixtures else \
+                "plik pobrany, ale bez nadchodzących meczów tej ligi"
+            if config.ARCHIVE_ODDS and fixtures:
+                log(f"[refresh] archiwum kursów {lg}: +{history.archive_odds(fixtures, config.HISTORY_DIR)}")
+        except Exception as e:  # noqa: BLE001
+            d["fixtures_csv"] = f"błąd: {e}"
             log(f"[refresh] fixtures {lg}: {e}")
+        if not fixtures:                                                      # zapasowe źródło terminarza
+            if fdorg.enabled() and fdorg.supports(lg):
+                try:
+                    rows = _fdorg_rows(conn, lg, lambda res: fdorg.upcoming(lg, res))
+                    db.upsert_matches(conn, rows)
+                    d["football-data.org"] = f"ok: {len(rows)} nadchodzących (bez kursów)"
+                except Exception as e:  # noqa: BLE001
+                    d["football-data.org"] = f"błąd: {e}"
+                    log(f"[refresh] fdorg {lg}: {e}")
+            elif not fdorg.enabled():
+                d["football-data.org"] = "zapas wyłączony: brak tokenu FOOTBALL_DATA_ORG_TOKEN"
     db.purge_stale_upcoming(conn)
     if not log_predictions:
         return
     from . import ledger, params as prm
-    for lg in leagues:
+    horizon = pd.Timestamp.today().normalize() + pd.Timedelta(days=config.LOG_HORIZON_DAYS)
+    for lg in lgs:
         df, up = db.load_matches(conn, lg), db.load_upcoming(conn, lg)
+        up = up[up["date"] <= horizon]
         if len(df) >= 100 and not up.empty:
             try:
                 P, p = prm.build_predictor(df, lg)
@@ -115,23 +182,22 @@ def refresh(leagues: list[str], log_predictions: bool = True, log=_log) -> None:
                 log(f"[refresh] dziennik {lg}: {e}")
 
 
-def run_once(leagues: list[str] | None = None, years: int | None = None, log=_log,
-             export_ledger: bool = False) -> None:
-    leagues = leagues or config.BOOTSTRAP_LEAGUES
+def run_once(leagues_: list[str] | None = None, years: int | None = None, log=_log, export_ledger: bool = False) -> None:
+    lgs = leagues_ or leagues()
     with _work_lock:
         try:
             if STATUS["state"] != "ready":
-                _set("loading", f"Pobieram dane ({', '.join(leagues)}) - to potrwa kilka sekund, odśwież stronę.")
-            ensure_data(leagues, years or config.BOOTSTRAP_YEARS, log=log)
+                _set("loading", f"Pobieram dane ({', '.join(lgs)}) - to potrwa kilka sekund, odśwież stronę.")
+            ensure_data(lgs, years or config.BOOTSTRAP_YEARS, log=log)
             from . import ledger
             conn = db.connect(config.DB_PATH)
             n_imp = ledger.import_csv(conn, config.LEDGER_CSV)  # dziennik z repo (jeśli jest)
             if n_imp:
                 log(f"[bootstrap] wczytano {n_imp} prognoz z {config.LEDGER_CSV}")
-            refresh(leagues, log=log)
+            refresh(lgs, log=log)
             if export_ledger:
                 log(f"[bootstrap] zapisano {ledger.export_csv(conn, config.LEDGER_CSV)} prognoz do {config.LEDGER_CSV}")
-            total = sum(count_finished(conn, lg) for lg in leagues)
+            total = sum(count_finished(conn, lg) for lg in lgs)
             _set("ready" if total else "error", f"Gotowe: {total} meczów w bazie." if total else
                  "Nie udało się pobrać danych (sprawdź logi serwisu).")
         except Exception as e:  # noqa: BLE001
@@ -159,10 +225,10 @@ def start_background() -> None:
             time.sleep(config.REFRESH_HOURS * 3600)
             with _work_lock:
                 try:
-                    refresh(config.BOOTSTRAP_LEAGUES)
+                    refresh()
                     _set("ready", "Odświeżono dane.")
                 except Exception as e:  # noqa: BLE001
-                    print(f"[refresh] błąd: {e}")
+                    print(f"[refresh] błąd: {e}", flush=True)
 
     if STATUS["state"] != "ready":
         _set("loading", "Start aplikacji - zasilanie bazy w toku.")

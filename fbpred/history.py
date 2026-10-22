@@ -19,6 +19,7 @@ from pathlib import Path
 import pandas as pd
 
 from . import config, csvdata, db
+from .leagues import NO_CSV
 
 INT_COLS = ["fixture_id", "season", "hg", "ag", "hg_ht", "ag_ht", "h_shots", "a_shots", "h_sot", "a_sot",
             "h_corners", "a_corners", "h_yellow", "a_yellow", "h_red", "a_red", "stats_done"]
@@ -35,6 +36,20 @@ def hdir(p=None) -> Path:
 def season_of(d) -> int:
     t = pd.Timestamp(d)
     return t.year if t.month >= 7 else t.year - 1
+
+
+def discover_leagues(hist=None) -> list[str]:
+    """Ligi, które mają pliki w history/ (bez sztucznej DEMO)."""
+    hd = hdir(hist)
+    found = {m["league"] for f in hd.glob("*.csv") if (m := FILE_RE.match(f.name))} if hd.exists() else set()
+    return sorted(found - {"DEMO"})
+
+
+def resolve_leagues(spec: str | None, hist=None) -> list[str]:
+    """'auto' / puste = wszystkie ligi z history/ (albo domyślna), inaczej lista rozdzielona przecinkami."""
+    if not spec or spec.strip().lower() == "auto":
+        return discover_leagues(hist) or [config.DEFAULT_LEAGUE]
+    return [x.strip() for x in spec.split(",") if x.strip()]
 
 
 # ------------------------------------------------------------------ aliasy nazw
@@ -211,7 +226,12 @@ def update_from_source(leagues: list[str], seasons: list[int] | None = None, his
     for lg in leagues:
         for y in seasons:
             try:
-                res = save_matches(csvdata.parse_csv(csvdata.download(lg, y), lg, y), hd)
+                if lg in NO_CSV:                       # np. Liga Mistrzów: tylko football-data.org
+                    from . import fdorg
+                    rows = fdorg.fetch_season(lg, y)
+                else:
+                    rows = csvdata.parse_csv(csvdata.download(lg, y), lg, y)
+                res = save_matches(rows, hd)
             except Exception as e:  # noqa: BLE001 - brak sezonu / sieci nie przerywa reszty
                 log(f"  {lg} {y}: błąd ({e})")
                 continue

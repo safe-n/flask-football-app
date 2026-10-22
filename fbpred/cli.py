@@ -9,7 +9,7 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
-from . import config, csvdata, db, history, ledger, notify, params as prm, quality, report
+from . import config, csvdata, db, history, ledger, notify, params as prm, quality, report, stats as stats_mod
 from .backtest import (best_blend, betting_sim, calibration, compare_report, summarize, walk_forward)
 from .odds import apply_blend, value_picks
 from .predictor import format_prediction
@@ -119,7 +119,8 @@ def cmd_strengths(a):
     df = _load(a)
     P, p = _predictor(a, df)
     print(f"Siła drużyn (atak wyżej = lepiej, obrona niżej = lepiej)  | ridge={p['ridge']}, xi={p['xi']}\n")
-    print(P.goals.strengths().to_string())
+    act = set(stats_mod.active_teams(df))
+    print(P.goals.strengths().loc[lambda t: t.index.isin(act)].to_string())
     print(f"\nPrzewaga domowa: {np.exp(P.goals.ha):.2f}x goli, rho (korekta niskich wyników): {P.goals.rho:+.3f}")
     if P.yellow and P.yellow.r:
         n = df["referee"].value_counts()
@@ -128,6 +129,14 @@ def cmd_strengths(a):
         t = t[t["mecze"] >= 8].sort_values("mnoznik_kartek", ascending=False).round(3)
         print("\nSędziowie (mnożnik oczekiwanych żółtych kartek, min. 8 meczów):")
         print(pd.concat([t.head(8), t.tail(8)]).drop_duplicates().to_string())
+
+
+def cmd_stats(a):
+    df = _load(a)
+    P, _ = _predictor(a, df)
+    t = stats_mod.referee_table(df, P, a.seasons, a.min_matches) if a.view == "referees" else \
+        stats_mod.team_table(df, P, a.seasons)
+    print(t.to_string(index=False) if not t.empty else "Brak statystyk kartek/rożnych w danych tej ligi.")
 
 
 def cmd_predict(a):
@@ -297,13 +306,13 @@ def cmd_demo(a):
 
 
 def cmd_history_init(a):
-    res = history.update_from_source(a.league.split(","), _years(a.seasons))
+    res = history.update_from_source(history.resolve_leagues(a.league), _years(a.seasons))
     print(f"Gotowe: {len(res)} plików w {config.HISTORY_DIR}. Zacommituj katalog history/.")
 
 
 def cmd_history_update(a):
     seasons = _years(a.seasons) if a.seasons else None
-    res = history.update_from_source([x.strip() for x in a.leagues.split(",")], seasons)
+    res = history.update_from_source(history.resolve_leagues(a.leagues), seasons)
     print(f"Zaktualizowano {len(res)} plików; nowych meczów: {sum(r['dodane'] for r in res)}, "
           f"poprawionych: {sum(r['zmienione'] for r in res)}.")
 
@@ -324,7 +333,7 @@ def cmd_history_status(a):
 def cmd_report(a):
     conn = db.connect(config.DB_PATH)
     txt = "# Raport dziennika prognoz\n\n" + "\n".join(
-        report.ledger_report(conn, lg.strip(), a.min_edge) for lg in a.leagues.split(","))
+        report.ledger_report(conn, lg, a.min_edge) for lg in history.resolve_leagues(a.leagues))
     if a.out:
         from pathlib import Path
         Path(a.out).parent.mkdir(parents=True, exist_ok=True)
@@ -338,7 +347,7 @@ def cmd_notify(a):
     conn = db.connect(config.DB_PATH)
     horizon = pd.Timestamp.today().normalize() + pd.Timedelta(days=a.days)
     blocks = []
-    for lg in [x.strip() for x in a.leagues.split(",")]:
+    for lg in history.resolve_leagues(a.leagues):
         df, up = db.load_matches(conn, lg), db.load_upcoming(conn, lg)
         up = up[up["date"] <= horizon]
         if df.empty or up.empty:
@@ -364,8 +373,7 @@ def cmd_notify(a):
 
 def cmd_bootstrap(a):
     from . import bootstrap
-    leagues = [x.strip() for x in a.leagues.split(",")]
-    bootstrap.run_once(leagues, a.years, export_ledger=a.export_ledger)
+    bootstrap.run_once(history.resolve_leagues(a.leagues), a.years, export_ledger=a.export_ledger)
     print(bootstrap.STATUS["message"])
 
 
@@ -400,6 +408,10 @@ def main(argv=None):
     add("teams", cmd_teams, "lista drużyn w modelu")
     add("strengths", cmd_strengths, "ranking siły drużyn i sędziów")
 
+    s = add("stats", cmd_stats, "statystyki sędziów / drużyn (kartki, rożne)")
+    s.add_argument("--view", choices=["referees", "teams"], default="referees")
+    s.add_argument("--seasons", type=int, default=2)
+    s.add_argument("--min-matches", type=int, default=8)
     s = add("predict", cmd_predict, "prognoza jednego meczu")
     s.add_argument("--home", required=True)
     s.add_argument("--away", required=True)
@@ -441,27 +453,27 @@ def main(argv=None):
     s.add_argument("--ridge", type=float)
     s.add_argument("--xi", type=float)
     s = add("history-init", cmd_history_init, "pobierz wiele sezonów do history/*.csv (jednorazowo)", league=False)
-    s.add_argument("--league", default=config.DEFAULT_LEAGUE, help="np. E0 lub E0,D1")
-    s.add_argument("--seasons", default="2018-2025")
+    s.add_argument("--league", default=config.DEFAULT_LEAGUE, help="np. E0 lub E0,D1,SP1,I1,F1,N1,P1,CL (CL wymaga tokenu)")
+    s.add_argument("--seasons", default="2020-2025")
     s = add("history-update", cmd_history_update, "dopisz nowe mecze do history/*.csv (np. raz w tygodniu)", league=False)
-    s.add_argument("--leagues", default=config.DEFAULT_LEAGUE)
+    s.add_argument("--leagues", default="auto", help="auto = wszystkie ligi z history/, albo np. E0,D1,CL")
     s.add_argument("--seasons", help="domyślnie bieżący i poprzedni sezon")
     s = add("history-export", cmd_history_export, "zapisz mecze z lokalnej bazy SQLite do history/*.csv", league=False)
     s.add_argument("--leagues", help="np. E0 (domyślnie wszystkie oprócz DEMO)")
     s.add_argument("--include-demo", action="store_true", help="uwzględnij sztuczną ligę DEMO (nie zalecane)")
     add("history-status", cmd_history_status, "pokrycie danych w history/", league=False)
     s = add("report", cmd_report, "raport dziennika w markdown (CI)", league=False)
-    s.add_argument("--leagues", default=config.DEFAULT_LEAGUE)
+    s.add_argument("--leagues", default="auto", help="auto = wszystkie ligi z history/, albo np. E0,D1,CL")
     s.add_argument("--min-edge", type=float, default=0.03)
     s.add_argument("--out")
     s = add("notify", cmd_notify, "wyślij zestawienie prognoz na Telegram", league=False)
-    s.add_argument("--leagues", default=config.DEFAULT_LEAGUE)
+    s.add_argument("--leagues", default="auto", help="auto = wszystkie ligi z history/, albo np. E0,D1,CL")
     s.add_argument("--days", type=int, default=3)
     s.add_argument("--limit", type=int, default=10)
     s.add_argument("--min-edge", type=float, default=0.05)
     s.add_argument("--dry-run", action="store_true")
     s = sp.add_parser("bootstrap", help="pierwsze zasilenie bazy (CSV) + prognozy do dziennika")
-    s.add_argument("--leagues", default=config.DEFAULT_LEAGUE, help="np. E0,D1,SP1")
+    s.add_argument("--leagues", default="auto", help="auto = wszystkie ligi z history/, albo np. E0,D1,CL")
     s.add_argument("--years", type=int, default=4)
     s.add_argument("--export-ledger", action="store_true", help="zapisz dziennik do ledger/predictions.csv (dla CI)")
     s.set_defaults(fn=cmd_bootstrap)

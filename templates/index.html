@@ -1,35 +1,10 @@
-<!doctype html>
-<html lang="pl">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Prognozy meczów</title>
-<style>
-:root{--bg:#f6f7f9;--card:#fff;--fg:#1b1f24;--mut:#5b6672;--acc:#0b7a4b;--bar:#d9e2ec;--warn:#9a6700}
-@media (prefers-color-scheme:dark){:root{--bg:#10151a;--card:#182028;--fg:#e8edf2;--mut:#9aa7b4;--acc:#3ecf8e;--bar:#2a3642;--warn:#e3b341}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.4 system-ui,sans-serif;padding:12px;max-width:760px;margin-inline:auto}
-h1{font-size:20px;margin:6px 0 10px}.card{background:var(--card);border-radius:12px;padding:12px;margin:10px 0}
-.t{font-weight:600}.m{color:var(--mut);font-size:13px}.row{display:flex;gap:6px;margin:8px 0}
-.b{flex:1;text-align:center;border-radius:8px;background:var(--bar);padding:6px 2px;font-size:13px}
-.b b{display:block;font-size:16px}.hl{outline:2px solid var(--acc)}
-.pick{color:var(--warn);font-size:13px;margin-top:6px}select{font-size:15px;padding:4px}
-.small{font-size:12px;color:var(--mut);margin-top:16px}
-</style>
-</head>
-<body>
-<h1>Prognozy meczów</h1>
-<nav style="display:flex;gap:12px;margin-bottom:8px"><a href="/table?league={{ league }}">Tabela</a>
-<a href="/strengths?league={{ league }}">Siła drużyn</a><a href="/track?league={{ league }}">Dziennik</a><a href="/data?league={{ league }}">Dane</a></nav>
-<form method="get"><select name="league" onchange="this.form.submit()">
-{% for l in leagues %}<option value="{{ l }}" {{ 'selected' if l == league }}>{{ l }}</option>{% endfor %}
-</select></form>
+{% extends "base.html" %}
+{% block body %}
 {% for it in items %}{% set p = it.p %}{% set x = p['1x2_blend'] or p['1x2'] %}{% set mx = x.values()|max %}
 <div class="card">
-  <div class="t">{{ p.home }} – {{ p.away }}</div>
+  <div class="t"><a href="/match?league={{ league }}&home={{ p.home|urlencode }}&away={{ p.away|urlencode }}&referee={{ (p.referee or '')|urlencode }}">{{ p.home }} – {{ p.away }}</a></div>
   <div class="m">{{ it.row.date.strftime('%Y-%m-%d') }}{% if p.referee %} · sędzia {{ p.referee }}{% endif %} · xG {{ p.xg.home }}–{{ p.xg.away }}</div>
-  <div class="row">
-    {% for k in ['1','X','2'] %}<div class="b {{ 'hl' if x[k] == mx }}">{{ k }}<b>{{ '%.0f'|format(x[k]*100) }}%</b></div>{% endfor %}
-  </div>
+  <div class="row">{% for k in ['1','X','2'] %}<div class="b {{ 'hl' if x[k] == mx }}">{{ k }}<b>{{ '%.0f'|format(x[k]*100) }}%</b></div>{% endfor %}</div>
   {% if p['1x2_blend'] %}<div class="m">miks model+rynek · rynek: {{ '%.0f'|format(p.market_1x2['1']*100) }}/{{ '%.0f'|format(p.market_1x2['X']*100) }}/{{ '%.0f'|format(p.market_1x2['2']*100) }}%</div>{% endif %}
   <div class="row">
     <div class="b">O2.5<b>{{ '%.0f'|format(p.goals['over_2.5']*100) }}%</b></div>
@@ -41,6 +16,6 @@ h1{font-size:20px;margin:6px 0 10px}.card{background:var(--card);border-radius:1
   {% if p.corners %} · Rożne: śr. {{ p.corners.total_mean }} (O9.5 {{ '%.0f'|format(p.corners.over['9.5']*100) }}%){% endif %}</div>
   {% for k in it.picks %}<div class="pick">⚑ {{ k.rynek }}: kurs {{ k.kurs }}, przewaga {{ '%+.1f'|format(k.edge*100) }}%{% if k.edge > 0.15 %} ⚠ podejrzanie duża - to zwykle błąd modelu{% endif %}</div>{% endfor %}
 </div>
-{% else %}<p class="m">Brak nadchodzących meczów w bazie dla ligi {{ league }}.</p>{% endfor %}
+{% else %}<p class="m">Brak nadchodzących meczów w bazie dla ligi {{ league }}. Sprawdź stronę <a href="/data?league={{ league }}">Dane</a> - tam jest diagnoza, skąd bierze się terminarz i dlaczego może być pusty.</p>{% endfor %}
 <p class="small">Model statystyczny, nie gwarancja wyniku. Przewaga względem kursu często wynika z błędu modelu, nie z błędu bukmachera.</p>
-</body></html>
+{% endblock %}

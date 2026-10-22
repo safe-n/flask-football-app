@@ -44,6 +44,10 @@ def check(df: pd.DataFrame) -> list[tuple[str, str]]:
     if few:
         add("UWAGA", f"drużyny z <10 meczami (model użyje shrinkage): {', '.join(few[:8])}")
 
+    if "season" in df and df["season"].notna().any():
+        have = set(df["season"].dropna().astype(int))
+        gap = sorted(set(range(min(have), max(have) + 1)) - have)
+        add("UWAGA" if gap else "OK", f"brakujące sezony w środku zakresu: {gap}" if gap else "sezony ciągłe, bez luk")
     names = sorted(cnt.index)
     sim = [(a, b) for a, b in combinations(names, 2)
            if difflib.SequenceMatcher(None, a.lower(), b.lower()).ratio() >= 0.85]

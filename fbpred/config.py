@@ -39,7 +39,9 @@ def auto_bootstrap_default(env=None) -> bool:
 
 
 AUTO_BOOTSTRAP = auto_bootstrap_default()
-BOOTSTRAP_LEAGUES = [x.strip() for x in os.getenv("BOOTSTRAP_LEAGUES", DEFAULT_LEAGUE).split(",") if x.strip()]
+# "auto" (domyślnie) = wszystkie ligi, które mają pliki w history/ (bez DEMO); albo jawna lista "E0,D1,SP1"
+BOOTSTRAP_LEAGUES = [x.strip() for x in os.getenv("BOOTSTRAP_LEAGUES", "auto").split(",")
+                     if x.strip() and x.strip().lower() != "auto"]
 BOOTSTRAP_YEARS = int(os.getenv("BOOTSTRAP_YEARS", "4"))   # ile ostatnich sezonów pobrać
 REFRESH_HOURS = float(os.getenv("REFRESH_HOURS", "24"))     # co ile godzin odświeżać (0 = wyłączone)
 LEDGER_CSV = _path("LEDGER_CSV", "ledger/predictions.csv")   # dziennik trzymany w repo (trwały, za darmo)
@@ -48,3 +50,7 @@ HISTORY_DIR = _path("HISTORY_DIR", "history")                # źródło prawdy:
 ARCHIVE_ODDS = os.getenv("ARCHIVE_ODDS", "0") == "1"          # archiwizuj kursy przedmeczowe (włącza CI)
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+
+FDORG_TOKEN = os.getenv("FOOTBALL_DATA_ORG_TOKEN", "")        # darmowy token z football-data.org (Liga Mistrzów + fallback terminarza)
+FDORG_PAUSE = float(os.getenv("FDORG_PAUSE", "6.5"))          # plan darmowy: 10 zapytań/min
+LOG_HORIZON_DAYS = int(os.getenv("LOG_HORIZON_DAYS", "10"))   # prognozy do dziennika tylko na najbliższe N dni

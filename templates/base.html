@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+{% if refresh %}<meta http-equiv="refresh" content="8">{% endif %}
+<title>{{ title }}</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--fg:#1b1f24;--mut:#5b6672;--acc:#0b7a4b;--bar:#e3e9ef;--warn:#9a6700}
+@media (prefers-color-scheme:dark){:root{--bg:#10151a;--card:#182028;--fg:#e8edf2;--mut:#9aa7b4;--acc:#3ecf8e;--bar:#2a3642;--warn:#e3b341}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.4 system-ui,sans-serif;padding:12px;max-width:960px;margin-inline:auto}
+h1{font-size:20px;margin:6px 0 10px}h2{font-size:16px;margin:14px 0 6px}a{color:var(--acc)}
+nav{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px}nav a{text-decoration:none;font-weight:600}
+.card{background:var(--card);border-radius:12px;padding:12px;margin:10px 0;overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:5px 8px;text-align:right;border-bottom:1px solid var(--bar);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}.m{color:var(--mut);font-size:13px}select,button{font-size:15px;padding:5px}
+.row{display:flex;gap:6px;margin:8px 0}.b{flex:1;text-align:center;border-radius:8px;background:var(--bar);padding:6px 2px;font-size:13px}
+.b b{display:block;font-size:16px}.hl{outline:2px solid var(--acc)}.pick{color:var(--warn);font-size:13px;margin-top:6px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}.t{font-weight:600}
+.small{font-size:12px;color:var(--mut);margin-top:16px}.tabs a{margin-right:10px}
+</style>
+</head>
+<body>
+<h1>{{ title }}</h1>
+<nav><a href="/?league={{ league }}">Mecze</a><a href="/match?league={{ league }}">Mecz</a><a href="/stats?league={{ league }}">Statystyki</a>
+<a href="/table?league={{ league }}">Tabela</a><a href="/strengths?league={{ league }}">Siła drużyn</a>
+<a href="/track?league={{ league }}">Dziennik</a><a href="/data?league={{ league }}">Dane</a></nav>
+<form method="get" action="{{ request.path }}"><select name="league" onchange="this.form.submit()">
+{% for code, lab in leagues %}<option value="{{ code }}" {{ 'selected' if code == league }}>{{ lab }}</option>{% endfor %}
+</select></form>
+{% block body %}{% endblock %}
+</body></html>
