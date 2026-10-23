@@ -16,15 +16,22 @@ CREATE TABLE IF NOT EXISTS predictions (
     fixture_id INTEGER PRIMARY KEY,
     league TEXT, date TEXT, home TEXT, away TEXT, logged_at TEXT, model_version TEXT,
     p1 REAL, px REAL, p2 REAL, q1 REAL, qx REAL, q2 REAL,
-    p_over25 REAL, p_btts REAL, p_draw_ht REAL, p_draw_2h REAL,
+    p_over25 REAL, p_btts REAL, p_draw_ht REAL, p_draw_2h REAL, p_draw_either REAL, p_draw_htft REAL,
     o_home REAL, o_draw REAL, o_away REAL, o_over25 REAL, o_under25 REAL,
     payload TEXT
 );
 """
 
 
+NEW_COLS = ("p_draw_either", "p_draw_htft")  # dodane w 0.4.1 - migracja starych baz/dzienników
+
+
 def ensure(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
+    have = {r[1] for r in conn.execute("PRAGMA table_info(predictions)")}
+    for c in NEW_COLS:
+        if c not in have:
+            conn.execute(f"ALTER TABLE predictions ADD COLUMN {c} REAL")
     conn.commit()
 
 
@@ -45,13 +52,15 @@ def log_predictions(conn, predictor, upcoming: pd.DataFrame, league: str, versio
         p = apply_blend(predictor.predict(r["home"], r["away"], r.get("referee")), r, blend_w)
         h = p.get("halves", {})
         q = p.get("1x2_blend") or {}
-        conn.execute(
-            "INSERT OR REPLACE INTO predictions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (int(r["fixture_id"]), str(league), pd.Timestamp(r["date"]).strftime("%Y-%m-%d"), r["home"], r["away"],
-             now, version, p["1x2"]["1"], p["1x2"]["X"], p["1x2"]["2"], q.get("1"), q.get("X"), q.get("2"),
-             p["goals"]["over_2.5"], p["goals"]["btts_yes"], h.get("draw_ht"), h.get("draw_2h"),
-             _f(r.get("o_home")), _f(r.get("o_draw")), _f(r.get("o_away")),
-             _f(r.get("o_over25")), _f(r.get("o_under25")), json.dumps(p)))
+        vals = {"fixture_id": int(r["fixture_id"]), "league": str(league), "date": mdate, "home": r["home"], "away": r["away"],
+                "logged_at": now, "model_version": version, "p1": p["1x2"]["1"], "px": p["1x2"]["X"], "p2": p["1x2"]["2"],
+                "q1": q.get("1"), "qx": q.get("X"), "q2": q.get("2"), "p_over25": p["goals"]["over_2.5"],
+                "p_btts": p["goals"]["btts_yes"], "p_draw_ht": h.get("draw_ht"), "p_draw_2h": h.get("draw_2h"),
+                "p_draw_either": h.get("draw_either_half"), "p_draw_htft": h.get("draw_ht_or_ft"),
+                "o_home": _f(r.get("o_home")), "o_draw": _f(r.get("o_draw")), "o_away": _f(r.get("o_away")),
+                "o_over25": _f(r.get("o_over25")), "o_under25": _f(r.get("o_under25")), "payload": json.dumps(p)}
+        conn.execute(f"INSERT OR REPLACE INTO predictions ({', '.join(vals)}) VALUES ({', '.join('?' * len(vals))})",
+                     tuple(vals.values()))
         n += 1
     conn.commit()
     return n
@@ -93,6 +102,8 @@ def league_base_rates(hist: pd.DataFrame) -> dict:
     t = h.dropna(subset=["hg_ht", "ag_ht"])
     if len(t):
         out["draw_ht"] = float((t.hg_ht == t.ag_ht).mean())
+        out["draw_either"] = float(((t.hg_ht == t.ag_ht) | ((t.hg - t.hg_ht) == (t.ag - t.ag_ht))).mean())
+        out["draw_htft"] = float(((t.hg_ht == t.ag_ht) | (t.hg == t.ag)).mean())
     return out
 
 
@@ -114,10 +125,16 @@ def track_summary(df: pd.DataFrame, min_edge: float = 0.03, base: dict | None = 
     if df["q1"].notna().all():
         r["mix"] = logloss_multi(df[["q1", "qx", "q2"]].to_numpy(), y)
     rows.append(r)
-    for name, pc, yy, bk in (("Over 2.5", "p_over25", (df.hg + df.ag > 2.5).astype(float), "over25"),
-                             ("BTTS", "p_btts", ((df.hg > 0) & (df.ag > 0)).astype(float), "btts"),
-                             ("Remis do przerwy", "p_draw_ht", (df.hg_ht == df.ag_ht).astype(float), "draw_ht")):
-        ok = df[pc].notna() & (df["hg_ht"].notna() if "ht" in name.lower() or "przerwy" in name else True)
+    ht_eq = df.hg_ht == df.ag_ht
+    for name, pc, yy, bk, needs_ht in (
+            ("Over 2.5", "p_over25", (df.hg + df.ag > 2.5).astype(float), "over25", False),
+            ("BTTS", "p_btts", ((df.hg > 0) & (df.ag > 0)).astype(float), "btts", False),
+            ("Remis do przerwy", "p_draw_ht", ht_eq.astype(float), "draw_ht", True),
+            ("Remis HT lub 2H", "p_draw_either", (ht_eq | ((df.hg - df.hg_ht) == (df.ag - df.ag_ht))).astype(float), "draw_either", True),
+            ("Remis HT lub FT", "p_draw_htft", (ht_eq | (df.hg == df.ag)).astype(float), "draw_htft", True)):
+        if pc not in df:
+            continue
+        ok = df[pc].notna() & (df["hg_ht"].notna() if needs_ht else True)
         if ok.sum() == 0:
             continue
         p, t = df.loc[ok, pc].to_numpy(float), yy[ok].to_numpy(float)
@@ -150,7 +167,7 @@ def track_summary(df: pd.DataFrame, min_edge: float = 0.03, base: dict | None = 
 
 # ------------------------------------------------------------------ trwałość w repo (CSV)
 EXPORT_COLS = ["fixture_id", "league", "date", "home", "away", "logged_at", "model_version",
-               "p1", "px", "p2", "q1", "qx", "q2", "p_over25", "p_btts", "p_draw_ht", "p_draw_2h",
+               "p1", "px", "p2", "q1", "qx", "q2", "p_over25", "p_btts", "p_draw_ht", "p_draw_2h", "p_draw_either", "p_draw_htft",
                "o_home", "o_draw", "o_away", "o_over25", "o_under25"]
 
 

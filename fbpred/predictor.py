@@ -17,6 +17,17 @@ def _r(x: float, n: int = 4) -> float:
     return round(float(x), n)
 
 
+DRAW_KEYS = ("draw_ht", "draw_2h", "draw_either_half", "draw_ht_or_ft")
+
+
+def shift_prob(p: float, s: float) -> float:
+    """Przesunięcie prawdopodobieństwa na skali logitów (kalibracja obciążenia modelu)."""
+    if not s:
+        return p
+    p = min(max(p, 1e-6), 1 - 1e-6)
+    return float(1.0 / (1.0 + np.exp(-(np.log(p / (1 - p)) + s))))
+
+
 class MatchPredictor:
     """Trenuje modele na `df` (zakończone mecze jednej ligi).
 
@@ -25,12 +36,14 @@ class MatchPredictor:
     """
 
     def __init__(self, df: pd.DataFrame, as_of=None, min_rows: int = 80,
-                 xi: float = 0.0019, ridge: float = 10.0, shot_weight: float = 0.0):
+                 xi: float = 0.0019, ridge: float = 10.0, shot_weight: float = 0.0,
+                 calib: dict | None = None):
         self.as_of = pd.Timestamp(as_of) if as_of is not None else df["date"].max()
         self.n_matches = len(df)
         self.goals = DixonColes(xi=xi, ridge=ridge).fit(df, self.as_of)
         self.ht = self.h2 = self.yellow = self.corners = self.sot = None
         self.shot_weight = float(shot_weight)
+        self.calib = calib or {}          # {'draw_ht': +0.05, ...} - przesunięcia logitów z `tune`
         self.conv = (0.3, 0.3)
 
         def ok(cols):
@@ -103,14 +116,14 @@ class MatchPredictor:
             "exact_total": {k: _r(v) for k, v in mk.exact_total(tot).items()},
         }
         if self.ht and self.h2:
-            out["halves"] = self._halves(home, away)
+            out["halves"] = self._halves(home, away, out["1x2"]["X"])
         if self.yellow:
             out["yellow"] = self._count(self.yellow, home, away, referee, YELLOW_LINES, 15)
         if self.corners:
             out["corners"] = self._count(self.corners, home, away, None, CORNER_LINES, 30)
         return out
 
-    def _halves(self, home: str, away: str) -> dict:
+    def _halves(self, home: str, away: str, ft_draw: float) -> dict:
         def mat(model):
             ph = model.pmf(model.mean(home, away, 1), 10)
             pa = model.pmf(model.mean(away, home, 0), 10)
@@ -120,18 +133,26 @@ class MatchPredictor:
         m2, h2, a2 = mat(self.h2)
         d1, d2 = float(np.trace(m1)), float(np.trace(m2))
         t1, t2 = mk.total_pmf(m1), mk.total_pmf(m2)
+        htft = mk.htft(m1, m2)
+        both = htft["X/X"]                                   # remis do przerwy ORAZ na koniec
+        # P(HT lub FT) = P(HT) + P(FT) - P(oba); FT z głównego modelu (z korektą niskich wyników), granice Frécheta
+        ht_or_ft = min(1.0, max(d1, ft_draw, d1 + ft_draw - both))
+        either = 1 - (1 - d1) * (1 - d2)
+        sh = lambda k, v: shift_prob(v, self.calib.get(k, 0.0))  # noqa: E731
         return {
             "xg_ht": {"home": _r(h1, 2), "away": _r(a1, 2)},
             "xg_2h": {"home": _r(h2, 2), "away": _r(a2, 2)},
             "ht_1x2": {k: _r(v) for k, v in mk.outcome_1x2(m1).items()},
             "2h_1x2": {k: _r(v) for k, v in mk.outcome_1x2(m2).items()},
-            "draw_ht": _r(d1),
-            "draw_2h": _r(d2),
-            "draw_either_half": _r(1 - (1 - d1) * (1 - d2)),
+            "draw_ht": _r(sh("draw_ht", d1)),
+            "draw_2h": _r(sh("draw_2h", d2)),
+            "draw_either_half": _r(sh("draw_either_half", either)),       # remis w 1. LUB 2. połowie
+            "draw_ht_or_ft": _r(sh("draw_ht_or_ft", ht_or_ft)),           # remis do przerwy LUB na koniec meczu
+            "draw_ft": _r(ft_draw),
             "draw_both_halves": _r(d1 * d2),
             "over_0.5_ht": _r(mk.over(t1, 0.5)),
             "over_1.5_2h": _r(mk.over(t2, 1.5)),
-            "htft": {k: _r(v) for k, v in mk.htft(m1, m2).items()},
+            "htft": {k: _r(v) for k, v in htft.items()},
         }
 
     def _count(self, model: CountModel, home, away, ref, lines, kmax) -> dict:

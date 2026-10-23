@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from flask import Flask, abort, jsonify, render_template, request
 
-from . import bootstrap, config, db, history, ledger, leagues as lg_cat, params as prm, stats
+from . import bootstrap, config, db, draws, history, ledger, leagues as lg_cat, params as prm, stats
 from .odds import apply_blend, value_picks
 from .simulate import simulate_table
 
@@ -42,6 +42,9 @@ def match_sections(p: dict) -> tuple[dict, list[tuple[str, list]], list[str]]:
         S.append(("Połowy", [("Remis do przerwy", _pct(h["draw_ht"])), ("Remis w 2. połowie", _pct(h["draw_2h"])),
                              ("Remis w którejkolwiek", _pct(h["draw_either_half"])), ("Remis w obu", _pct(h["draw_both_halves"])),
                              ("Gol w 1. połowie", _pct(h["over_0.5_ht"]))]))
+        S.append(("Remisy: HT / FT", [("Remis do przerwy LUB na koniec", _pct(h["draw_ht_or_ft"])),
+                                      ("Remis w 1. LUB 2. połowie", _pct(h["draw_either_half"])),
+                                      ("Remis na koniec meczu", _pct(h["draw_ft"])), ("Remis do przerwy i na koniec", _pct(h["htft"]["X/X"]))]))
         S.append(("Połowa/mecz (najczęstsze)", [(k, _pct(v)) for k, v in best]))
     for key, title in (("yellow", "Żółte kartki"), ("corners", "Rzuty rożne")):
         if key in p:
@@ -141,6 +144,29 @@ def create_app() -> Flask:
             head, sections, notes = match_sections(P.predict(home, away, referee))
             ctx.update(head=head, sections=sections, notes=notes)
         return render_template("match.html", **ctx)
+
+    @app.get("/draws")
+    def draws_page():
+        league = league_arg()
+        market = request.args.get("market", "ht_or_ft")
+        days = max(1, min(int(request.args.get("days", 7)), 30))
+        if market not in draws.MARKETS:
+            abort(400, f"Nieznany rynek. Dostępne: {', '.join(draws.MARKETS)}")
+        P, p, df = model(league)
+        up = db.load_upcoming(db.connect(config.DB_PATH), league)
+        title = draws.MARKETS[market][0]
+        tabs = ("tabs", [(lab.split(" ", 1)[1] if False else lab, f"/draws?league={league}&market={k}&days={days}")
+                         for k, (lab, _) in draws.MARKETS.items()])
+        base = draws.base_rates(df).get(market)
+        note = ("p", f"{title}. Średnia ligi z historii: {100 * base:.1f}%. " if base else f"{title}. ")
+        note = ("p", note[1] + "kurs_fair = 1/prawdopodobieństwo (bez marży bukmachera) - stawiaj tylko, gdy kurs u bukmachera jest "
+                "wyraźnie wyższy. 'vs_liga_pp' = o ile punktów proc. powyżej średniej ligi.")
+        if any((p.get("draw_shift") or {}).values()):
+            note = ("p", note[1] + f" Zastosowano kalibrację z tune: {p['draw_shift']}.")
+        t = draws.draw_table(P, df, up, market, days)
+        if t.empty:
+            return page("Remisy", league, tabs, ("p", f"Brak nadchodzących meczów w ciągu {days} dni (zajrzyj na stronę Dane)."))
+        return page(f"Remisy · {lg_cat.name(league)}", league, tabs, note, ("t", t))
 
     @app.get("/stats")
     def stats_page():

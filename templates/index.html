@@ -12,6 +12,9 @@
     {% if p.halves %}<div class="b">Remis HT<b>{{ '%.0f'|format(p.halves.draw_ht*100) }}%</b></div>
     <div class="b">Remis 2H<b>{{ '%.0f'|format(p.halves.draw_2h*100) }}%</b></div>{% endif %}
   </div>
+  {% if p.halves %}<div class="row"><div class="b">HT lub 2H<b>{{ '%.0f'|format(p.halves.draw_either_half*100) }}%</b></div>
+    <div class="b">HT lub FT<b>{{ '%.0f'|format(p.halves.draw_ht_or_ft*100) }}%</b></div>
+    <div class="b">Remis FT<b>{{ '%.0f'|format(p.halves.draw_ft*100) }}%</b></div></div>{% endif %}
   <div class="m">{% if p.yellow %}Żółte: śr. {{ p.yellow.total_mean }} (O3.5 {{ '%.0f'|format(p.yellow.over['3.5']*100) }}%){% endif %}
   {% if p.corners %} · Rożne: śr. {{ p.corners.total_mean }} (O9.5 {{ '%.0f'|format(p.corners.over['9.5']*100) }}%){% endif %}</div>
   {% for k in it.picks %}<div class="pick">⚑ {{ k.rynek }}: kurs {{ k.kurs }}, przewaga {{ '%+.1f'|format(k.edge*100) }}%{% if k.edge > 0.15 %} ⚠ podejrzanie duża - to zwykle błąd modelu{% endif %}</div>{% endfor %}

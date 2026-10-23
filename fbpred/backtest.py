@@ -80,6 +80,8 @@ def _baselines(train: pd.DataFrame) -> dict:
         t = train.dropna(subset=["hg_ht", "ag_ht"])
         b["b_draw_ht"] = (t.hg_ht == t.ag_ht).mean()
         b["b_draw_2h"] = ((t.hg - t.hg_ht) == (t.ag - t.ag_ht)).mean()
+        b["b_draw_either"] = ((t.hg_ht == t.ag_ht) | ((t.hg - t.hg_ht) == (t.ag - t.ag_ht))).mean()
+        b["b_draw_htft"] = ((t.hg_ht == t.ag_ht) | (t.hg == t.ag)).mean()
     if train["h_yellow"].notna().any():
         t = train.dropna(subset=["h_yellow", "a_yellow"])
         b["b_yel"] = ((t.h_yellow + t.a_yellow) > YELLOW_LINE).mean()
@@ -109,7 +111,11 @@ def _record(P: MatchPredictor, r, base: dict) -> dict:
         rec.update(y_draw_ht=int(r.hg_ht == r.ag_ht), p_draw_ht=p["halves"]["draw_ht"],
                    b_draw_ht=base.get("b_draw_ht"),
                    y_draw_2h=int((r.hg - r.hg_ht) == (r.ag - r.ag_ht)),
-                   p_draw_2h=p["halves"]["draw_2h"], b_draw_2h=base.get("b_draw_2h"))
+                   p_draw_2h=p["halves"]["draw_2h"], b_draw_2h=base.get("b_draw_2h"),
+                   y_draw_either=int(r.hg_ht == r.ag_ht or (r.hg - r.hg_ht) == (r.ag - r.ag_ht)),
+                   p_draw_either=p["halves"]["draw_either_half"], b_draw_either=base.get("b_draw_either"),
+                   y_draw_htft=int(r.hg_ht == r.ag_ht or r.hg == r.ag),
+                   p_draw_htft=p["halves"]["draw_ht_or_ft"], b_draw_htft=base.get("b_draw_htft"))
     if "yellow" in p and pd.notna(r.h_yellow):
         rec.update(y_yel=int(r.h_yellow + r.a_yellow > YELLOW_LINE),
                    p_yel=p["yellow"]["over"][str(YELLOW_LINE)], b_yel=base.get("b_yel"))
@@ -150,6 +156,8 @@ def summarize(res: pd.DataFrame) -> pd.DataFrame:
     binrow("BTTS", "y_btts", "p_btts", "b_btts")
     binrow("Remis do przerwy", "y_draw_ht", "p_draw_ht", "b_draw_ht")
     binrow("Remis 2. połowa", "y_draw_2h", "p_draw_2h", "b_draw_2h")
+    binrow("Remis HT lub 2H", "y_draw_either", "p_draw_either", "b_draw_either")
+    binrow("Remis HT lub FT", "y_draw_htft", "p_draw_htft", "b_draw_htft")
     binrow(f"Żółte >{YELLOW_LINE}", "y_yel", "p_yel", "b_yel")
     binrow(f"Rożne >{CORNER_LINE}", "y_cor", "p_cor", "b_cor")
     t = pd.DataFrame(out)
@@ -247,3 +255,53 @@ def compare_report(res: pd.DataFrame) -> list[str]:
         lines.append(f"Optymalny miks: {int(bl['w'] * 100)}% model + {int(100 - bl['w'] * 100)}% rynek → log-loss "
                      f"{bl['logloss']:.4f} (sam rynek {bl['rynek']:.4f}, zysk {gain:+.2f}%)")
     return lines
+
+
+# ---------------------------------------------------------------- obciążenie (czy model zawyża/zaniża?)
+BIAS_MARKETS = [("Over 2.5", "y_over25", "p_over25"), ("BTTS", "y_btts", "p_btts"),
+                ("Remis do przerwy", "y_draw_ht", "p_draw_ht"), ("Remis 2. połowa", "y_draw_2h", "p_draw_2h"),
+                ("Remis HT lub 2H", "y_draw_either", "p_draw_either"), ("Remis HT lub FT", "y_draw_htft", "p_draw_htft"),
+                (f"Żółte >{YELLOW_LINE}", "y_yel", "p_yel"), (f"Rożne >{CORNER_LINE}", "y_cor", "p_cor")]
+
+
+def bias_table(res: pd.DataFrame) -> pd.DataFrame:
+    """Średnia prognoza vs faktyczna częstość. 'wniosek' ostrzega, gdy różnica wykracza poza ~2 błędy standardowe."""
+    rows = []
+    for name, yc, pc in BIAS_MARKETS:
+        if yc not in res or pc not in res:
+            continue
+        s = res.dropna(subset=[yc, pc])
+        if len(s) < 50:
+            continue
+        avg_p, freq = float(s[pc].mean()), float(s[yc].mean())
+        se = float(np.sqrt(max(freq * (1 - freq), 1e-9) / len(s)))
+        diff = avg_p - freq
+        rows.append({"rynek": name, "n": len(s), "srednia_prognoza_%": 100 * avg_p, "faktycznie_%": 100 * freq,
+                     "roznica_pp": 100 * diff,
+                     "wniosek": "ok" if abs(diff) <= 2 * se else ("model ZAWYŻA" if diff > 0 else "model ZANIŻA")})
+    return pd.DataFrame(rows).round(2)
+
+
+def bias_shift(res: pd.DataFrame, ycol: str, pcol: str, min_n: int = 200) -> float:
+    """Przesunięcie logitów s tak, by średnia skorygowana prognoza = faktycznej częstości (0 przy małej próbie)."""
+    from scipy.optimize import brentq
+    if ycol not in res or pcol not in res:
+        return 0.0
+    s = res.dropna(subset=[ycol, pcol])
+    if len(s) < min_n:
+        return 0.0
+    p = np.clip(s[pcol].to_numpy(float), 1e-6, 1 - 1e-6)
+    target = float(s[ycol].mean())
+    se = float(np.sqrt(max(target * (1 - target), 1e-9) / len(s)))
+    if abs(float(p.mean()) - target) <= 3 * se:   # różnica nieodróżnialna od szumu (3 SE) -> nie korygujemy
+        return 0.0
+    z = np.log(p / (1 - p))
+    f = lambda sh: float(np.mean(1 / (1 + np.exp(-(z + sh)))) - target)  # noqa: E731
+    if f(-3) * f(3) > 0:
+        return 0.0
+    return round(float(brentq(f, -3, 3)), 3)
+
+
+# klucz w prognozie -> (kolumna faktów, kolumna prognoz) w wynikach backtestu
+DRAW_CALIB = {"draw_ht": ("y_draw_ht", "p_draw_ht"), "draw_2h": ("y_draw_2h", "p_draw_2h"),
+              "draw_either_half": ("y_draw_either", "p_draw_either"), "draw_ht_or_ft": ("y_draw_htft", "p_draw_htft")}

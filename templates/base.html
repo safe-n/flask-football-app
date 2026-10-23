@@ -22,7 +22,7 @@ th:first-child,td:first-child{text-align:left}.m{color:var(--mut);font-size:13px
 </head>
 <body>
 <h1>{{ title }}</h1>
-<nav><a href="/?league={{ league }}">Mecze</a><a href="/match?league={{ league }}">Mecz</a><a href="/stats?league={{ league }}">Statystyki</a>
+<nav><a href="/?league={{ league }}">Mecze</a><a href="/match?league={{ league }}">Mecz</a><a href="/draws?league={{ league }}">Remisy</a><a href="/stats?league={{ league }}">Statystyki</a>
 <a href="/table?league={{ league }}">Tabela</a><a href="/strengths?league={{ league }}">Siła drużyn</a>
 <a href="/track?league={{ league }}">Dziennik</a><a href="/data?league={{ league }}">Dane</a></nav>
 <form method="get" action="{{ request.path }}"><select name="league" onchange="this.form.submit()">

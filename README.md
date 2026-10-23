@@ -226,3 +226,20 @@ W konsoli: `python -m fbpred stats --league E0 --view referees` / `--view teams`
 Terminarz pochodzi z `fixtures.csv` (football-data.co.uk), a gdy tam nie ma meczów danej ligi - z football-data.org (jeśli ustawiono
 token). Strona **Dane** pokazuje teraz krok po kroku, co się udało, a co nie (np. "plik pobrany, ale bez nadchodzących meczów tej ligi"
 albo "zapas wyłączony: brak tokenu"). Bez tokenu i z pustym `fixtures.csv` terminarza po prostu nie ma skąd wziąć.
+
+
+## Rynki remisowe (0.4.1)
+
+Model zna pięć rynków remisowych i liczy je z oczekiwanych goli osobno dla 1. i 2. połowy (Poisson / ujemna dwumianowa):
+**remis do przerwy**, **remis w 2. połowie**, **remis w 1. LUB 2. połowie** (`draw_either_half`),
+**remis do przerwy LUB na koniec meczu** (`draw_ht_or_ft` = P(HT) + P(FT) − P(HT i FT)) oraz remis na koniec meczu.
+Jak xG wpływa na remis: im więcej goli oczekiwanych w połowie, tym rzadszy remis (suma xG 0,6 → ~60%, 1,2 → ~42%, 2,0 → ~31%),
+a mecze wyrównane remisują częściej niż jednostronne. Dokładny rachunek robi aplikacja, więc nie trzeba go liczyć ręcznie.
+
+* Strona **Remisy** (`/draws`) i komenda `python -m fbpred draws --market ht_or_ft` rankingują nadchodzące mecze,
+  pokazują uczciwy kurs (1/p) i różnicę względem średniej ligi. Stawiaj tylko, gdy kurs bukmachera jest wyraźnie wyższy.
+* `backtest` wypisuje **tabelę obciążenia** (średnia prognoza vs faktyczna częstość) i werdykt „zawyża / zaniża / ok”.
+* `tune` (etap 3) koryguje obciążenie tych rynków przesunięciem logitów, ale tylko gdy różnica przekracza 3 błędy
+  standardowe (inaczej model goniłby za szumem). Dziennik prognoz zapisuje oba nowe rynki, więc `track` pokaże ich skuteczność na żywo.
+* Uwaga: football-data.co.uk nie ma kursów na remis do przerwy ani na „HT lub FT”, więc nie da się policzyć zysku z historii;
+  można sprawdzić tylko, czy prawdopodobieństwa są wiarygodne. Opłacalność zweryfikujesz porównując `kurs_fair` z kursem u bukmachera.

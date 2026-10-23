@@ -21,7 +21,8 @@ def format_match(pred: dict, row: dict, picks: list[dict]) -> str:
              + (f"  (rynek {_pct(pred['market_1x2']['1'])}/{_pct(pred['market_1x2']['X'])}/{_pct(pred['market_1x2']['2'])})"
                 if "market_1x2" in pred else ""),
              f" O2.5 {_pct(pred['goals']['over_2.5'])}% · BTTS {_pct(pred['goals']['btts_yes'])}%"
-             + (f" · remis HT {_pct(pred['halves']['draw_ht'])}%" if "halves" in pred else "")]
+             + (f" · remis HT {_pct(pred['halves']['draw_ht'])}% · HT lub FT {_pct(pred['halves']['draw_ht_or_ft'])}%"
+                if "halves" in pred else "")]
     if "yellow" in pred:
         lines.append(f" żółte śr. {pred['yellow']['total_mean']} · rożne śr. {pred.get('corners', {}).get('total_mean', '–')}")
     for k in picks[:2]:

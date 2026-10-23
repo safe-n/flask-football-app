@@ -10,7 +10,9 @@ import numpy as np
 import pandas as pd
 
 from . import config, csvdata, db, history, ledger, notify, params as prm, quality, report, stats as stats_mod
-from .backtest import (best_blend, betting_sim, calibration, compare_report, summarize, walk_forward)
+from .backtest import (DRAW_CALIB, best_blend, betting_sim, bias_shift, bias_table, calibration, compare_report,
+                       summarize, walk_forward)
+from . import draws as draws_mod
 from .odds import apply_blend, value_picks
 from .predictor import format_prediction
 from .simulate import simulate_table
@@ -139,6 +141,24 @@ def cmd_stats(a):
     print(t.to_string(index=False) if not t.empty else "Brak statystyk kartek/rożnych w danych tej ligi.")
 
 
+def cmd_draws(a):
+    conn = db.connect(config.DB_PATH)
+    df, up = db.load_matches(conn, a.league), db.load_upcoming(conn, a.league)
+    if df.empty or up.empty:
+        sys.exit("Brak danych lub nadchodzących meczów (zajrzyj na stronę /data albo uruchom fetch-fixtures).")
+    P, p = _predictor(a, df)
+    t = draws_mod.draw_table(P, df, up, a.market, a.days, a.top)
+    title, _ = draws_mod.MARKETS[a.market]
+    if t.empty:
+        sys.exit(f"Brak meczów w horyzoncie {a.days} dni.")
+    base = draws_mod.base_rates(df).get(a.market)
+    print(f"{title} - mecze w ciągu {a.days} dni (średnia ligi: {100 * base:.1f}%)\n" if base else f"{title}\n")
+    print(t.to_string(index=False))
+    print("\nkurs_fair = 1/prawdopodobieństwo (bez marży). Opłaca się, gdy kurs bukmachera jest WYRAŹNIE wyższy.")
+    if p.get("draw_shift") and any(p["draw_shift"].values()):
+        print(f"(zastosowano kalibrację z tune: {p['draw_shift']})")
+
+
 def cmd_predict(a):
     df = _load(a)
     P, p = _predictor(a, df)
@@ -191,6 +211,10 @@ def cmd_backtest(a):
     res = walk_forward(df, a.min_train, a.step, ridge=p["ridge"], xi=p["xi"], shot_weight=p["shot_weight"])
     print("\nLog-loss (mniej = lepiej). 'vs_baseline_%' > 0: model lepszy od średniej ligowej.\n")
     print(summarize(res).to_string(index=False))
+    bt = bias_table(res)
+    if not bt.empty:
+        print("\nCzy model zawyża/zaniża? (średnia prognoza vs faktyczna częstość; 'tune' koryguje istotne obciążenie remisów)\n")
+        print(bt.to_string(index=False))
     print()
     for line in compare_report(res):
         print(" •", line)
@@ -234,7 +258,16 @@ def cmd_tune(a):
             if ll < best_sw[0] - 1e-6:
                 best_sw = (ll, cand, bl["w"] if bl else w)
         _, sw, w = best_sw
-    f = prm.save(a.league, {"ridge": r, "xi": x, "blend_w": w, "shot_weight": sw})
+    print("\nEtap 3: kalibracja rynków remisowych")
+    res_f = walk_forward(df, a.min_train, a.step, progress=False, ridge=r, xi=x, shot_weight=sw)
+    bl = best_blend(res_f)
+    w = bl["w"] if bl else w
+    shifts = {k: bias_shift(res_f, yc, pc) for k, (yc, pc) in DRAW_CALIB.items()}
+    bt = bias_table(res_f)
+    if not bt.empty:
+        print(bt.to_string(index=False))
+    print(f"  przesunięcia logitów (0 = brak istotnego obciążenia): {shifts}")
+    f = prm.save(a.league, {"ridge": r, "xi": x, "blend_w": w, "shot_weight": sw, "draw_shift": shifts})
     print(f"\nNajlepsze: ridge={r}, xi={x}, shot_weight={sw}, waga modelu w miksie z rynkiem={w}  → zapisano {f}")
     print("Uwaga: strojenie na tych samych danych co ocena zawyża wynik - traktuj jako wskazówkę.")
 
@@ -412,6 +445,10 @@ def main(argv=None):
     s.add_argument("--view", choices=["referees", "teams"], default="referees")
     s.add_argument("--seasons", type=int, default=2)
     s.add_argument("--min-matches", type=int, default=8)
+    s = add("draws", cmd_draws, "ranking meczów pod rynki remisowe (HT, 2H, HT lub FT...)")
+    s.add_argument("--market", choices=list(draws_mod.MARKETS), default="ht_or_ft")
+    s.add_argument("--days", type=int, default=7)
+    s.add_argument("--top", type=int, default=15)
     s = add("predict", cmd_predict, "prognoza jednego meczu")
     s.add_argument("--home", required=True)
     s.add_argument("--away", required=True)
