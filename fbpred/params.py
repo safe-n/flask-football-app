@@ -9,7 +9,7 @@ import pandas as pd
 from . import config
 from .predictor import MatchPredictor
 
-DEFAULTS = {"ridge": 10.0, "xi": 0.0019, "blend_w": None, "shot_weight": 0.0, "draw_shift": {}}
+DEFAULTS = {"ridge": 10.0, "xi": 0.0019, "blend_w": None, "shot_weight": 0.0, "draw_shift": {}, "fatigue": {}}
 
 
 def _file(league: str) -> Path:
@@ -33,5 +33,11 @@ def save(league: str, params: dict) -> Path:
 
 def build_predictor(df: pd.DataFrame, league: str, **override) -> tuple[MatchPredictor, dict]:
     p = {**load(league), **{k: v for k, v in override.items() if v is not None}}
+    cal = None
+    try:                                           # kalendarz odpoczynku (liga + ewentualnie LM z bazy)
+        from . import db, rest
+        cal = rest.build_calendar(df, db.connect(config.DB_PATH))
+    except Exception:  # noqa: BLE001 - brak kalendarza nie może blokować prognoz
+        cal = None
     return MatchPredictor(df, ridge=p["ridge"], xi=p["xi"], shot_weight=p.get("shot_weight", 0.0),
-                          calib=p.get("draw_shift") or None), p
+                          calib=p.get("draw_shift") or None, calendar=cal, fatigue=p.get("fatigue") or None), p

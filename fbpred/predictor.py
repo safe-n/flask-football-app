@@ -37,13 +37,15 @@ class MatchPredictor:
 
     def __init__(self, df: pd.DataFrame, as_of=None, min_rows: int = 80,
                  xi: float = 0.0019, ridge: float = 10.0, shot_weight: float = 0.0,
-                 calib: dict | None = None):
+                 calib: dict | None = None, calendar=None, fatigue: dict | None = None):
         self.as_of = pd.Timestamp(as_of) if as_of is not None else df["date"].max()
         self.n_matches = len(df)
         self.goals = DixonColes(xi=xi, ridge=ridge).fit(df, self.as_of)
         self.ht = self.h2 = self.yellow = self.corners = self.sot = None
         self.shot_weight = float(shot_weight)
         self.calib = calib or {}          # {'draw_ht': +0.05, ...} - przesunięcia logitów z `tune`
+        self.calendar = calendar          # rest.Calendar - dni odpoczynku (informacyjnie; korekta tylko z istotnymi współczynnikami)
+        self.fatigue = fatigue or {}      # {'own_short': -0.1, ...} z `fatigue-test --apply`
         self.conv = (0.3, 0.3)
 
         def ok(cols):
@@ -73,7 +75,7 @@ class MatchPredictor:
         return self.goals.teams
 
     # ------------------------------------------------------------ lambdy i macierz wyników
-    def lambdas(self, home: str, away: str) -> tuple[float, float]:
+    def lambdas(self, home: str, away: str, adj: tuple[float, float] = (1.0, 1.0)) -> tuple[float, float]:
         """Oczekiwane gole; z celnymi strzałami: średnia geometryczna (1-w)*gole + w*strzały."""
         lh, la = self.goals.lambdas(home, away)
         if self.sot is not None:
@@ -82,22 +84,47 @@ class MatchPredictor:
             sa = max(self.sot.mean(away, home, 0) * self.conv[1], 0.05)
             lh = float(np.exp((1 - b) * np.log(lh) + b * np.log(sh)))
             la = float(np.exp((1 - b) * np.log(la) + b * np.log(sa)))
-        return lh, la
+        return lh * adj[0], la * adj[1]
 
-    def matrix(self, home: str, away: str) -> np.ndarray:
-        lh, la = self.lambdas(home, away)
+    def matrix(self, home: str, away: str, adj: tuple[float, float] = (1.0, 1.0)) -> np.ndarray:
+        lh, la = self.lambdas(home, away, adj)
         return score_matrix(lh, la, self.goals.rho)
 
+    # ------------------------------------------------------------ odpoczynek i korekty
+    def rest_info(self, home: str, away: str, date) -> dict | None:
+        if self.calendar is None or date is None:
+            return None
+        return self.calendar.info(home, away, date)
+
+    def fatigue_factors(self, rest: dict | None) -> tuple[float, float]:
+        """Mnożniki oczekiwanych goli (gospodarz, gość) - tylko z współczynników, które przeszły test istotności."""
+        if not rest or not self.fatigue:
+            return 1.0, 1.0
+        c = self.fatigue
+        eh = c.get("own_short", 0) * rest["home_short"] + c.get("opp_short", 0) * rest["away_short"] \
+            + c.get("own_cl", 0) * rest["home_cl"] + c.get("opp_cl", 0) * rest["away_cl"]
+        ea = c.get("own_short", 0) * rest["away_short"] + c.get("opp_short", 0) * rest["home_short"] \
+            + c.get("own_cl", 0) * rest["away_cl"] + c.get("opp_cl", 0) * rest["home_cl"]
+        return float(np.exp(eh)), float(np.exp(ea))
+
     # ------------------------------------------------------------ predict
-    def predict(self, home: str, away: str, referee: str | None = None) -> dict:
+    def predict(self, home: str, away: str, referee: str | None = None, date=None,
+                adj: tuple[float, float] | None = None) -> dict:
+        """date -> uwzględnia dni odpoczynku; adj=(mnożnik xG gospodarzy, gości) -> ręczna korekta (kontuzje, rotacja...)."""
         g = self.goals
-        lh, la = self.lambdas(home, away)
-        m = self.matrix(home, away)
+        rest = self.rest_info(home, away, date)
+        fh, fa = self.fatigue_factors(rest)
+        mh, ma = adj or (1.0, 1.0)
+        A = (fh * mh, fa * ma)
+        lh, la = self.lambdas(home, away, A)
+        m = score_matrix(lh, la, g.rho)
         tot = mk.total_pmf(m)
         out: dict = {
             "home": home, "away": away, "referee": referee,
             "unknown_teams": [t for t in (home, away) if not g.knows(t)],
             "xg": {"home": _r(lh, 2), "away": _r(la, 2)},
+            **({"rest": {**rest, "factors": (_r(fh, 3), _r(fa, 3))}} if rest else {}),
+            **({"manual_adj": (mh, ma)} if (mh, ma) != (1.0, 1.0) else {}),
             "1x2": {k: _r(v) for k, v in mk.outcome_1x2(m).items()},
             "goals": {
                 **{f"over_{l}": _r(mk.over(tot, l)) for l in GOAL_LINES},
@@ -116,18 +143,17 @@ class MatchPredictor:
             "exact_total": {k: _r(v) for k, v in mk.exact_total(tot).items()},
         }
         if self.ht and self.h2:
-            out["halves"] = self._halves(home, away, out["1x2"]["X"])
+            out["halves"] = self._halves(home, away, out["1x2"]["X"], A)
         if self.yellow:
             out["yellow"] = self._count(self.yellow, home, away, referee, YELLOW_LINES, 15)
         if self.corners:
             out["corners"] = self._count(self.corners, home, away, None, CORNER_LINES, 30)
         return out
 
-    def _halves(self, home: str, away: str, ft_draw: float) -> dict:
+    def _halves(self, home: str, away: str, ft_draw: float, A: tuple[float, float] = (1.0, 1.0)) -> dict:
         def mat(model):
-            ph = model.pmf(model.mean(home, away, 1), 10)
-            pa = model.pmf(model.mean(away, home, 0), 10)
-            return np.outer(ph, pa), model.mean(home, away, 1), model.mean(away, home, 0)
+            mh, ma = model.mean(home, away, 1) * A[0], model.mean(away, home, 0) * A[1]
+            return np.outer(model.pmf(mh, 10), model.pmf(ma, 10)), mh, ma
 
         m1, h1, a1 = mat(self.ht)
         m2, h2, a2 = mat(self.h2)
@@ -179,6 +205,15 @@ def format_prediction(p: dict) -> str:
     if p["unknown_teams"]:
         L.append(f"! Brak historii dla: {', '.join(p['unknown_teams'])} (użyto średniej ligowej)")
     L.append(f"Oczekiwane gole: {p['xg']['home']} - {p['xg']['away']}")
+    if "rest" in p:
+        rs = p["rest"]
+        d = lambda side: "?" if rs[f"{side}_days"] is None else f"{rs[f'{side}_days']} dni" + (" (LM)" if rs[f"{side}_tag"] == "CL" else "")  # noqa: E731
+        warn = "  ⚠ krótka przerwa" if rs["home_short"] or rs["away_short"] else ""
+        L.append(f"Odpoczynek: gospodarz {d('home')}, gość {d('away')}{warn}")
+        if rs["factors"] != (1.0, 1.0):
+            L.append(f"  korekta zmęczenia xG: ×{rs['factors'][0]} / ×{rs['factors'][1]}")
+    if "manual_adj" in p:
+        L.append(f"  ręczna korekta xG: ×{p['manual_adj'][0]} / ×{p['manual_adj'][1]}")
     x = p["1x2"]
     L.append(f"\n1X2:   1 {pct(x['1'])}   X {pct(x['X'])}   2 {pct(x['2'])}")
     g = p["goals"]

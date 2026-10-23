@@ -52,6 +52,19 @@ def match_sections(p: dict) -> tuple[dict, list[tuple[str, list]], list[str]]:
             S.append((f"{title} (śr. {c['total_mean']} = {c['home_mean']} + {c['away_mean']})",
                       [(f"Over {k}", _pct(v)) for k, v in c["over"].items()] +
                       [("Gospodarz więcej", _pct(c["more_than_opponent"]["home"])), ("Gość więcej", _pct(c["more_than_opponent"]["away"]))]))
+    if "rest" in p or "manual_adj" in p:
+        rows = []
+        if "rest" in p:
+            rs = p["rest"]
+            for side, lab in (("home", "Gospodarz"), ("away", "Gość")):
+                days = rs[f"{side}_days"]
+                tag = " (Liga Mistrzów)" if rs[f"{side}_tag"] == "CL" else ""
+                rows.append((f"{lab}: dni od ostatniego meczu", "brak danych" if days is None else f"{days}{tag}" + ("  ⚠" if rs[f"{side}_short"] else "")))
+            if rs["factors"] != (1.0, 1.0):
+                rows.append(("Korekta zmęczenia xG (test)", f"×{rs['factors'][0]} / ×{rs['factors'][1]}"))
+        if "manual_adj" in p:
+            rows.append(("Ręczna korekta xG", f"×{p['manual_adj'][0]} / ×{p['manual_adj'][1]}"))
+        S.insert(0, ("Odpoczynek i korekty", rows))
     notes = [] if "yellow" in p else ["Brak statystyk kartek/rożnych w danych tej ligi (np. Liga Mistrzów z darmowego źródła ich nie zawiera)."]
     return head, S, notes
 
@@ -121,7 +134,7 @@ def create_app() -> Flask:
         if not up.empty:
             P, p, _ = model(league)
             for r in up.head(40).to_dict("records"):
-                pred = apply_blend(P.predict(r["home"], r["away"], r.get("referee")), r, p["blend_w"])
+                pred = apply_blend(P.predict(r["home"], r["away"], r.get("referee"), date=r["date"]), r, p["blend_w"])
                 items.append({"row": r, "p": pred, "picks": value_picks(pred, r)})
         return render_template("index.html", items=items, league=league, leagues=league_options(),
                                title=f"Mecze · {lg_cat.name(league)}")
@@ -134,14 +147,20 @@ def create_app() -> Flask:
         home = request.args.get("home") or (teams[0] if teams else "")
         away = request.args.get("away") or (teams[1] if len(teams) > 1 else "")
         referee = request.args.get("referee") or None
+        date = request.args.get("date") or None
+        try:
+            adj_h, adj_a = float(request.args.get("adj_h", 1.0)), float(request.args.get("adj_a", 1.0))
+        except ValueError:
+            adj_h = adj_a = 1.0
         recent = stats.season_slice(df, 2)
         refs = sorted(recent["referee"].dropna().unique()) if "referee" in recent else []
         ctx = dict(title=f"Podgląd meczu · {lg_cat.name(league)}", league=league, leagues=league_options(), teams=teams,
-                   referees=refs, home=home, away=away, referee=referee, head=None, sections=[], notes=[])
+                   referees=refs, home=home, away=away, referee=referee, head=None, sections=[], notes=[],
+                   date=date or "", adj_h=adj_h, adj_a=adj_a, adj_opts=[0.7, 0.8, 0.9, 1.0, 1.1, 1.2])
         if request.args.get("home") and request.args.get("away") and home != away:
             if home not in P.teams or away not in P.teams:
                 abort(404, f"Nieznana drużyna: {home if home not in P.teams else away}")
-            head, sections, notes = match_sections(P.predict(home, away, referee))
+            head, sections, notes = match_sections(P.predict(home, away, referee, date=date, adj=(adj_h, adj_a)))
             ctx.update(head=head, sections=sections, notes=notes)
         return render_template("match.html", **ctx)
 

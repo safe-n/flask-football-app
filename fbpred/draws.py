@@ -34,7 +34,7 @@ def draw_table(P, df: pd.DataFrame, upcoming: pd.DataFrame, market: str = "ht_or
     for r in upcoming[upcoming["date"] <= horizon].to_dict("records"):
         if r["home"] not in P.teams or r["away"] not in P.teams:
             continue
-        p = P.predict(r["home"], r["away"], r.get("referee"))
+        p = P.predict(r["home"], r["away"], r.get("referee"), date=r["date"])
         if "halves" not in p:
             continue
         h = p["halves"]

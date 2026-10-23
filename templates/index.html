@@ -2,8 +2,9 @@
 {% block body %}
 {% for it in items %}{% set p = it.p %}{% set x = p['1x2_blend'] or p['1x2'] %}{% set mx = x.values()|max %}
 <div class="card">
-  <div class="t"><a href="/match?league={{ league }}&home={{ p.home|urlencode }}&away={{ p.away|urlencode }}&referee={{ (p.referee or '')|urlencode }}">{{ p.home }} – {{ p.away }}</a></div>
+  <div class="t"><a href="/match?league={{ league }}&home={{ p.home|urlencode }}&away={{ p.away|urlencode }}&referee={{ (p.referee or '')|urlencode }}&date={{ it.row.date.strftime('%Y-%m-%d') }}">{{ p.home }} – {{ p.away }}</a></div>
   <div class="m">{{ it.row.date.strftime('%Y-%m-%d') }}{% if p.referee %} · sędzia {{ p.referee }}{% endif %} · xG {{ p.xg.home }}–{{ p.xg.away }}</div>
+  {% if p.rest and (p.rest.home_short or p.rest.away_short) %}<div class="pick">⚠ krótka przerwa: {% if p.rest.home_short %}{{ p.home }} {{ p.rest.home_days }} dni{% if p.rest.home_tag == 'CL' %} (LM){% endif %}{% endif %}{% if p.rest.home_short and p.rest.away_short %}, {% endif %}{% if p.rest.away_short %}{{ p.away }} {{ p.rest.away_days }} dni{% if p.rest.away_tag == 'CL' %} (LM){% endif %}{% endif %} - mecze po takim tygodniu bywają mniej przewidywalne</div>{% endif %}
   <div class="row">{% for k in ['1','X','2'] %}<div class="b {{ 'hl' if x[k] == mx }}">{{ k }}<b>{{ '%.0f'|format(x[k]*100) }}%</b></div>{% endfor %}</div>
   {% if p['1x2_blend'] %}<div class="m">miks model+rynek · rynek: {{ '%.0f'|format(p.market_1x2['1']*100) }}/{{ '%.0f'|format(p.market_1x2['X']*100) }}/{{ '%.0f'|format(p.market_1x2['2']*100) }}%</div>{% endif %}
   <div class="row">

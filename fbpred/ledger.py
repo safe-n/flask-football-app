@@ -49,7 +49,7 @@ def log_predictions(conn, predictor, upcoming: pd.DataFrame, league: str, versio
         if mdate <= today and conn.execute("SELECT 1 FROM predictions WHERE fixture_id=?",
                                            (int(r["fixture_id"]),)).fetchone():
             continue
-        p = apply_blend(predictor.predict(r["home"], r["away"], r.get("referee")), r, blend_w)
+        p = apply_blend(predictor.predict(r["home"], r["away"], r.get("referee"), date=r["date"]), r, blend_w)
         h = p.get("halves", {})
         q = p.get("1x2_blend") or {}
         vals = {"fixture_id": int(r["fixture_id"]), "league": str(league), "date": mdate, "home": r["home"], "away": r["away"],

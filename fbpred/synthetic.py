@@ -20,7 +20,8 @@ REFEREES = ["M Oliver", "A Taylor", "P Tierney", "S Attwell", "A Madley", "C Paw
 
 
 def generate(n_seasons: int = 3, seed: int = 7, league: str = "DEMO", start_year: int = 2021,
-             margin: float = 0.05, with_upcoming: bool = True) -> pd.DataFrame:
+             margin: float = 0.05, with_upcoming: bool = True, rest_effect: float = 0.0,
+             midweek_every: int = 0, short_days: int = 4) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
     T = len(TEAMS)
     att = rng.normal(0, 0.28, T)
@@ -37,12 +38,20 @@ def generate(n_seasons: int = 3, seed: int = 7, league: str = "DEMO", start_year
         rng.shuffle(pairs)
         n_days = len(pairs) // 10
         last = s == n_seasons - 1
+        last_played: dict[int, pd.Timestamp] = {}
         for k, (i, j) in enumerate(pairs):
             day = k // 10
-            date = pd.Timestamp(f"{year}-08-10") + pd.Timedelta(days=7 * day + int(rng.integers(0, 2)))
+            off = 7 * day - (4 if midweek_every and day % midweek_every == midweek_every - 1 else 0)  # co n-ta kolejka w tygodniu
+            date = pd.Timestamp(f"{year}-08-10") + pd.Timedelta(days=off + int(rng.integers(0, 2)))
             upcoming = with_upcoming and last and day >= n_days - 1
             lh = np.exp(mu + ha + att[i] + de[j])
             la = np.exp(mu + att[j] + de[i])
+            if rest_effect:   # zmęczona drużyna strzela mniej (efekt e), a jej rywal trochę więcej (-e/2)
+                sh = (date - last_played.get(i, date - pd.Timedelta(days=7))).days <= short_days
+                sa = (date - last_played.get(j, date - pd.Timedelta(days=7))).days <= short_days
+                lh *= np.exp(rest_effect * sh - 0.5 * rest_effect * sa)
+                la *= np.exp(rest_effect * sa - 0.5 * rest_effect * sh)
+            last_played[i] = last_played[j] = date
             ref = REFEREES[int(rng.integers(0, len(REFEREES)))]
             row = dict(fixture_id=fid, league=league, season=year, date=date.strftime("%Y-%m-%d"),
                        home=TEAMS[i], away=TEAMS[j], referee=ref, status="NS" if upcoming else "FT")

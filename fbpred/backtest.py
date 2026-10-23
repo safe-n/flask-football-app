@@ -94,8 +94,9 @@ def _baselines(train: pd.DataFrame) -> dict:
 def _record(P: MatchPredictor, r, base: dict) -> dict:
     p = P.predict(r.home, r.away, r.referee)
     y = 0 if r.hg > r.ag else (1 if r.hg == r.ag else 2)
+    lh, la = P.lambdas(r.home, r.away)
     rec = {
-        "date": r.date, "home": r.home, "away": r.away, "y": y,
+        "date": r.date, "home": r.home, "away": r.away, "y": y, "hg": r.hg, "ag": r.ag, "xg_h": lh, "xg_a": la,
         "p1": p["1x2"]["1"], "px": p["1x2"]["X"], "p2": p["1x2"]["2"],
         "b1": base["b1"], "bx": base["bx"], "b2": base["b2"],
         "y_over25": int(r.hg + r.ag > 2.5), "p_over25": p["goals"]["over_2.5"], "b_over25": base["b_over25"],

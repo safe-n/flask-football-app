@@ -9,7 +9,7 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
-from . import config, csvdata, db, history, ledger, notify, params as prm, quality, report, stats as stats_mod
+from . import config, csvdata, db, fatigue as fat, history, ledger, notify, params as prm, quality, rest, report, stats as stats_mod
 from .backtest import (DRAW_CALIB, best_blend, betting_sim, bias_shift, bias_table, calibration, compare_report,
                        summarize, walk_forward)
 from . import draws as draws_mod
@@ -141,6 +141,54 @@ def cmd_stats(a):
     print(t.to_string(index=False) if not t.empty else "Brak statystyk kartek/rożnych w danych tej ligi.")
 
 
+def cmd_fatigue(a):
+    """Czy krótka przerwa / LM zmienia wyniki? Test na prognozach walk-forward (jedna lub wiele lig łącznie)."""
+    conn = db.connect(config.DB_PATH)
+    sides, parts = [], []
+    leagues = history.resolve_leagues(a.leagues)
+    for lg in leagues:
+        df = db.load_matches(conn, lg)
+        if len(df) < a.min_train + 100:
+            print(f"  {lg}: za mało meczów ({len(df)}), pomijam")
+            continue
+        p = prm.load(lg)
+        res = walk_forward(df, a.min_train, a.step, progress=False, ridge=p["ridge"], xi=p["xi"], shot_weight=p["shot_weight"])
+        cal = rest.build_calendar(df, conn)
+        feats = cal.features(res)
+        sides.append(fat.side_frame(res, feats, lg))
+        parts.append((lg, res, feats))
+        print(f"  {lg}: {len(res)} prognoz, mecze po krótkiej przerwie: {int((feats.short_h | feats.short_a).sum())}"
+              + (", z kalendarzem Ligi Mistrzów" if cal.has_cl else ", BEZ danych o Lidze Mistrzów"))
+    if not sides:
+        sys.exit("Brak lig z wystarczającą liczbą meczów.")
+    table = fat.mean_shift_test(pd.concat(sides, ignore_index=True))
+    print("\n1) Efekt na liczbę goli względem prognozy modelu (próg istotności |z| >= %.1f):\n" % fat.Z_MIN)
+    print(table.drop(columns=["klucz", "wspolczynnik"]).to_string(index=False) if not table.empty else "brak wariancji w danych")
+    res_all = pd.concat([r for _, r, _ in parts], ignore_index=True)
+    feats_all = pd.concat([f for _, _, f in parts], ignore_index=True)
+    u = fat.uncertainty_test(res_all, feats_all)
+    print("\n2) Przewidywalność wyników po krótkiej przerwie (1X2, umiejętność modelu vs średnia ligi):")
+    print(f"   mecze po krótkiej przerwie: {u['n_krotka']}, zwykłe: {u['n_zwykle']}")
+    if "roznica" in u:
+        print(f"   umiejętność: krótka {u['umiejetnosc_krotka']:+.4f} | zwykłe {u['umiejetnosc_zwykle']:+.4f} | "
+              f"różnica {u['roznica']:+.4f} [95%: {u['przedzial_95'][0]:+.4f}, {u['przedzial_95'][1]:+.4f}]")
+    print(f"   → {u['wniosek']}")
+    side_all = pd.concat(sides, ignore_index=True)
+    ho = fat.holdout_gain(side_all)
+    print(f"\n3) Test na danych kontrolnych (ostatnie 40% meczów, {ho['n_test']} obserwacji): przyrost log-wiarygodności "
+          f"{ho['gain_per_100']:+.3f} na 100 obserwacji ({'poprawa' if ho['gain_per_100'] > 0 else 'brak poprawy'})")
+    coefs = fat.significant_coefs(table, ho)
+    print(f"\nWspółczynniki, które przeszły oba testy: {coefs or 'żaden - model zostaje bez czynnika zmęczenia'}")
+    if a.apply:
+        for lg, _, _ in parts:
+            cur = prm.load(lg)
+            cur["fatigue"] = coefs
+            prm.save(lg, cur)
+        print("Zapisano do parametrów lig" + (": " + ", ".join(lg for lg, _, _ in parts)) + ".")
+    else:
+        print("(użyj --apply, aby zapisać istotne współczynniki do modelu)")
+
+
 def cmd_draws(a):
     conn = db.connect(config.DB_PATH)
     df, up = db.load_matches(conn, a.league), db.load_upcoming(conn, a.league)
@@ -176,7 +224,7 @@ def cmd_upcoming_predict(a):
         sys.exit("Brak nadchodzących meczów w bazie (komendy: fetch-fixtures, upcoming, demo).")
     P, p = _predictor(a, df)
     for r in up.head(a.limit).to_dict("records"):
-        pred = apply_blend(P.predict(r["home"], r["away"], r.get("referee")), r, p["blend_w"])
+        pred = apply_blend(P.predict(r["home"], r["away"], r.get("referee"), date=r["date"]), r, p["blend_w"])
         print(format_prediction(pred))
         picks = value_picks(pred, r, a.min_edge)
         if picks:
@@ -388,7 +436,7 @@ def cmd_notify(a):
         P, p = prm.build_predictor(df, lg)
         blocks.append(f"⚽ Prognozy {lg} (model statystyczny, nie gwarancja)")
         for r in up.head(a.limit).to_dict("records"):
-            pred = apply_blend(P.predict(r["home"], r["away"], r.get("referee")), r, p["blend_w"])
+            pred = apply_blend(P.predict(r["home"], r["away"], r.get("referee"), date=r["date"]), r, p["blend_w"])
             picks = [k for k in value_picks(pred, r, a.min_edge)]
             blocks.append(notify.format_match(pred, r, picks))
     if len(blocks) <= 1:
@@ -445,6 +493,11 @@ def main(argv=None):
     s.add_argument("--view", choices=["referees", "teams"], default="referees")
     s.add_argument("--seasons", type=int, default=2)
     s.add_argument("--min-matches", type=int, default=8)
+    s = add("fatigue-test", cmd_fatigue, "zmęczenie / krótka przerwa: czy to realny efekt? (test na prognozach)", league=False)
+    s.add_argument("--leagues", default="auto", help="auto = wszystkie ligi z bazy/history; wiele lig = większa moc testu")
+    s.add_argument("--min-train", type=int, default=300)
+    s.add_argument("--step", type=int, default=28)
+    s.add_argument("--apply", action="store_true", help="zapisz istotne współczynniki do params_<liga>.json")
     s = add("draws", cmd_draws, "ranking meczów pod rynki remisowe (HT, 2H, HT lub FT...)")
     s.add_argument("--market", choices=list(draws_mod.MARKETS), default="ht_or_ft")
     s.add_argument("--days", type=int, default=7)

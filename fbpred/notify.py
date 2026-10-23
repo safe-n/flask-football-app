@@ -25,6 +25,10 @@ def format_match(pred: dict, row: dict, picks: list[dict]) -> str:
                 if "halves" in pred else "")]
     if "yellow" in pred:
         lines.append(f" żółte śr. {pred['yellow']['total_mean']} · rożne śr. {pred.get('corners', {}).get('total_mean', '–')}")
+    rs = pred.get("rest")
+    if rs and (rs["home_short"] or rs["away_short"]):
+        who = [f"{pred[s]} {rs[f'{s}_days']} dni" + (" (LM)" if rs[f"{s}_tag"] == "CL" else "") for s in ("home", "away") if rs[f"{s}_short"]]
+        lines.append(f" ⚠ krótka przerwa: {', '.join(who)}")
     for k in picks[:2]:
         flag = " ⚠ podejrzanie duża" if k["edge"] > 0.15 else ""
         lines.append(f" ⚑ {k['rynek']} @{k['kurs']} przewaga {100 * k['edge']:+.0f}%{flag}")

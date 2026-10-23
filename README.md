@@ -243,3 +243,24 @@ a mecze wyrównane remisują częściej niż jednostronne. Dokładny rachunek ro
   standardowe (inaczej model goniłby za szumem). Dziennik prognoz zapisuje oba nowe rynki, więc `track` pokaże ich skuteczność na żywo.
 * Uwaga: football-data.co.uk nie ma kursów na remis do przerwy ani na „HT lub FT”, więc nie da się policzyć zysku z historii;
   można sprawdzić tylko, czy prawdopodobieństwa są wiarygodne. Opłacalność zweryfikujesz porównując `kurs_fair` z kursem u bukmachera.
+
+
+## Zmęczenie, krótka przerwa i ręczne korekty (0.5)
+
+**Dni odpoczynku.** Aplikacja liczy, ile dni drużyna miała od poprzedniego meczu (liga + mecze Ligi Mistrzów, jeśli masz je w bazie
+i token football-data.org). Na kartach meczów, w podglądzie meczu i w powiadomieniach pojawia się ostrzeżenie „⚠ krótka przerwa”
+(≤ 4 dni; mecz LM = w ciągu 5 dni). To na razie informacja, nie zmiana prognozy.
+
+**Czy zmęczenie realnie zmienia wyniki? `python -m fbpred fatigue-test --leagues auto`** sprawdza to na prognozach walk-forward:
+1. efekt na liczbę goli względem prognozy modelu (własna krótka przerwa, przerwa rywala, LM) z przedziałem ufności i wnioskiem,
+2. czy po krótkiej przerwie model jest mniej przewidywalny (mecze, które Ty odpuszczasz),
+3. test na ostatnich 40% meczów, których nie użyto do estymacji.
+Z `--apply` do modelu trafiają tylko współczynniki, które przeszły i próg istotności (|z| ≥ 2,5), i test na danych kontrolnych.
+Współczynnik to **korekta względem prognozy modelu**, nie surowy efekt przyczynowy (model uczył się na tych samych danych i część
+efektu już wchłonął). Moc testu rośnie z liczbą lig, bo jedna liga to za mało meczów, by wykryć efekt rzędu kilku procent.
+
+**Ręczne korekty.** W podglądzie meczu możesz ustawić mnożnik xG gospodarzy i gości (×0,7 … ×1,2), np. za brak kluczowego gracza,
+pauzę za kartki albo rotację po pucharach. Aplikacja nie ma danych o składach i kontuzjach (darmowe źródła ich nie dają), więc to
+Twoja wiedza, której model nie ma.
+
+Czego nie ma: pucharów krajowych, Ligi Europy i meczów reprezentacji w darmowych źródłach, więc „krótka przerwa” bywa niepełna.

@@ -5,6 +5,12 @@
   <select name="home">{% for t in teams %}<option {{ 'selected' if t == home }}>{{ t }}</option>{% endfor %}</select> –
   <select name="away">{% for t in teams %}<option {{ 'selected' if t == away }}>{{ t }}</option>{% endfor %}</select><br><br>
   <select name="referee"><option value="">(sędzia: dowolny)</option>{% for r in referees %}<option {{ 'selected' if r == referee }}>{{ r }}</option>{% endfor %}</select>
+  <br><br><label class="m">Data meczu (liczy dni odpoczynku): <input type="date" name="date" value="{{ date }}"></label><br><br>
+  <label class="m">Korekta xG gospodarzy ×
+    <select name="adj_h">{% for o in adj_opts %}<option {{ 'selected' if o == adj_h }}>{{ o }}</option>{% endfor %}</select></label>
+  <label class="m">gości ×
+    <select name="adj_a">{% for o in adj_opts %}<option {{ 'selected' if o == adj_a }}>{{ o }}</option>{% endfor %}</select></label>
+  <span class="m">(Twoja wiedza: kontuzje, pauzy za kartki, rotacja po pucharach)</span><br><br>
   <button>Pokaż prognozę</button>
 </form>
 {% if head %}
