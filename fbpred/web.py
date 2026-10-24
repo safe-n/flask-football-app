@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from flask import Flask, abort, jsonify, render_template, request
 
-from . import bootstrap, config, db, draws, history, ledger, leagues as lg_cat, params as prm, stats
+from . import bootstrap, config, db, draws, gh_store, history, ledger, leagues as lg_cat, params as prm, recent as recent_mod, stats
 from .odds import apply_blend, value_picks
 from .simulate import simulate_table
 
@@ -229,19 +229,46 @@ def create_app() -> Flask:
                     ("p", f"Tylko drużyny z bieżącego sezonu. Przewaga domowa: {np.exp(P.goals.ha):.2f}x goli. "
                           f"ridge={p['ridge']}, xi={p['xi']}, shot_weight={p.get('shot_weight', 0)}."), ("t", s))
 
+    @app.get("/recent")
+    def recent_page():
+        league = league_arg()
+        days = max(3, min(int(request.args.get("days", 10)), 30))
+        P, p, df = model(league)
+
+        def build():
+            return recent_mod.recent_predictions(df, days, ridge=p["ridge"], xi=p["xi"], shot_weight=p.get("shot_weight", 0.0),
+                                                 calib=p.get("draw_shift") or None)
+        res = cached(("recent", league, days), build)
+        if res.empty:
+            return page("Ostatnie mecze", league, ("p", f"Brak rozegranych meczów z ostatnich {days} dni w bazie."))
+        tabs = ("tabs", [(f"{d} dni", f"/recent?league={league}&days={d}") for d in (7, 14, 30)])
+        return page(f"Ostatnie mecze · {lg_cat.name(league)}", league, tabs,
+                    ("p", "Retrospektywa: model uczony wyłącznie na meczach sprzed danej kolejki (bez zaglądania w przyszłość). "
+                          "To nie jest dziennik na żywo, tylko podgląd, jak model poradziłby sobie z ostatnimi meczami."),
+                    ("p", recent_mod.summary(res)), ("t", recent_mod.show_table(res).iloc[::-1].reset_index(drop=True)))
+
     @app.get("/track")
     def track():
         league = league_arg()
         conn = db.connect(config.DB_PATH)
+        st = ledger.stats(conn, league)
+        d = bootstrap.DIAG.get("dziennik", {})
+        diag = ("p", f"W bazie: {st['w_bazie']} prognoz (rozliczone {st['rozliczone']}, oczekujące {st['oczekujace']}). "
+                     f"Trwałość: {d.get('trwalosc', 'brak informacji (odświeżanie jeszcze się nie wykonało)')}. "
+                     f"Ostatni zapis do GitHuba: {d.get('zapis', '-')}.")
         s = ledger.settled(conn, league)
         if s.empty:
-            return page("Dziennik prognoz", league,
-                        ("p", f"Brak rozliczonych prognoz. Oczekujące: {ledger.pending(conn, league)}. "
-                              "Zapisuj prognozy komendą `python -m fbpred log` (albo `daily`)."))
+            why = ("Dziennik zapisuje prognozę PRZED meczem i rozlicza ją, gdy pojawi się wynik. Mecze, które odbyły się, zanim "
+                   "prognozy zaczęły być zapisywane (albo zanim dziennik stał się trwały), nie trafią tu wstecznie - zobacz "
+                   "zakładkę Ostatnie mecze, która pokazuje retrospektywę. " +
+                   ("" if gh_store.enabled() else "UWAGA: trwałość dziennika jest wyłączona (brak GITHUB_TOKEN/GITHUB_REPO), "
+                                                  "więc dziennik znika przy każdym restarcie serwisu."))
+            return page("Dziennik prognoz", league, diag, ("p", why),
+                        ("tabs", [("Zobacz ostatnie mecze (retrospektywa)", f"/recent?league={league}")]))
         hist = db.load_matches(conn, league)
         hist = hist[~hist["fixture_id"].isin(s["fixture_id"])]
         tab, sim = ledger.track_summary(s, base=ledger.league_base_rates(hist))
-        return page("Dziennik prognoz", league,
+        return page("Dziennik prognoz", league, diag,
                     ("p", f"Rozliczone: {len(s)}, oczekujące: {ledger.pending(conn, league)}. Log-loss: mniej = lepiej."),
                     ("t", tab), ("p", f"Symulacja typów: {sim}"))
 

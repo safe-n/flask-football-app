@@ -54,3 +54,9 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 FDORG_TOKEN = os.getenv("FOOTBALL_DATA_ORG_TOKEN", "")        # darmowy token z football-data.org (Liga Mistrzów + fallback terminarza)
 FDORG_PAUSE = float(os.getenv("FDORG_PAUSE", "6.5"))          # plan darmowy: 10 zapytań/min
 LOG_HORIZON_DAYS = int(os.getenv("LOG_HORIZON_DAYS", "10"))   # prognozy do dziennika tylko na najbliższe N dni
+
+# --- trwałość dziennika bez GitHub Actions: aplikacja zapisuje CSV w osobnej gałęzi repo przez GitHub REST API
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")                 # token z uprawnieniem Contents: write (tylko dla tego repo!)
+GITHUB_REPO = os.getenv("GITHUB_REPO", "")                   # "uzytkownik/nazwa-repo"
+LEDGER_BRANCH = os.getenv("LEDGER_BRANCH", "ledger-data")    # osobna gałąź - nie wywołuje redeployu na Renderze
+LEDGER_REMOTE_PATH = os.getenv("LEDGER_REMOTE_PATH", "ledger/predictions.csv")

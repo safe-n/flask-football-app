@@ -9,7 +9,7 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
-from . import config, csvdata, db, fatigue as fat, history, ledger, notify, params as prm, quality, rest, report, stats as stats_mod
+from . import config, csvdata, db, fatigue as fat, history, ledger, notify, params as prm, quality, recent as recent_mod, rest, report, stats as stats_mod
 from .backtest import (DRAW_CALIB, best_blend, betting_sim, bias_shift, bias_table, calibration, compare_report,
                        summarize, walk_forward)
 from . import draws as draws_mod
@@ -187,6 +187,17 @@ def cmd_fatigue(a):
         print("Zapisano do parametrów lig" + (": " + ", ".join(lg for lg, _, _ in parts)) + ".")
     else:
         print("(użyj --apply, aby zapisać istotne współczynniki do modelu)")
+
+
+def cmd_recent(a):
+    df = _load(a)
+    p = prm.load(a.league)
+    res = recent_mod.recent_predictions(df, a.days, ridge=p["ridge"], xi=p["xi"], shot_weight=p["shot_weight"],
+                                        calib=p.get("draw_shift") or None)
+    if res.empty:
+        sys.exit("Brak meczów w wybranym oknie.")
+    print(recent_mod.show_table(res).to_string(index=False))
+    print("\n" + recent_mod.summary(res))
 
 
 def cmd_draws(a):
@@ -498,6 +509,8 @@ def main(argv=None):
     s.add_argument("--min-train", type=int, default=300)
     s.add_argument("--step", type=int, default=28)
     s.add_argument("--apply", action="store_true", help="zapisz istotne współczynniki do params_<liga>.json")
+    s = add("recent", cmd_recent, "retrospektywa: co model przewidziałby przed ostatnimi meczami")
+    s.add_argument("--days", type=int, default=10)
     s = add("draws", cmd_draws, "ranking meczów pod rynki remisowe (HT, 2H, HT lub FT...)")
     s.add_argument("--market", choices=list(draws_mod.MARKETS), default="ht_or_ft")
     s.add_argument("--days", type=int, default=7)

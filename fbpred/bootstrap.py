@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import config, csvdata, db, fdorg, history, names
+from . import config, csvdata, db, fdorg, gh_store, history, names
 from .leagues import NO_CSV
 
 
@@ -182,6 +182,30 @@ def refresh(leagues_: list[str] | None = None, log_predictions: bool = True, log
                 log(f"[refresh] dziennik {lg}: {e}")
 
 
+def _ledger_pull(conn, log) -> None:
+    d = DIAG.setdefault("dziennik", {})
+    if not gh_store.enabled():
+        d["trwalosc"] = ("WYŁĄCZONA - ustaw GITHUB_TOKEN i GITHUB_REPO w Render → Environment; bez tego dziennik znika "
+                         "przy każdym restarcie lub uśpieniu serwisu")
+        return
+    try:
+        d["trwalosc"] = f"GitHub, gałąź {config.LEDGER_BRANCH}: wczytano {gh_store.sync_down(conn)} prognoz przy starcie"
+    except Exception as e:  # noqa: BLE001 - problem z GitHubem nie może zatrzymać aplikacji
+        d["trwalosc"] = f"błąd odczytu z GitHuba: {e}"
+        log(f"[ledger] {e}")
+
+
+def _ledger_push(conn, log) -> None:
+    d = DIAG.setdefault("dziennik", {})
+    if not gh_store.enabled():
+        return
+    try:
+        d["zapis"] = gh_store.sync_up(conn)
+    except Exception as e:  # noqa: BLE001
+        d["zapis"] = f"błąd zapisu do GitHuba: {e}"
+        log(f"[ledger] {e}")
+
+
 def run_once(leagues_: list[str] | None = None, years: int | None = None, log=_log, export_ledger: bool = False) -> None:
     lgs = leagues_ or leagues()
     with _work_lock:
@@ -194,7 +218,9 @@ def run_once(leagues_: list[str] | None = None, years: int | None = None, log=_l
             n_imp = ledger.import_csv(conn, config.LEDGER_CSV)  # dziennik z repo (jeśli jest)
             if n_imp:
                 log(f"[bootstrap] wczytano {n_imp} prognoz z {config.LEDGER_CSV}")
+            _ledger_pull(conn, log)
             refresh(lgs, log=log)
+            _ledger_push(conn, log)
             if export_ledger:
                 log(f"[bootstrap] zapisano {ledger.export_csv(conn, config.LEDGER_CSV)} prognoz do {config.LEDGER_CSV}")
             total = sum(count_finished(conn, lg) for lg in lgs)
@@ -226,6 +252,7 @@ def start_background() -> None:
             with _work_lock:
                 try:
                     refresh()
+                    _ledger_push(db.connect(config.DB_PATH), _log)
                     _set("ready", "Odświeżono dane.")
                 except Exception as e:  # noqa: BLE001
                     print(f"[refresh] błąd: {e}", flush=True)

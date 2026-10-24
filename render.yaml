@@ -26,6 +26,10 @@ services:
         value: "1"
       - key: BOOTSTRAP_LEAGUES
         value: auto                    # auto = wszystkie ligi z katalogu history/
+      - key: GITHUB_TOKEN
+        sync: false                    # token (Contents: write, tylko to repo) - trwały dziennik bez Actions
+      - key: GITHUB_REPO
+        sync: false                    # np. uzytkownik/flask-football-app
       - key: FOOTBALL_DATA_ORG_TOKEN
         sync: false                    # darmowy token (Liga Mistrzów + zapasowy terminarz) - wpisz w panelu Render
       - key: BOOTSTRAP_YEARS

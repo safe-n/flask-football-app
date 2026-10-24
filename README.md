@@ -264,3 +264,22 @@ pauzę za kartki albo rotację po pucharach. Aplikacja nie ma danych o składach
 Twoja wiedza, której model nie ma.
 
 Czego nie ma: pucharów krajowych, Ligi Europy i meczów reprezentacji w darmowych źródłach, więc „krótka przerwa” bywa niepełna.
+
+
+## Trwały dziennik prognoz bez GitHub Actions (0.5.1)
+
+Dziennik zapisuje prognozę PRZED meczem i rozlicza ją, gdy pojawi się wynik. Na darmowym Renderze baza SQLite znika przy każdym
+restarcie i uśpieniu, więc bez trwałego miejsca dziennik jest zawsze pusty. Aplikacja potrafi zapisywać go sama w **osobnej gałęzi
+repo** (`ledger-data`) przez GitHub REST API: za darmo, bez Actions i bez wywoływania przebudowy serwisu.
+
+1. GitHub → *Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token*.
+   *Repository access*: **Only select repositories** → wybierz TYLKO to repo. *Permissions → Repository permissions → Contents: Read and write*.
+2. Render → usługa → *Environment*: `GITHUB_TOKEN` (wklejony token) i `GITHUB_REPO` (np. `safe-n/flask-football-app`).
+   Opcjonalnie `LEDGER_BRANCH` (domyślnie `ledger-data`). Token jest sekretem: nie wklejaj go do czatu, kodu ani commitów.
+3. Strona **Dziennik** pokazuje teraz, ile prognoz jest w bazie, czy trwałość działa i kiedy był ostatni zapis.
+
+Prognozy powstają, gdy aplikacja jest uruchomiona (przy starcie i co 24 h). Na darmowym planie serwis śpi po 15 minutach bez ruchu,
+więc **wejdź na stronę przed meczami** (np. w piątek), żeby prognozy na weekend zostały zapisane przed pierwszym gwizdkiem.
+Prognozy są zamrażane w dniu meczu. Mecze rozegrane, zanim dziennik zaczął działać, nie mogą trafić do niego wstecznie (to byłaby
+prognoza po fakcie). Zamiast tego jest zakładka **Ostatnie** (`/recent`, `python -m fbpred recent`): retrospektywa z modelem uczonym
+wyłącznie na meczach sprzed kolejki.

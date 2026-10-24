@@ -197,3 +197,15 @@ def import_csv(conn, path) -> int:
                      [tuple(r[c] for c in cols) for r in df.to_dict("records")])
     conn.commit()
     return conn.total_changes - before
+
+
+def stats(conn, league: str | None = None) -> dict:
+    """Ile prognoz jest w bazie i kiedy zapisano pierwszą/ostatnią (diagnostyka strony Dziennik)."""
+    ensure(conn)
+    q, params = "SELECT COUNT(*), MIN(logged_at), MAX(logged_at) FROM predictions", []
+    if league:
+        q += " WHERE league = ?"
+        params.append(str(league))
+    n, first, last = conn.execute(q, params).fetchone()
+    return {"w_bazie": n, "pierwsza": first, "ostatnia": last, "oczekujace": pending(conn, league),
+            "rozliczone": len(settled(conn, league))}
