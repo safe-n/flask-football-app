@@ -21,5 +21,6 @@
   {% for k in it.picks %}<div class="pick">⚑ {{ k.rynek }}: kurs {{ k.kurs }}, przewaga {{ '%+.1f'|format(k.edge*100) }}%{% if k.edge > 0.15 %} ⚠ podejrzanie duża - to zwykle błąd modelu{% endif %}</div>{% endfor %}
 </div>
 {% else %}<p class="m">Brak nadchodzących meczów w bazie dla ligi {{ league }}. Sprawdź stronę <a href="/data?league={{ league }}">Dane</a> - tam jest diagnoza, skąd bierze się terminarz i dlaczego może być pusty.</p>{% endfor %}
+{% if skipped %}<p class="m">Pominięto {{ skipped }} mecz(e) z wcześniejszych dni - już się odbyły, a wyniki jeszcze nie dotarły ze źródła danych.</p>{% endif %}
 <p class="small">Model statystyczny, nie gwarancja wyniku. Przewaga względem kursu często wynika z błędu modelu, nie z błędu bukmachera.</p>
 {% endblock %}

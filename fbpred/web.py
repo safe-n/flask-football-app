@@ -129,14 +129,16 @@ def create_app() -> Flask:
                 return page("Ładowanie danych", league, ("p", bootstrap.STATUS["message"]), refresh=True), 503
             if st == "error":
                 return page("Brak danych", league, ("p", bootstrap.STATUS["message"] + " Ponowię próbę za kilka minut.")), 503
-        up = db.load_upcoming(conn, league)
+        all_up = db.load_upcoming(conn, league)
+        up = db.load_upcoming(conn, league, since=db.today())
+        skipped = len(all_up) - len(up)       # rozegrane, ale bez wyniku w źródle danych - nie pokazujemy jako "nadchodzące"
         items = []
         if not up.empty:
             P, p, _ = model(league)
             for r in up.head(40).to_dict("records"):
                 pred = apply_blend(P.predict(r["home"], r["away"], r.get("referee"), date=r["date"]), r, p["blend_w"])
                 items.append({"row": r, "p": pred, "picks": value_picks(pred, r)})
-        return render_template("index.html", items=items, league=league, leagues=league_options(),
+        return render_template("index.html", items=items, league=league, leagues=league_options(), skipped=skipped,
                                title=f"Mecze · {lg_cat.name(league)}")
 
     @app.get("/match")
@@ -172,7 +174,7 @@ def create_app() -> Flask:
         if market not in draws.MARKETS:
             abort(400, f"Nieznany rynek. Dostępne: {', '.join(draws.MARKETS)}")
         P, p, df = model(league)
-        up = db.load_upcoming(db.connect(config.DB_PATH), league)
+        up = db.load_upcoming(db.connect(config.DB_PATH), league, since=db.today())
         title = draws.MARKETS[market][0]
         tabs = ("tabs", [(lab.split(" ", 1)[1] if False else lab, f"/draws?league={league}&market={k}&days={days}")
                          for k, (lab, _) in draws.MARKETS.items()])
@@ -254,7 +256,7 @@ def create_app() -> Flask:
         st = ledger.stats(conn, league)
         d = bootstrap.DIAG.get("dziennik", {})
         diag = ("p", f"W bazie: {st['w_bazie']} prognoz (rozliczone {st['rozliczone']}, oczekujące {st['oczekujace']}). "
-                     f"Trwałość: {d.get('trwalosc', 'brak informacji (odświeżanie jeszcze się nie wykonało)')}. "
+                     f"Trwałość: {d.get('trwalosc', 'brak informacji (ten proces serwera jeszcze nie odświeżał danych; jeśli to się utrzymuje, serwis ma kilka procesów - ustaw Start Command na gunicorn fbpred.web:app --workers 1 --threads 4 --timeout 120)')}. "
                      f"Ostatni zapis do GitHuba: {d.get('zapis', '-')}.")
         s = ledger.settled(conn, league)
         if s.empty:

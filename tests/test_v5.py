@@ -156,6 +156,7 @@ class Env(unittest.TestCase):
 class TestWebCliNotify(Env):
     def _seed(self):
         df = generate(n_seasons=3, seed=8, league="E0", with_upcoming=False)
+        df["date"] = df["date"] + (pd.Timestamp.today().normalize() - pd.Timedelta(days=1) - df["date"].max())  # ostatni mecz: wczoraj
         conn = db.connect(config.DB_PATH)
         db.upsert_matches(conn, rows_of(df))
         history.save_matches(rows_of(df), config.HISTORY_DIR)

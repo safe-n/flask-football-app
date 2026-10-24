@@ -46,7 +46,7 @@ def describe() -> dict:
     hd = Path(config.HISTORY_DIR)
     return {"AUTO_BOOTSTRAP": config.AUTO_BOOTSTRAP, "RENDER": os.getenv("RENDER", "-"),
             "ligi": ",".join(leagues()), "REFRESH_HOURS": config.REFRESH_HOURS,
-            "football-data.org": "token ustawiony" if fdorg.enabled() else "brak tokenu",
+            "football-data.org": "token ustawiony" if fdorg.enabled() else "brak tokenu", "pid": os.getpid(),
             "pliki_historii": len(list(hd.glob("*.csv"))) if hd.exists() else 0, "DB_PATH": str(config.DB_PATH)}
 
 
@@ -118,6 +118,29 @@ def _fdorg_rows(conn, lg: str, fetch) -> list[dict]:
     return fetch(resolver)
 
 
+def settle_pending(conn, lg: str, season_rows, log=_log) -> tuple[int, str]:
+    """Wyniki meczów z ostatnich dni, które już się odbyły, a jeszcze nie dotarły do CSV (opóźnienie źródła).
+
+    Uzupełnia je z football-data.org (tylko wynik i wynik do przerwy, bez kartek/rożnych - te przyjdą z CSV).
+    Wiersz zachowuje swój fixture_id, więc późniejszy plik CSV po prostu go uzupełni, bez duplikatów."""
+    pend = conn.execute("SELECT fixture_id, date, home, away FROM matches WHERE league=? AND hg IS NULL AND date < ? "
+                        "AND date >= date(?, '-7 day')", (lg, db.today(), db.today())).fetchall()
+    if not pend:
+        return 0, "brak meczów czekających na wynik"
+    if not (fdorg.enabled() and fdorg.supports(lg)):
+        return 0, f"{len(pend)} meczów czeka na wynik; szybsze wyniki wymagają tokenu FOOTBALL_DATA_ORG_TOKEN"
+    finished = [r for r in season_rows() if r["status"] == "FT"]
+    n = 0
+    for fid, date, h, a in pend:
+        day = pd.Timestamp(date)
+        for r in finished:
+            if r["home"] == h and r["away"] == a and abs((pd.Timestamp(r["date"]) - day).days) <= 1:   # UTC vs czas lokalny
+                db.update_fields(conn, fid, {"hg": r["hg"], "ag": r["ag"], "hg_ht": r["hg_ht"], "ag_ht": r["ag_ht"], "status": "FT"})
+                n += 1
+                break
+    return n, f"dopisano {n} z {len(pend)} wyników (football-data.org)"
+
+
 def refresh(leagues_: list[str] | None = None, log_predictions: bool = True, log=_log) -> None:
     """Bieżący sezon + terminarz (z kursami, jeśli są), sprzątanie, zapis prognoz do dziennika."""
     lgs = leagues_ or leagues()
@@ -145,6 +168,12 @@ def refresh(leagues_: list[str] | None = None, log_predictions: bool = True, log
             d["sezon_csv"] = f"błąd: {e}"
             log(f"[refresh] sezon {lg}: {e}")
         fixtures: list[dict] = []
+        fd_cache: dict[str, list] = {}
+
+        def fd_season(lg=lg, y=y, fd_cache=fd_cache):                        # jedno zapytanie na ligę: wyniki + terminarz
+            if "rows" not in fd_cache:
+                fd_cache["rows"] = _fdorg_rows(conn, lg, lambda res: fdorg.fetch_season(lg, y, res))
+            return fd_cache["rows"]
         try:                                                                  # terminarz + kursy (football-data.co.uk)
             fixtures = history.apply_aliases(csvdata.parse_csv(csvdata.download_fixtures(), lg, None, only_div=True))
             db.upsert_matches(conn, fixtures)
@@ -155,10 +184,15 @@ def refresh(leagues_: list[str] | None = None, log_predictions: bool = True, log
         except Exception as e:  # noqa: BLE001
             d["fixtures_csv"] = f"błąd: {e}"
             log(f"[refresh] fixtures {lg}: {e}")
+        try:                                                                  # wyniki wcześniej niż CSV
+            d["wyniki_szybkie"] = settle_pending(conn, lg, fd_season, log)[1]
+        except Exception as e:  # noqa: BLE001
+            d["wyniki_szybkie"] = f"błąd: {e}"
+            log(f"[refresh] wyniki {lg}: {e}")
         if not fixtures:                                                      # zapasowe źródło terminarza
             if fdorg.enabled() and fdorg.supports(lg):
                 try:
-                    rows = _fdorg_rows(conn, lg, lambda res: fdorg.upcoming(lg, res))
+                    rows = [r for r in fd_season() if r["status"] == "NS"]
                     db.upsert_matches(conn, rows)
                     d["football-data.org"] = f"ok: {len(rows)} nadchodzących (bez kursów)"
                 except Exception as e:  # noqa: BLE001
@@ -172,7 +206,7 @@ def refresh(leagues_: list[str] | None = None, log_predictions: bool = True, log
     from . import ledger, params as prm
     horizon = pd.Timestamp.today().normalize() + pd.Timedelta(days=config.LOG_HORIZON_DAYS)
     for lg in lgs:
-        df, up = db.load_matches(conn, lg), db.load_upcoming(conn, lg)
+        df, up = db.load_matches(conn, lg), db.load_upcoming(conn, lg, since=db.today())  # nie dla meczów już rozegranych
         up = up[up["date"] <= horizon]
         if len(df) >= 100 and not up.empty:
             try:

@@ -283,3 +283,24 @@ więc **wejdź na stronę przed meczami** (np. w piątek), żeby prognozy na wee
 Prognozy są zamrażane w dniu meczu. Mecze rozegrane, zanim dziennik zaczął działać, nie mogą trafić do niego wstecznie (to byłaby
 prognoza po fakcie). Zamiast tego jest zakładka **Ostatnie** (`/recent`, `python -m fbpred recent`): retrospektywa z modelem uczonym
 wyłącznie na meczach sprzed kolejki.
+
+
+## Mecze z wczoraj na liście „nadchodzących” (0.5.2)
+
+Mecz jest „nadchodzący”, dopóki jego wynik nie pojawi się w źródle danych, a ono publikuje wyniki z opóźnieniem. Dlatego
+wczorajszy mecz mógł wyglądać jak przyszły. Od 0.5.2 strony Mecze i Remisy, powiadomienia oraz dziennik pokazują i zapisują
+tylko mecze od dziś. Pominięte mecze są policzone w komunikacie na stronie, a symulacja tabeli nadal traktuje je jako nierozegrane.
+Wyjątek: komendy `log`, `upcoming-predict`, `draws` mają flagę `--include-past` (dane demo i testy).
+Dla meczów „dziś” aplikacja nie zna godziny rozpoczęcia, więc mogą już trwać - sprawdź godzinę przed obstawieniem.
+
+
+## Wyniki bez opóźnienia (0.5.3)
+
+football-data.co.uk publikuje wyniki z opóźnieniem. Mecz, który już się odbył, a nie ma jeszcze wyniku w pliku CSV, jest ukryty na liście
+nadchodzących i nie ma go w zakładce **Ostatnie**. Jeśli ustawisz `FOOTBALL_DATA_ORG_TOKEN`, aplikacja dopisze wynik i wynik do przerwy
+z football-data.org (Premier League, Bundesliga, La Liga, Serie A, Ligue 1, Eredivisie, Primeira Liga, Championship), jednym zapytaniem
+na ligę. Kartki i rożne dojdą później z CSV, bez duplikatów. Bez tokenu strona **Dane** pokaże, ile meczów czeka na wynik.
+
+Aplikacja trzyma stan (diagnostykę, wątek odświeżania) w pamięci procesu, więc na Renderze używaj jednego workera:
+`gunicorn fbpred.web:app --workers 1 --threads 4 --timeout 120`. Strona **Dane** pokazuje `pid` procesu; jeśli po odświeżeniach
+widzisz różne wartości, serwis działa na kilku procesach.

@@ -81,12 +81,23 @@ def load_matches(conn: sqlite3.Connection, league: str | None = None,
     return df
 
 
-def load_upcoming(conn: sqlite3.Connection, league: str | None = None) -> pd.DataFrame:
+def today() -> str:
+    """Dzisiejsza data (YYYY-MM-DD) wg zegara serwera."""
+    from datetime import date
+    return date.today().isoformat()
+
+
+def load_upcoming(conn: sqlite3.Connection, league: str | None = None, since: str | None = None) -> pd.DataFrame:
+    """Mecze bez wyniku. since='YYYY-MM-DD' pomija mecze z wcześniejszych dni - takie, których wynik jeszcze nie dotarł
+    ze źródła danych, wyglądają jak nadchodzące, ale już się odbyły (nie można do nich zapisywać prognoz)."""
     q = "SELECT * FROM matches WHERE hg IS NULL"
     params: list = []
     if league:
         q += " AND league = ?"
         params.append(str(league))
+    if since:
+        q += " AND date >= ?"
+        params.append(str(since))
     q += " ORDER BY date, fixture_id"
     df = pd.read_sql_query(q, conn, params=params)
     df["date"] = pd.to_datetime(df["date"])

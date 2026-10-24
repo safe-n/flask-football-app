@@ -19,8 +19,10 @@ FIN = DF[DF.hg.notna()].copy()
 UP = DF[DF.hg.isna()].copy()
 
 
-def rows_of(df):
+def rows_of(df, recent=False):
     d = df.copy()
+    if recent:   # przesuń daty tak, by nierozegrane mecze wypadły jutro (aplikacja ukrywa mecze z wcześniejszych dni)
+        d["date"] = d["date"] + (pd.Timestamp.today().normalize() + pd.Timedelta(days=1) - d.loc[d.hg.isna(), "date"].min())
     d["date"] = d["date"].dt.strftime("%Y-%m-%d")
     cols = [c for c in db.COLUMNS if c in d.columns]
     return d[cols].astype(object).where(d[cols].notna(), None).to_dict("records")
@@ -165,12 +167,12 @@ class Env(unittest.TestCase):
 class TestWebAndTune(Env):
     def test_draws_page_and_match_sections(self):
         from fbpred import history
-        history.save_matches(rows_of(DF), config.HISTORY_DIR)
-        db.upsert_matches(db.connect(config.DB_PATH), [r for r in rows_of(DF) if r["status"] == "NS"])
+        history.save_matches(rows_of(DF, recent=True), config.HISTORY_DIR)
+        db.upsert_matches(db.connect(config.DB_PATH), [r for r in rows_of(DF, recent=True) if r["status"] == "NS"])
         c = create_app().test_client()
         for market in draws.MARKETS:
-            self.assertEqual(c.get(f"/draws?league=E0&market={market}&days=4000").status_code, 200, market)
-        page = c.get("/draws?league=E0&days=4000").data.decode()
+            self.assertEqual(c.get(f"/draws?league=E0&market={market}&days=30").status_code, 200, market)
+        page = c.get("/draws?league=E0&days=30").data.decode()
         self.assertIn("kurs_fair", page)
         self.assertIn("Remisy", page)
         self.assertEqual(c.get("/draws?league=E0&market=xyz").status_code, 400)

@@ -202,7 +202,8 @@ def cmd_recent(a):
 
 def cmd_draws(a):
     conn = db.connect(config.DB_PATH)
-    df, up = db.load_matches(conn, a.league), db.load_upcoming(conn, a.league)
+    df = db.load_matches(conn, a.league)
+    up = db.load_upcoming(conn, a.league, since=None if a.include_past else db.today())
     if df.empty or up.empty:
         sys.exit("Brak danych lub nadchodzących meczów (zajrzyj na stronę /data albo uruchom fetch-fixtures).")
     P, p = _predictor(a, df)
@@ -230,9 +231,9 @@ def cmd_predict(a):
 def cmd_upcoming_predict(a):
     conn = db.connect(config.DB_PATH)
     df = db.load_matches(conn, a.league)
-    up = db.load_upcoming(conn, a.league)
+    up = db.load_upcoming(conn, a.league, since=None if a.include_past else db.today())
     if up.empty:
-        sys.exit("Brak nadchodzących meczów w bazie (komendy: fetch-fixtures, upcoming, demo).")
+        sys.exit("Brak nadchodzących meczów w bazie (komendy: fetch-fixtures, upcoming, demo; --include-past dla danych demo).")
     P, p = _predictor(a, df)
     for r in up.head(a.limit).to_dict("records"):
         pred = apply_blend(P.predict(r["home"], r["away"], r.get("referee"), date=r["date"]), r, p["blend_w"])
@@ -335,9 +336,9 @@ def cmd_tune(a):
 def cmd_log(a):
     conn = db.connect(config.DB_PATH)
     df = db.load_matches(conn, a.league)
-    up = db.load_upcoming(conn, a.league)
+    up = db.load_upcoming(conn, a.league, since=None if a.include_past else db.today())
     if up.empty:
-        sys.exit("Brak nadchodzących meczów do zapisania.")
+        sys.exit("Brak nadchodzących meczów do zapisania (mecze z wcześniejszych dni są pomijane; --include-past tylko do testów).")
     P, p = _predictor(a, df)
     n = ledger.log_predictions(conn, P, up, a.league, blend_w=p["blend_w"])
     print(f"Zapisano {n} prognoz do dziennika (tabela predictions).")
@@ -440,7 +441,7 @@ def cmd_notify(a):
     horizon = pd.Timestamp.today().normalize() + pd.Timedelta(days=a.days)
     blocks = []
     for lg in history.resolve_leagues(a.leagues):
-        df, up = db.load_matches(conn, lg), db.load_upcoming(conn, lg)
+        df, up = db.load_matches(conn, lg), db.load_upcoming(conn, lg, since=db.today())
         up = up[up["date"] <= horizon]
         if df.empty or up.empty:
             continue
@@ -512,6 +513,7 @@ def main(argv=None):
     s = add("recent", cmd_recent, "retrospektywa: co model przewidziałby przed ostatnimi meczami")
     s.add_argument("--days", type=int, default=10)
     s = add("draws", cmd_draws, "ranking meczów pod rynki remisowe (HT, 2H, HT lub FT...)")
+    s.add_argument("--include-past", action="store_true", help="także mecze z wcześniejszych dni (tylko demo/testy)")
     s.add_argument("--market", choices=list(draws_mod.MARKETS), default="ht_or_ft")
     s.add_argument("--days", type=int, default=7)
     s.add_argument("--top", type=int, default=15)
@@ -523,6 +525,7 @@ def main(argv=None):
     s.add_argument("--ridge", type=float)
     s.add_argument("--xi", type=float)
     s = add("upcoming-predict", cmd_upcoming_predict, "prognozy dla nadchodzących meczów z bazy")
+    s.add_argument("--include-past", action="store_true", help="także mecze z wcześniejszych dni (tylko demo/testy)")
     s.add_argument("--limit", type=int, default=10)
     s.add_argument("--min-edge", type=float, default=0.03)
     s = add("simulate", cmd_simulate, "symulacja tabeli do końca sezonu (Monte Carlo)")
@@ -545,6 +548,7 @@ def main(argv=None):
     s.add_argument("--shot-weights", type=float, nargs="+", default=[0.25, 0.5])
 
     s = add("log", cmd_log, "zapisz prognozy nadchodzących meczów do dziennika")
+    s.add_argument("--include-past", action="store_true", help="także mecze z wcześniejszych dni (tylko demo/testy)")
     s.add_argument("--ridge", type=float)
     s.add_argument("--xi", type=float)
     s = add("track", cmd_track, "raport z dziennika (rozliczone prognozy)")
