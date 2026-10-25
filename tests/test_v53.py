@@ -92,3 +92,40 @@ class TestFastResults(Env):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestParamsLocation(unittest.TestCase):
+    """Regresja: parametry z `tune` leżały w ignorowanym przez git data/, więc Render ich nie widział."""
+
+    def test_saved_to_tracked_params_dir_and_read_back_with_legacy_fallback(self):
+        from fbpred import params
+        with tempfile.TemporaryDirectory() as tmp:
+            old = (config.DB_PATH, config.PARAMS_DIR)
+            config.DB_PATH, config.PARAMS_DIR = Path(tmp) / "data" / "x.db", Path(tmp) / "params"
+            try:
+                (Path(tmp) / "data").mkdir()
+                (Path(tmp) / "data" / "params_E0.json").write_text('{"ridge": 7.0, "xi": 0.003}')   # stara lokalizacja
+                self.assertEqual(params.load("E0")["ridge"], 7.0)                                  # nadal czytana lokalnie
+                self.assertIn("dostrojone", params.describe("E0")["zrodlo"])
+                f = params.save("E0", {"ridge": 15.0, "xi": 0.001, "blend_w": 0.3})
+                self.assertEqual(f.parent, Path(tmp) / "params")                                   # zapis do params/
+                self.assertEqual(params.load("E0")["ridge"], 15.0)                                 # params/ ma pierwszeństwo
+                self.assertIn("DOMYŚLNE", params.describe("D1")["zrodlo"])                         # brak pliku -> jasny komunikat
+            finally:
+                config.DB_PATH, config.PARAMS_DIR = old
+
+    def test_data_page_shows_parameter_source(self):
+        from fbpred.web import create_app
+        with tempfile.TemporaryDirectory() as tmp:
+            old = (config.DB_PATH, config.HISTORY_DIR, config.AUTO_BOOTSTRAP, config.BOOTSTRAP_LEAGUES, config.PARAMS_DIR)
+            config.DB_PATH, config.HISTORY_DIR = Path(tmp) / "x.db", Path(tmp) / "history"
+            config.AUTO_BOOTSTRAP, config.BOOTSTRAP_LEAGUES, config.PARAMS_DIR = False, ["E0"], Path(tmp) / "params"
+            try:
+                sy = bootstrap.season_now()
+                history.save_matches(csvdata.parse_csv(fd_csv(sy - 1), "E0", sy - 1), config.HISTORY_DIR)
+                page = create_app().test_client().get("/data?league=E0").data.decode()
+                self.assertIn("Parametry modelu używane przez ten serwis", page)
+                self.assertIn("DOMYŚLNE", page)
+                self.assertIn("0.0019", page)                                   # xi nie może być zaokrąglone do 0
+            finally:
+                config.DB_PATH, config.HISTORY_DIR, config.AUTO_BOOTSTRAP, config.BOOTSTRAP_LEAGUES, config.PARAMS_DIR = old

@@ -60,3 +60,6 @@ GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")                 # token z uprawnien
 GITHUB_REPO = os.getenv("GITHUB_REPO", "")                   # "uzytkownik/nazwa-repo"
 LEDGER_BRANCH = os.getenv("LEDGER_BRANCH", "ledger-data")    # osobna gałąź - nie wywołuje redeployu na Renderze
 LEDGER_REMOTE_PATH = os.getenv("LEDGER_REMOTE_PATH", "ledger/predictions.csv")
+
+# parametry modelu z `tune` / `fatigue-test --apply`: katalog ŚLEDZONY w gicie (data/ jest ignorowane, więc Render ich nie widział)
+PARAMS_DIR = _path("PARAMS_DIR", "params")

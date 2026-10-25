@@ -304,3 +304,21 @@ na ligę. Kartki i rożne dojdą później z CSV, bez duplikatów. Bez tokenu st
 Aplikacja trzyma stan (diagnostykę, wątek odświeżania) w pamięci procesu, więc na Renderze używaj jednego workera:
 `gunicorn fbpred.web:app --workers 1 --threads 4 --timeout 120`. Strona **Dane** pokazuje `pid` procesu; jeśli po odświeżeniach
 widzisz różne wartości, serwis działa na kilku procesach.
+
+
+## Historia wielu lig w repo i parametry dla Rendera (0.5.4)
+
+**Historia w `history/`** przyspiesza start: serwis czyta pliki zamiast pobierać po kilka sezonów każdej ligi, a to oszczędza też zapytania
+do football-data.org (limit 10 na minutę). Bez GitHub Actions zrób to jednorazowo u siebie (w katalogu projektu, token w `.env`):
+```
+python -m fbpred history-init --league E0,D1,SP1,I1,F1,N1,P1 --seasons 2020-2026
+python -m fbpred history-init --league CL --seasons 2023-2026
+git rm history/DEMO_2021.csv history/DEMO_2022.csv history/DEMO_2023.csv
+git add history && git commit -m "historia lig" && git push
+```
+Bieżący sezon aplikacja i tak odświeża przy starcie, więc plik z historią może być "migawką" i nie wymaga częstych aktualizacji.
+
+**Parametry modelu (`params/`).** Komendy `tune` i `fatigue-test --apply` zapisują `params_<liga>.json`. Do 0.5.3 trafiały do `data/`, które jest ignorowane
+przez git, więc **Render ich nigdy nie widział** i liczył na ustawieniach domyślnych. Od 0.5.4 zapis idzie do `params/` (w repo):
+`git add params && git commit -m "parametry" && git push`. Strona **Dane** pokazuje tabelę „Parametry modelu używane przez ten serwis”
+(`dostrojone (params/)` albo `DOMYŚLNE`). Stare pliki z `data/` nadal są czytane lokalnie; żeby wysłać je na Render, skopiuj je do `params/`.

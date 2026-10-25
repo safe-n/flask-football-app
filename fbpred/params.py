@@ -13,15 +13,30 @@ DEFAULTS = {"ridge": 10.0, "xi": 0.0019, "blend_w": None, "shot_weight": 0.0, "d
 
 
 def _file(league: str) -> Path:
-    return config.DB_PATH.parent / f"params_{league}.json"
+    """Plik do ZAPISU: params/ w repo (commitujesz go, żeby Render używał tych samych ustawień)."""
+    return Path(config.PARAMS_DIR) / f"params_{league}.json"
+
+
+def _sources(league: str) -> list[Path]:
+    """Pliki do odczytu: najpierw stara lokalizacja (data/), potem params/ (ma pierwszeństwo)."""
+    return [config.DB_PATH.parent / f"params_{league}.json", _file(league)]
 
 
 def load(league: str) -> dict:
     p = dict(DEFAULTS)
-    f = _file(league)
-    if f.exists():
-        p.update(json.loads(f.read_text()))
+    for f in _sources(league):
+        if f.exists():
+            p.update(json.loads(f.read_text()))
     return p
+
+
+def describe(league: str) -> dict:
+    """Skąd pochodzą parametry (do strony Dane: czy Render używa dostrojonych, czy domyślnych)."""
+    p = load(league)
+    used = [str(f) for f in _sources(league) if f.exists()]
+    return {"liga": league, "ridge": p["ridge"], "xi": p["xi"], "shot_weight": p.get("shot_weight", 0.0),
+            "waga_modelu_vs_rynek": p.get("blend_w"), "korekta_remisow": "tak" if any((p.get("draw_shift") or {}).values()) else "nie",
+            "zmeczenie": "tak" if p.get("fatigue") else "nie", "zrodlo": "dostrojone (params/)" if used else "DOMYŚLNE (nie uruchomiono tune lub plik nie jest w repo)"}
 
 
 def save(league: str, params: dict) -> Path:

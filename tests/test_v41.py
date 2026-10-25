@@ -155,12 +155,13 @@ class TestLedgerMigration(unittest.TestCase):
 class Env(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.old = (config.DB_PATH, config.HISTORY_DIR, config.AUTO_BOOTSTRAP, config.BOOTSTRAP_LEAGUES)
+        self.old = (config.DB_PATH, config.HISTORY_DIR, config.AUTO_BOOTSTRAP, config.BOOTSTRAP_LEAGUES, config.PARAMS_DIR)
         config.DB_PATH, config.HISTORY_DIR = Path(self.tmp.name) / "x.db", Path(self.tmp.name) / "history"
+        config.PARAMS_DIR = Path(self.tmp.name) / "params"
         config.AUTO_BOOTSTRAP, config.BOOTSTRAP_LEAGUES = False, ["E0"]
 
     def tearDown(self):
-        config.DB_PATH, config.HISTORY_DIR, config.AUTO_BOOTSTRAP, config.BOOTSTRAP_LEAGUES = self.old
+        config.DB_PATH, config.HISTORY_DIR, config.AUTO_BOOTSTRAP, config.BOOTSTRAP_LEAGUES, config.PARAMS_DIR = self.old
         self.tmp.cleanup()
 
 
@@ -185,7 +186,7 @@ class TestWebAndTune(Env):
         db.upsert_matches(conn, rows_of(DF))
         cli_main(["tune", "--league", "E0", "--min-train", "380", "--step", "63", "--ridges", "10", "--xis", "0.0019",
                   "--shot-weights", "0.5"])
-        saved = json.loads((config.DB_PATH.parent / "params_E0.json").read_text())
+        saved = json.loads((config.PARAMS_DIR / "params_E0.json").read_text())
         self.assertEqual(set(saved["draw_shift"]), set(DRAW_CALIB))
         self.assertTrue(all(isinstance(v, float) for v in saved["draw_shift"].values()))
         P, p = params.build_predictor(db.load_matches(conn, "E0"), "E0")

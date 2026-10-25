@@ -144,12 +144,13 @@ class TestPredictorRestAndAdjust(unittest.TestCase):
 class Env(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.old = (config.DB_PATH, config.HISTORY_DIR, config.AUTO_BOOTSTRAP, config.BOOTSTRAP_LEAGUES)
+        self.old = (config.DB_PATH, config.HISTORY_DIR, config.AUTO_BOOTSTRAP, config.BOOTSTRAP_LEAGUES, config.PARAMS_DIR)
         config.DB_PATH, config.HISTORY_DIR = Path(self.tmp.name) / "x.db", Path(self.tmp.name) / "history"
+        config.PARAMS_DIR = Path(self.tmp.name) / "params"
         config.AUTO_BOOTSTRAP, config.BOOTSTRAP_LEAGUES = False, ["E0"]
 
     def tearDown(self):
-        config.DB_PATH, config.HISTORY_DIR, config.AUTO_BOOTSTRAP, config.BOOTSTRAP_LEAGUES = self.old
+        config.DB_PATH, config.HISTORY_DIR, config.AUTO_BOOTSTRAP, config.BOOTSTRAP_LEAGUES, config.PARAMS_DIR = self.old
         self.tmp.cleanup()
 
 
@@ -188,7 +189,7 @@ class TestWebCliNotify(Env):
         df = generate(n_seasons=4, seed=31, league="E0", with_upcoming=False, midweek_every=3, rest_effect=-0.25)
         db.upsert_matches(db.connect(config.DB_PATH), rows_of(df))
         cli_main(["fatigue-test", "--leagues", "E0", "--min-train", "380", "--step", "84", "--apply"])
-        saved = json.loads((config.DB_PATH.parent / "params_E0.json").read_text())
+        saved = json.loads((config.PARAMS_DIR / "params_E0.json").read_text())
         self.assertIn("fatigue", saved)
         self.assertTrue(set(saved["fatigue"]) <= set(fat.TERMS))
         P, _ = params.build_predictor(db.load_matches(db.connect(config.DB_PATH), "E0"), "E0")

@@ -111,7 +111,7 @@ def create_app() -> Flask:
 
     def page(title, league, *blocks, refresh=False):
         return render_template("page.html", title=title, league=league, leagues=league_options(), blocks=blocks,
-                               refresh=refresh, fmt=lambda x: f"{x:.2f}".rstrip("0").rstrip(".") if abs(x) < 1e6 else str(x))
+                               refresh=refresh, fmt=lambda x: f"{x:.4g}" if abs(x) < 1e4 else f"{x:.0f}")
 
     @app.errorhandler(503)
     @app.errorhandler(404)
@@ -293,7 +293,8 @@ def create_app() -> Flask:
                                 "(render.yaml działa tylko dla usług utworzonych z Blueprintu). Dane z history/ i tak działają."))
         if not diag.empty:
             blocks += [("h", "Diagnostyka ostatniego odświeżenia (skąd bierze się terminarz)"), ("t", diag)]
-        blocks += [("h", "Baza w pamięci serwisu (SQLite)"), ("t", q)]
+        par = pd.DataFrame([prm.describe(c) for c, _ in league_options() if c != "DEMO"])
+        blocks += [("h", "Parametry modelu używane przez ten serwis"), ("t", par), ("h", "Baza w pamięci serwisu (SQLite)"), ("t", q)]
         if not hist.empty:
             blocks += [("h", f"Historia w repo ({config.HISTORY_DIR})"), ("t", hist)]
         return page("Dane", league, *blocks)

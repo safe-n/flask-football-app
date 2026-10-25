@@ -184,7 +184,8 @@ def cmd_fatigue(a):
             cur = prm.load(lg)
             cur["fatigue"] = coefs
             prm.save(lg, cur)
-        print("Zapisano do parametrów lig" + (": " + ", ".join(lg for lg, _, _ in parts)) + ".")
+        print("Zapisano do parametrów lig" + (": " + ", ".join(lg for lg, _, _ in parts)) + ". "
+              "Aby Render ich używał: git add params && git commit && git push")
     else:
         print("(użyj --apply, aby zapisać istotne współczynniki do modelu)")
 
@@ -330,6 +331,7 @@ def cmd_tune(a):
     f = prm.save(a.league, {"ridge": r, "xi": x, "blend_w": w, "shot_weight": sw, "draw_shift": shifts})
     print(f"\nNajlepsze: ridge={r}, xi={x}, shot_weight={sw}, waga modelu w miksie z rynkiem={w}  → zapisano {f}")
     print("Uwaga: strojenie na tych samych danych co ocena zawyża wynik - traktuj jako wskazówkę.")
+    print(f"Aby Render używał tych parametrów: git add params && git commit -m 'parametry {a.league}' && git push")
 
 
 # ------------------------------------------------------------------ dziennik
