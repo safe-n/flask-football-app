@@ -1,0 +1,12 @@
+{
+  "ridge": 5,
+  "xi": 0.0019,
+  "blend_w": 0.0,
+  "shot_weight": 0.25,
+  "draw_shift": {
+    "draw_ht": 0.0,
+    "draw_2h": -0.173,
+    "draw_either_half": -0.152,
+    "draw_ht_or_ft": 0.0
+  }
+}
