@@ -22,5 +22,11 @@
 {% endfor %}
 </div>
 {% for note in notes %}<p class="m">{{ note }}</p>{% endfor %}
+{% if addable %}
+<div class="card"><div class="t">Dodaj do zestawienia</div>
+<table><tr><th>rynek</th><th>szansa</th><th>fair</th><th>kurs</th><th></th></tr>
+{% for r in addable %}<tr><td>{{ r.group }}: {{ r.label }}</td><td>{{ '%.0f'|format(r.p) }}%</td><td>{{ '%.2f'|format(r.fair) }}</td><td>{{ r.odds if r.odds else '–' }}</td>
+<td><button class="add" data-id="{{ r.id }}">＋</button></td></tr>{% endfor %}</table></div>
+{% elif head %}<p class="m">Aby dodawać typy do zestawienia, otwórz mecz z listy Mecze (link niesie datę meczu).</p>{% endif %}
 {% endif %}
 {% endblock %}

@@ -9,7 +9,7 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
-from . import config, csvdata, db, fatigue as fat, history, ledger, notify, params as prm, quality, recent as recent_mod, rest, report, stats as stats_mod
+from . import config, csvdata, db, fatigue as fat, profile as prof_mod, history, ledger, notify, params as prm, quality, recent as recent_mod, rest, report, stats as stats_mod
 from .backtest import (DRAW_CALIB, best_blend, betting_sim, bias_shift, bias_table, calibration, compare_report,
                        summarize, walk_forward)
 from . import draws as draws_mod
@@ -199,6 +199,25 @@ def cmd_recent(a):
         sys.exit("Brak meczów w wybranym oknie.")
     print(recent_mod.show_table(res).to_string(index=False))
     print("\n" + recent_mod.summary(res))
+
+
+def cmd_profile(a):
+    """Czy metoda 'wyrównane kursy + lekka przewaga gości => remis w 1. lub 2. połowie' działa na historii?"""
+    conn = db.connect(config.DB_PATH)
+    if a.leagues == "auto":
+        lgs = [r[0] for r in conn.execute("SELECT DISTINCT league FROM matches ORDER BY 1") if r[0] not in ("DEMO", "CL")]
+    else:
+        lgs = [x.strip() for x in a.leagues.split(",")]
+    df = pd.concat([db.load_matches(conn, lg) for lg in lgs], ignore_index=True) if lgs else pd.DataFrame()
+    res = prof_mod.odds_profile(df, a.balance / 100) if not df.empty else {"n": 0}
+    if not res["n"]:
+        sys.exit("Brak meczów z kursami i wynikiem do przerwy.")
+    print(f"Ligi: {', '.join(lgs)} | mecze z kursami: {res['n']} | 'wyrównane' = różnica szans gość-gospodarz <= {a.balance:.0f} pp\n")
+    print(res["tabela"].to_string(index=False))
+    if not res["podzial_goli"].empty:
+        print("\nTen sam profil z podziałem na oczekiwaną liczbę goli (rynek O/U 2.5):\n")
+        print(res["podzial_goli"].to_string(index=False))
+    print("\n" + res["werdykt"])
 
 
 def cmd_draws(a):
@@ -514,6 +533,9 @@ def main(argv=None):
     s.add_argument("--apply", action="store_true", help="zapisz istotne współczynniki do params_<liga>.json")
     s = add("recent", cmd_recent, "retrospektywa: co model przewidziałby przed ostatnimi meczami")
     s.add_argument("--days", type=int, default=10)
+    s = add("profile", cmd_profile, "test metody: wyrównane kursy + przewaga gości => remis w 1. lub 2. połowie", league=False)
+    s.add_argument("--leagues", default="auto", help="auto = wszystkie ligi w bazie (bez DEMO i LM) albo np. E0,D1")
+    s.add_argument("--balance", type=float, default=10, help="próg 'wyrównane' w punktach procentowych")
     s = add("draws", cmd_draws, "ranking meczów pod rynki remisowe (HT, 2H, HT lub FT...)")
     s.add_argument("--include-past", action="store_true", help="także mecze z wcześniejszych dni (tylko demo/testy)")
     s.add_argument("--market", choices=list(draws_mod.MARKETS), default="ht_or_ft")

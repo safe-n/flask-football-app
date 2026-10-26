@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import threading
+import zlib
 import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -60,8 +61,9 @@ def seasons_in_db(conn, league: str) -> set[int]:
 
 
 def _known_teams(conn, league: str) -> list[str]:
-    rows = conn.execute("SELECT DISTINCT home FROM matches WHERE league=? AND season>=?",
-                        (league, season_now() - 2)).fetchall()
+    rows = conn.execute("SELECT home FROM matches WHERE league=? AND season>=? UNION "
+                        "SELECT away FROM matches WHERE league=? AND season>=?",
+                        (league, season_now() - 2, league, season_now() - 2)).fetchall()
     return [r[0] for r in rows]
 
 
@@ -118,27 +120,39 @@ def _fdorg_rows(conn, lg: str, fetch) -> list[dict]:
     return fetch(resolver)
 
 
-def settle_pending(conn, lg: str, season_rows, log=_log) -> tuple[int, str]:
-    """Wyniki meczów z ostatnich dni, które już się odbyły, a jeszcze nie dotarły do CSV (opóźnienie źródła).
+def settle_pending(conn, lg: str, season_rows, log=_log, days: int = 10) -> tuple[int, str]:
+    """Wyniki ostatnich dni z football-data.org, zanim pojawią się w CSV (opóźnienie źródła).
 
-    Uzupełnia je z football-data.org (tylko wynik i wynik do przerwy, bez kartek/rożnych - te przyjdą z CSV).
-    Wiersz zachowuje swój fixture_id, więc późniejszy plik CSV po prostu go uzupełni, bez duplikatów."""
-    pend = conn.execute("SELECT fixture_id, date, home, away FROM matches WHERE league=? AND hg IS NULL AND date < ? "
-                        "AND date >= date(?, '-7 day')", (lg, db.today(), db.today())).fetchall()
-    if not pend:
-        return 0, "brak meczów czekających na wynik"
+    Dla każdego niedawno zakończonego meczu: jeśli w bazie jest wiersz bez wyniku - uzupełnia go; jeśli wiersza nie ma w ogóle
+    (typowo po restarcie serwisu: terminarz zawiera już tylko przyszłe mecze) - WSTAWIA go z tym samym identyfikatorem, jaki
+    ma późniejszy CSV, więc kartki/rożne dojdą do tego samego rekordu bez duplikatów. Zapisujemy tylko wynik i wynik do przerwy."""
     if not (fdorg.enabled() and fdorg.supports(lg)):
-        return 0, f"{len(pend)} meczów czeka na wynik; szybsze wyniki wymagają tokenu FOOTBALL_DATA_ORG_TOKEN"
-    finished = [r for r in season_rows() if r["status"] == "FT"]
-    n = 0
-    for fid, date, h, a in pend:
-        day = pd.Timestamp(date)
-        for r in finished:
-            if r["home"] == h and r["away"] == a and abs((pd.Timestamp(r["date"]) - day).days) <= 1:   # UTC vs czas lokalny
-                db.update_fields(conn, fid, {"hg": r["hg"], "ag": r["ag"], "hg_ht": r["hg_ht"], "ag_ht": r["ag_ht"], "status": "FT"})
-                n += 1
-                break
-    return n, f"dopisano {n} z {len(pend)} wyników (football-data.org)"
+        n = conn.execute("SELECT COUNT(*) FROM matches WHERE league=? AND hg IS NULL AND date < ?", (lg, db.today())).fetchone()[0]
+        return 0, ("szybkie wyniki wyłączone: brak tokenu FOOTBALL_DATA_ORG_TOKEN" + (f" ({n} meczów czeka na wynik)" if n else ""))
+    start = (pd.Timestamp(db.today()) - pd.Timedelta(days=days)).strftime("%Y-%m-%d")
+    known = set(_known_teams(conn, lg))
+    updated = inserted = skipped = 0
+    for r in [x for x in season_rows() if x["status"] == "FT" and x["date"] >= start]:
+        if r["home"] not in known or r["away"] not in known:
+            skipped += 1                       # nierozpoznana nazwa drużyny - nie tworzymy "nowych drużyn" w bazie
+            continue
+        d = pd.Timestamp(r["date"])
+        found = conn.execute("SELECT fixture_id, hg FROM matches WHERE league=? AND home=? AND away=? AND date BETWEEN ? AND ?",
+                             (lg, r["home"], r["away"], (d - pd.Timedelta(days=1)).strftime("%Y-%m-%d"),
+                              (d + pd.Timedelta(days=1)).strftime("%Y-%m-%d"))).fetchall()
+        if found:
+            if found[0][1] is None:
+                db.update_fields(conn, found[0][0], {"hg": r["hg"], "ag": r["ag"], "hg_ht": r["hg_ht"], "ag_ht": r["ag_ht"],
+                                                    "status": "FT"})
+                updated += 1
+            continue
+        fid = zlib.crc32(f"{lg}|{r['date']}|{r['home']}|{r['away']}".encode()) & 0x7FFFFFFF   # jak w csvdata.parse_csv
+        db.upsert_matches(conn, [dict(fixture_id=fid, league=lg, season=r["season"], date=r["date"], home=r["home"],
+                                      away=r["away"], referee=r.get("referee"), status="FT", hg=r["hg"], ag=r["ag"],
+                                      hg_ht=r["hg_ht"], ag_ht=r["ag_ht"])])
+        inserted += 1
+    msg = f"dopisano {inserted} nowych i uzupełniono {updated} wyników (football-data.org)"
+    return inserted + updated, msg + (f"; pominięto {skipped} (nierozpoznane nazwy)" if skipped else "")
 
 
 def refresh(leagues_: list[str] | None = None, log_predictions: bool = True, log=_log) -> None:

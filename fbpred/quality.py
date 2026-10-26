@@ -17,6 +17,10 @@ def check(df: pd.DataFrame) -> list[tuple[str, str]]:
     dup = int(df.duplicated(["date", "home", "away"]).sum())
     add("BŁĄD" if dup else "OK", f"duplikaty (data+para): {dup}")
 
+    pair = df.sort_values("date").groupby(["home", "away"])["date"].diff().dt.days
+    near = int((pair <= 2).sum())
+    add("BŁĄD" if near else "OK", f"prawie-duplikaty (ta sama para w odstępie ≤ 2 dni): {near}")
+
     big = int(((df.hg > 9) | (df.ag > 9)).sum())
     add("UWAGA" if big else "OK", f"wyniki z >9 golami jednej drużyny: {big}")
 

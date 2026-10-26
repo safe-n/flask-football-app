@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block body %}
+<form method="get" class="card">
+  <p class="m"><b>Kryteria podpowiedzi</b> (zmień i kliknij „Szukaj”). Presety:
+    <a href="/suggest?leagues=ALL&key=d_either&min_p=55">Twoje remisy HT lub 2H</a> ·
+    <a href="/suggest?leagues=ALL&key=d_either&profile=balanced_away&min_p=50">…tylko wyrównane z przewagą gości</a> ·
+    <a href="/suggest?leagues=ALL&key=d_htft&min_p=45">HT lub FT</a> ·
+    <a href="/suggest?leagues=ALL&group=Podwójna+szansa&min_p=80">Pewniaki 1X/X2</a></p>
+  <div class="form">
+    <label>Ligi<select name="leagues"><option value="ALL" {{ 'selected' if sel == 'ALL' }}>wszystkie</option>
+      {% for code, lab in leagues %}{% if code != 'DEMO' %}<option value="{{ code }}" {{ 'selected' if sel == code }}>{{ lab }}</option>{% endif %}{% endfor %}</select></label>
+    <label>Min. szansa %<input name="min_p" type="number" step="1" value="{{ (crit.min_p * 100)|round|int }}"></label>
+    <label>Maks. szansa %<input name="max_p" type="number" step="1" value="{{ (crit.max_p * 100)|round|int }}"></label>
+    <label>Dni naprzód<input name="days" type="number" value="{{ crit.days }}"></label>
+    <label>Min. meczów drużyny<input name="min_games" type="number" value="{{ crit.min_games }}"></label>
+    <label>Ile wyników<input name="top" type="number" value="{{ crit.top }}"></label>
+    <label>Typów z meczu<input name="per_match" type="number" value="{{ crit.max_per_match }}"></label>
+    <label>Nóg w auto-kuponie<input name="legs" type="number" value="{{ auto|length if auto else 3 }}"></label>
+    <label>Min. przewaga % (wymaga kursu)<input name="min_edge" type="number" value="{{ (crit.min_edge * 100)|round|int if crit.min_edge is not none else '' }}"></label>
+    <label>Sortuj<select name="sort"><option value="p">po szansie</option><option value="edge" {{ 'selected' if crit.sort == 'edge' }}>po przewadze nad kursem</option></select></label>
+    <label>Profil kursów<select name="profile">
+      <option value="">dowolny</option><option value="balanced_away" {{ 'selected' if crit.profile == 'balanced_away' }}>wyrównane, lekka przewaga gości</option>
+      <option value="balanced" {{ 'selected' if crit.profile == 'balanced' }}>wyrównane (dowolna strona)</option></select></label>
+    <label>„Wyrównane” = różnica ≤ pp<input name="balance" type="number" value="{{ (crit.balance * 100)|round|int }}"></label>
+  </div>
+  <p class="m">Rynki (puste = grupy poniżej):
+    {% for g in groups_all %}<label><input type="checkbox" name="group" value="{{ g }}" {{ 'checked' if g in crit.groups and not crit.keys }}> {{ g }}</label> &nbsp;{% endfor %}
+    <label><input type="checkbox" name="skip_rest" value="1" {{ 'checked' if crit.skip_short_rest }}> pomiń krótką przerwę</label></p>
+  {% for k in crit.keys %}<input type="hidden" name="key" value="{{ k }}">{% endfor %}
+  <button>Szukaj</button> <a class="m" href="/profile?league={{ league }}">Czy profil kursów działa? →</a>
+</form>
+{% for n in notes %}<p class="warn">{{ n }}</p>{% endfor %}
+{% if building %}<meta http-equiv="refresh" content="8">{% endif %}
+{% if auto %}
+<div class="card"><div class="t">Auto-kupon ({{ auto|length }} typów z różnych meczów)</div>
+<table>{% for r in auto %}<tr><td>{{ r.liga }} {{ r.mecz }}</td><td>{{ r.rynek }}</td><td>{{ '%.0f'|format(r['p_%']) }}%</td></tr>{% endfor %}</table>
+<p class="m">Szansa całości wg modelu: <b>{{ '%.1f'|format(auto_comb.p * 100) }}%</b> · uczciwy kurs {{ '%.2f'|format(auto_comb.kurs_fair) }} · sensowny od ok. {{ '%.2f'|format(auto_comb.min_sensowny_kurs) }}</p>
+<button class="add" data-ids='{{ auto_ids|tojson }}'>＋ Dodaj wszystkie do zestawienia</button></div>
+{% endif %}
+<div class="card">
+{% if rows %}
+<table><tr><th>mecz</th><th>rynek</th><th>szansa</th><th>fair</th><th>kurs</th><th>przew.</th><th></th></tr>
+{% for r in rows %}<tr><td>{{ r.liga }} · {{ r.data[5:] }}<br>{{ r.mecz }}{% if r['ostrzeżenia'] %}<br><span class="warn" style="font-size:11px">⚠ {{ r['ostrzeżenia'] }}</span>{% endif %}</td>
+<td>{{ r.rynek }}</td><td>{{ '%.0f'|format(r['p_%']) }}%</td><td>{{ '%.2f'|format(r.kurs_fair) }}</td>
+<td>{{ r.kurs_bukm if r.kurs_bukm else '–' }}</td><td>{{ ('%+.0f%%'|format(r['przewaga_%'])) if r['przewaga_%'] is not none else '–' }}</td>
+<td><button class="add" data-id="{{ r.id }}">＋</button></td></tr>{% endfor %}</table>
+{% else %}<p class="m">Brak typów spełniających kryteria{% if building %} (modele jeszcze się liczą){% endif %}. Obniż „Min. szansa” albo zwiększ „Dni naprzód”.</p>{% endif %}
+{% if rej %}<p class="small">Odrzucone mecze: {% for k, v in rej.items() %}{{ k }}: {{ v }}{{ ', ' if not loop.last }}{% endfor %}.</p>{% endif %}
+</div>
+<p class="small">Szansa = prawdopodobieństwo wg modelu, nie gwarancja. „Przewaga” liczy się tylko tam, gdzie baza ma kurs bukmachera (1X2, O/U 2.5, BTTS); dla remisów w połowach kursu nie ma.</p>
+{% endblock %}

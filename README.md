@@ -322,3 +322,29 @@ Bieżący sezon aplikacja i tak odświeża przy starcie, więc plik z historią 
 przez git, więc **Render ich nigdy nie widział** i liczył na ustawieniach domyślnych. Od 0.5.4 zapis idzie do `params/` (w repo):
 `git add params && git commit -m "parametry" && git push`. Strona **Dane** pokazuje tabelę „Parametry modelu używane przez ten serwis”
 (`dostrojone (params/)` albo `DOMYŚLNE`). Stare pliki z `data/` nadal są czytane lokalnie; żeby wysłać je na Render, skopiuj je do `params/`.
+
+
+## Podpowiedzi i Zestawienie (0.6)
+
+**Podpowiedzi** (`/suggest`): model wybiera typy wg Twoich kryteriów: zakres szansy (np. 60–97%), rynki (domyślnie remisy; można zawęzić do
+jednego, np. „remis w 1. lub 2. połowie”), liczba dni naprzód, minimum meczów drużyny (odrzuca beniaminków, których model słabo zna),
+pominięcie krótkiej przerwy, minimalna przewaga nad kursem (tam, gdzie baza ma kurs), profil kursów (np. „wyrównane z przewagą gości”) i
+sortowanie. Ligi: jedna albo wszystkie. Każdy wiersz ma ostrzeżenia (mało danych, krótka przerwa, duża rozbieżność z rynkiem). „Auto-kupon”
+wybiera najlepsze N typów z RÓŻNYCH meczów.
+
+**Zestawienie** (`/coupon`): jedno miejsce na typy z obu źródeł naraz: z Podpowiedzi (przycisk ＋ albo „dodaj wszystkie”) i ręcznie ze strony
+**Mecz** (sekcja „Dodaj do zestawienia”, każdy rynek ma przycisk ＋). Wpisujesz własne kursy bukmachera; aplikacja liczy łączną szansę wg modelu,
+uczciwy kurs, „sensowny od” (uczciwy + 10% na marżę), oczekiwany zwrot (EV) i podaje ostrzeżenia. Dwa typy z jednego meczu nie są niezależne,
+więc wtedy łącznej szansy nie liczy. Zestawienie jest zapamiętywane **w przeglądarce** (nie ginie przy restarcie serwera, ale jest osobne na
+każdym urządzeniu).
+
+**Analiza AI (opcjonalna).** Przycisk „Analiza AI” na stronie Zestawienie wysyła do Claude API policzone dane kuponu (nie Twój tekst) i prosi o
+ocenę nóg oraz sprawdzenie wiadomości o składach, kontuzjach, pauzach za kartki i rotacji (narzędzie wyszukiwania; podaje źródła).
+Włączenie: w Renderze `ANTHROPIC_API_KEY` (klucz z konta Claude Console, płatny za użycie) i `AI_ACCESS_CODE` (dowolny Twój kod, który wpisujesz w
+aplikacji; bez niego obcy nie wydadzą Twoich pieniędzy). Domyślny model to tani `claude-haiku-5-5` (`AI_MODEL`), limit `AI_DAILY_LIMIT=20` analiz na dobę,
+wyniki są trzymane w pamięci 6 godzin. Wyszukiwanie w sieci jest dodatkowo płatne i może wymagać włączenia w ustawieniach konsoli, a cennik sprawdź w
+dokumentacji API. AI nie poprawia prawdopodobieństw modelu; ocenia kupon i zbiera wiadomości, więc zawsze zweryfikuj źródła. Bez AI podsumowanie
+oparte na regułach działa zawsze.
+
+**Profil kursów** (`/profile`, `python -m fbpred profile`): sprawdza na historii, czy mecze o wyrównanych kursach z lekką przewagą gości
+częściej kończą się remisem w 1. lub 2. połowie niż reszta (z przedziałami ufności) oraz czy to nie efekt samej liczby goli (podział wg rynku O/U 2.5).

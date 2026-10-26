@@ -63,3 +63,11 @@ LEDGER_REMOTE_PATH = os.getenv("LEDGER_REMOTE_PATH", "ledger/predictions.csv")
 
 # parametry modelu z `tune` / `fatigue-test --apply`: katalog ŚLEDZONY w gicie (data/ jest ignorowane, więc Render ich nie widział)
 PARAMS_DIR = _path("PARAMS_DIR", "params")
+
+# --- opcjonalna analiza AI (Claude API, płatne za użycie). Wyłączona, dopóki nie ustawisz OBU: klucza i kodu dostępu.
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+AI_ACCESS_CODE = os.getenv("AI_ACCESS_CODE", "")              # wymagany kod, żeby obcy nie wydali Twojego budżetu
+AI_MODEL = os.getenv("AI_MODEL", "claude-haiku-5-5")          # tani model; zmień np. na claude-sonnet-5-5 dla głębszych analiz
+AI_WEB_SEARCH = os.getenv("AI_WEB_SEARCH", "1") == "1"        # sprawdzanie wiadomości (składy, kontuzje) przez narzędzie wyszukiwania
+AI_DAILY_LIMIT = int(os.getenv("AI_DAILY_LIMIT", "20"))       # maks. liczba analiz na dobę
+AI_MAX_TOKENS = int(os.getenv("AI_MAX_TOKENS", "900"))

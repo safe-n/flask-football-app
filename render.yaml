@@ -30,6 +30,10 @@ services:
         sync: false                    # token (Contents: write, tylko to repo) - trwały dziennik bez Actions
       - key: GITHUB_REPO
         sync: false                    # np. uzytkownik/flask-football-app
+      - key: ANTHROPIC_API_KEY
+        sync: false                    # opcjonalnie: analiza AI zestawienia (płatna za użycie)
+      - key: AI_ACCESS_CODE
+        sync: false                    # kod, który wpisujesz w aplikacji, by użyć analizy AI
       - key: FOOTBALL_DATA_ORG_TOKEN
         sync: false                    # darmowy token (Liga Mistrzów + zapasowy terminarz) - wpisz w panelu Render
       - key: BOOTSTRAP_YEARS

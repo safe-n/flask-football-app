@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="card"><div id="coupon" class="m">Ładowanie…</div></div>
+<div class="card" id="aibox" {% if not ai_enabled %}style="display:none"{% endif %}>
+  <button id="aibtn">🤖 Analiza AI zestawienia (wiadomości, składy, ryzyka)</button>
+  <span class="m"> pozostało dziś: {{ ai_left }}</span>
+  <div id="aiout" class="m" style="white-space:pre-wrap;margin-top:8px"></div>
+</div>
+{% if not ai_enabled %}<p class="small">Analiza AI jest wyłączona (opcjonalna, płatna za użycie): ustaw w Renderze ANTHROPIC_API_KEY i AI_ACCESS_CODE.</p>{% endif %}
+<script>
+(function(){
+var box=document.getElementById('coupon');
+function el(tag,txt,cls){var e=document.createElement(tag);if(txt!==undefined)e.textContent=txt;if(cls)e.className=cls;return e;}
+function query(c){var q=new URLSearchParams();c.forEach(function(l){q.append('leg',l.id);q.append('odds',l.odds||'');});return q;}
+function draw(){
+  var c=fbLoad();
+  if(!c.length){box.textContent='Zestawienie jest puste. Dodaj typy ze strony Podpowiedzi albo Mecz (przycisk ＋).';return;}
+  fetch('/api/coupon?'+query(c).toString()).then(function(r){return r.json().then(function(d){return [r.status,d];});}).then(function(x){
+    if(x[0]===202){box.textContent=x[1].komunikat;setTimeout(draw,6000);return;}
+    render(x[1],c);
+  }).catch(function(){box.textContent='Nie udało się pobrać danych zestawienia.';});
+}
+function render(d,c){
+  box.textContent='';
+  var t=el('table');var h=el('tr');['mecz','rynek','szansa','fair','Twój kurs',''].forEach(function(x){h.appendChild(el('th',x));});t.appendChild(h);
+  d.legs.forEach(function(l,i){
+    var r=el('tr');
+    r.appendChild(el('td',(l.data||'').slice(5)+' '+(l.mecz||l.id)));
+    if(l.blad){var td=el('td',l.blad,'warn');td.colSpan=3;r.appendChild(td);}
+    else{r.appendChild(el('td',l.rynek));r.appendChild(el('td',(100*l.p).toFixed(0)+'%'));r.appendChild(el('td',l.kurs_fair.toFixed(2)));}
+    var tdo=el('td');
+    if(!l.blad){var inp=el('input');inp.type='number';inp.step='0.01';inp.style.width='70px';inp.placeholder=l.kurs_uzyty&&l.kurs_zrodlo!=='Twój'?String(l.kurs_uzyty):'kurs';
+      inp.value=c[i].odds||'';inp.addEventListener('change',function(){var cc=fbLoad();cc[i].odds=inp.value;fbSave(cc);draw();});tdo.appendChild(inp);}
+    r.appendChild(tdo);
+    var tdx=el('td');var b=el('button','✕');b.className='add';b.addEventListener('click',function(){var cc=fbLoad();cc.splice(i,1);fbSave(cc);draw();});tdx.appendChild(b);r.appendChild(tdx);
+    t.appendChild(r);
+    (l.ostrzezenia||[]).forEach(function(w){var rw=el('tr');var tw=el('td','⚠ '+w,'warn');tw.colSpan=6;tw.style.fontSize='11px';tw.style.textAlign='left';rw.appendChild(tw);t.appendChild(rw);});
+  });
+  box.appendChild(t);
+  var s=el('div',d.podsumowanie,'m');s.style.whiteSpace='pre-wrap';s.style.marginTop='10px';box.appendChild(s);
+  var clr=el('button','Wyczyść zestawienie');clr.addEventListener('click',function(){fbSave([]);draw();});clr.style.marginTop='10px';box.appendChild(clr);
+}
+var ai=document.getElementById('aibtn');
+if(ai)ai.addEventListener('click',function(){
+  var code=localStorage.getItem('fb_ai_code')||prompt('Kod dostępu do analizy AI (AI_ACCESS_CODE):');if(!code)return;
+  var c=fbLoad(),out=document.getElementById('aiout');out.textContent='Analizuję… (może potrwać do minuty)';
+  fetch('/api/ai/coupon',{method:'POST',headers:{'Content-Type':'application/json','X-AI-Code':code},
+    body:JSON.stringify({legs:c.map(function(l){return l.id;}),odds:c.map(function(l){return l.odds||'';})})})
+  .then(function(r){return r.json().then(function(d){return [r.status,d];});}).then(function(x){
+    if(x[0]===403){localStorage.removeItem('fb_ai_code');out.textContent=x[1].error;return;}
+    if(x[1].error){out.textContent=x[1].error;return;}
+    localStorage.setItem('fb_ai_code',code);out.textContent=x[1].tekst+(x[1].zrodla&&x[1].zrodla.length?'\n\nŹródła:\n'+x[1].zrodla.map(function(s){return '• '+s.tytul+' - '+s.url;}).join('\n'):'')+(x[1].z_cache?'\n\n(wynik z pamięci podręcznej)':'');
+  }).catch(function(){out.textContent='Błąd połączenia.';});
+});
+draw();
+})();
+</script>
+{% endblock %}

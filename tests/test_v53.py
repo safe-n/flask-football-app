@@ -54,7 +54,7 @@ class TestFastResults(Env):
         with mock.patch.object(fdorg.requests, "get") as get:
             self.refresh()
         get.assert_not_called()                                          # bez tokenu żadnych zapytań
-        self.assertIn("wymagają tokenu", bootstrap.DIAG["E0"]["wyniki_szybkie"])
+        self.assertIn("brak tokenu", bootstrap.DIAG["E0"]["wyniki_szybkie"])
         self.assertTrue(db.load_matches(self.conn, "E0", finished_only=False).query("fixture_id == @self.fid")["hg"].isna().all())
 
     def test_with_token_result_is_filled_and_shows_in_recent(self):
@@ -64,7 +64,7 @@ class TestFastResults(Env):
         self.assertEqual(get.call_count, 1)                              # jedno zapytanie na ligę
         row = self.conn.execute("SELECT hg, ag, hg_ht, ag_ht, status FROM matches WHERE fixture_id=?", (self.fid,)).fetchone()
         self.assertEqual(row, (3, 1, 1, 1, "FT"))
-        self.assertIn("dopisano 1 z 1", bootstrap.DIAG["E0"]["wyniki_szybkie"])
+        self.assertIn("uzupełniono 1", bootstrap.DIAG["E0"]["wyniki_szybkie"])
         res = recent.recent_predictions(db.load_matches(self.conn, "E0"), days=3)
         self.assertIn(f"{self.a}|{self.b}", set(res["home"] + "|" + res["away"]))   # mecz wchodzi do 'Ostatnich'
 
@@ -78,6 +78,37 @@ class TestFastResults(Env):
         self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM matches WHERE home=? AND away=? AND date=?",
                                            (self.a, self.b, d(-1))).fetchone()[0], 1)
         self.assertEqual(self.conn.execute("SELECT h_yellow, h_corners FROM matches WHERE fixture_id=?", (self.fid,)).fetchone(), (2, 6))
+
+    def test_restart_scenario_inserts_missing_finished_match_without_duplicates(self):
+        """Dokładnie błąd zgłoszony przez użytkownika: po restarcie w bazie nie ma wiersza wczorajszego meczu."""
+        config.FDORG_TOKEN = "TKN"
+        self.conn.execute("DELETE FROM matches WHERE fixture_id=?", (self.fid,))        # po restarcie: brak wiersza NS
+        self.conn.commit()
+        with mock.patch.object(fdorg.requests, "get", return_value=fake_resp(self.payload())):
+            self.refresh()
+        row = self.conn.execute("SELECT fixture_id, hg, ag, hg_ht, status FROM matches WHERE home=? AND away=? AND date=?",
+                                (self.a, self.b, d(-1))).fetchall()
+        self.assertEqual(row, [(self.fid, 3, 1, 1, "FT")])                           # wstawiony, z identyfikatorem jak z CSV
+        self.assertIn("dopisano 1 nowych", bootstrap.DIAG["E0"]["wyniki_szybkie"])
+        with mock.patch.object(fdorg.requests, "get", return_value=fake_resp(self.payload())):
+            self.refresh()                                                            # drugi raz: bez duplikatów
+        self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM matches WHERE home=? AND away=?", (self.a, self.b)).fetchone()[0] -
+                         self.conn.execute("SELECT COUNT(*) FROM matches WHERE home=? AND away=? AND date<>?", (self.a, self.b, d(-1))).fetchone()[0], 1)
+        csv = ("Div,Date,HomeTeam,AwayTeam,FTHG,FTAG,HTHG,HTAG,HY,AY\n"
+               f"E0,{pd.Timestamp(d(-1)):%d/%m/%Y},{self.a},{self.b},3,1,1,1,2,3\n")
+        db.upsert_matches(self.conn, csvdata.parse_csv(csv, "E0", bootstrap.season_now()))   # CSV dochodzi później
+        self.assertEqual(self.conn.execute("SELECT COUNT(*), MAX(h_yellow) FROM matches WHERE fixture_id=?", (self.fid,)).fetchone(), (1, 2))
+
+    def test_unknown_team_names_are_not_inserted(self):
+        config.FDORG_TOKEN = "TKN"
+        self.conn.execute("DELETE FROM matches WHERE fixture_id=?", (self.fid,))
+        self.conn.commit()
+        payload = self.payload()
+        payload["matches"][0]["homeTeam"] = {"name": "Zupełnie Nowy Klub XYZ", "shortName": "Nowy XYZ", "tla": "XYZ"}
+        with mock.patch.object(fdorg.requests, "get", return_value=fake_resp(payload)):
+            self.refresh()
+        self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM matches WHERE date=?", (d(-1),)).fetchone()[0], 0)
+        self.assertIn("pominięto 1", bootstrap.DIAG["E0"]["wyniki_szybkie"])
 
     def test_api_error_does_not_break_refresh(self):
         config.FDORG_TOKEN = "TKN"

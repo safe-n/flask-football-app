@@ -1,13 +1,15 @@
 """Aplikacja Flask: mecze, podgląd meczu, statystyki sędziów/drużyn, tabela, siła drużyn, dziennik, dane + JSON API."""
 from __future__ import annotations
 
+import threading
 import time
 
 import numpy as np
 import pandas as pd
 from flask import Flask, abort, jsonify, render_template, request
 
-from . import bootstrap, config, db, draws, gh_store, history, ledger, leagues as lg_cat, params as prm, recent as recent_mod, stats
+from . import ai, bootstrap, config, db, draws, gh_store, history, ledger, leagues as lg_cat, params as prm, profile as prof, recent as recent_mod, stats, suggest as sg
+from .betmarkets import GROUPS as BET_GROUPS, book_odds, catalogue, parse_leg
 from .odds import apply_blend, value_picks
 from .simulate import simulate_table
 
@@ -104,6 +106,31 @@ def create_app() -> Flask:
             return P, p, df
         return cached(("model", league), build)
 
+    building: set[str] = set()
+
+    def model_nowait(league: str):
+        """Model z pamięci podręcznej albo None (wtedy zlecamy budowę w tle) - żeby żądanie nie przekroczyło limitu czasu."""
+        hit = cache.get(("model", league))
+        if hit and time.time() - hit[0] < TTL:
+            return hit[1]
+        if league not in building:
+            building.add(league)
+
+            def work():
+                try:
+                    model(league)
+                except Exception:  # noqa: BLE001 - brak danych ligi itp.
+                    pass
+                finally:
+                    building.discard(league)
+            threading.Thread(target=work, daemon=True).start()
+        return None
+
+    def match_row(league: str, home: str, away: str, date: str):
+        q = pd.read_sql_query("SELECT * FROM matches WHERE league=? AND home=? AND away=? AND date=?",
+                              db.connect(config.DB_PATH), params=[league, home, away, date])
+        return q.to_dict("records")[0] if len(q) else None
+
     def league_options() -> list[tuple[str, str]]:
         conn = db.connect(config.DB_PATH)
         codes = [r[0] for r in conn.execute("SELECT DISTINCT league FROM matches ORDER BY 1")]
@@ -156,14 +183,23 @@ def create_app() -> Flask:
             adj_h = adj_a = 1.0
         recent = stats.season_slice(df, 2)
         refs = sorted(recent["referee"].dropna().unique()) if "referee" in recent else []
-        ctx = dict(title=f"Podgląd meczu · {lg_cat.name(league)}", league=league, leagues=league_options(), teams=teams,
+        ctx = dict(addable=None, title=f"Podgląd meczu · {lg_cat.name(league)}", league=league, leagues=league_options(), teams=teams,
                    referees=refs, home=home, away=away, referee=referee, head=None, sections=[], notes=[],
                    date=date or "", adj_h=adj_h, adj_a=adj_a, adj_opts=[0.7, 0.8, 0.9, 1.0, 1.1, 1.2])
         if request.args.get("home") and request.args.get("away") and home != away:
             if home not in P.teams or away not in P.teams:
                 abort(404, f"Nieznana drużyna: {home if home not in P.teams else away}")
-            head, sections, notes = match_sections(P.predict(home, away, referee, date=date, adj=(adj_h, adj_a)))
-            ctx.update(head=head, sections=sections, notes=notes)
+            pred = P.predict(home, away, referee, date=date, adj=(adj_h, adj_a))
+            row = match_row(league, home, away, date) if date else None
+            if row:
+                from .odds import apply_blend as _ab
+                pred = _ab(pred, row, prm.load(league).get("blend_w"))
+            head, sections, notes = match_sections(pred)
+            ctx.update(head=head, sections=sections, notes=notes, addable=None)
+            if date:
+                ctx["addable"] = [{"group": m["group"], "label": m["label"], "p": 100 * m["p"], "fair": 1 / m["p"],
+                                   "odds": book_odds(row or {}, k), "id": sg.leg_id(league, date, home, away, k)}
+                                  for k, m in catalogue(pred).items()]
         return render_template("match.html", **ctx)
 
     @app.get("/draws")
@@ -244,10 +280,14 @@ def create_app() -> Flask:
         if res.empty:
             return page("Ostatnie mecze", league, ("p", f"Brak rozegranych meczów z ostatnich {days} dni w bazie."))
         tabs = ("tabs", [(f"{d} dni", f"/recent?league={league}&days={d}") for d in (7, 14, 30)])
+        last = str(pd.to_datetime(res["date"]).max())[:10]
+        fast = bootstrap.DIAG.get(league, {}).get("wyniki_szybkie", "brak informacji (odświeżanie jeszcze się nie wykonało)")
         return page(f"Ostatnie mecze · {lg_cat.name(league)}", league, tabs,
                     ("p", "Retrospektywa: model uczony wyłącznie na meczach sprzed danej kolejki (bez zaglądania w przyszłość). "
                           "To nie jest dziennik na żywo, tylko podgląd, jak model poradziłby sobie z ostatnimi meczami."),
-                    ("p", recent_mod.summary(res)), ("t", recent_mod.show_table(res).iloc[::-1].reset_index(drop=True)))
+                    ("p", recent_mod.summary(res)),
+                    ("p", f"Najnowszy wynik w bazie: {last}. Szybkie wyniki: {fast}."),
+                    ("t", recent_mod.show_table(res).iloc[::-1].reset_index(drop=True)))
 
     @app.get("/track")
     def track():
@@ -298,6 +338,169 @@ def create_app() -> Flask:
         if not hist.empty:
             blocks += [("h", f"Historia w repo ({config.HISTORY_DIR})"), ("t", hist)]
         return page("Dane", league, *blocks)
+
+    # ------------------------------------------------------------------ zestawienie (kupon)
+    def compute_coupon(legs: list[str], odds_in: list[str]):
+        """Zwraca (dict, None) albo (None, [ligi, które jeszcze się liczą]). Wszystko liczone po stronie serwera."""
+        parsed, leagues_needed = [], set()
+        for i, lid in enumerate(legs[:12]):
+            try:
+                parsed.append((i, lid, parse_leg(lid)))
+                leagues_needed.add(parse_leg(lid)[0])
+            except ValueError:
+                parsed.append((i, lid, None))
+        ready = {lg: model_nowait(lg) for lg in leagues_needed}
+        if any(v is None for v in ready.values()):
+            return None, sorted(lg for lg, v in ready.items() if v is None)
+        preds: dict[tuple, tuple] = {}
+        out_legs = []
+        for i, lid, tup in parsed:
+            if tup is None:
+                out_legs.append({"id": lid, "blad": "nieprawidłowy identyfikator typu"})
+                continue
+            league, date, home, away, key = tup
+            row = match_row(league, home, away, date)
+            base = {"id": lid, "liga": league, "data": date, "mecz": f"{home} – {away}", "key": key}
+            if row is None:
+                out_legs.append({**base, "blad": "mecz niedostępny (rozegrany lub usunięty z terminarza)"})
+                continue
+            if row.get("hg") is not None and row["hg"] == row["hg"]:
+                out_legs.append({**base, "blad": "mecz już rozegrany"})
+                continue
+            P, p, df = ready[league]
+            mk = (league, date, home, away)
+            if mk not in preds:
+                from .odds import apply_blend as _ab
+                pred = _ab(P.predict(home, away, row.get("referee"), date=date), row, p["blend_w"])
+                preds[mk] = (pred, row, sg.team_games(df))
+            pred, row, games = preds[mk]
+            m = catalogue(pred).get(key)
+            if not m:
+                out_legs.append({**base, "blad": "ten rynek nie jest dostępny dla tego meczu"})
+                continue
+            user_odds = None
+            try:
+                user_odds = float(odds_in[i]) if i < len(odds_in) and odds_in[i] else None
+            except ValueError:
+                user_odds = None
+            used = user_odds if user_odds and user_odds > 1 else book_odds(row, key)
+            e = (m["p"] * used - 1) if used else None
+            out_legs.append({**base, "rynek": m["label"], "p": m["p"], "kurs_fair": 1 / m["p"], "kurs_uzyty": used,
+                             "kurs_zrodlo": "Twój" if user_odds and user_odds > 1 else ("z bazy" if used else None),
+                             "ostrzezenia": sg.leg_flags(pred, row, games, 12, e)})
+        good = [l for l in out_legs if not l.get("blad")]
+        warnings, combined = [], None
+        matches = [l["mecz"] + l["data"] for l in good]
+        if len(set(matches)) < len(matches):
+            warnings.append("W zestawieniu są dwa typy z tego samego meczu - nie są niezależne, więc nie liczę łącznej szansy. Zostaw jeden.")
+        elif good:
+            odds = [l["kurs_uzyty"] for l in good]
+            combined = sg.combine([l["p"] for l in good], odds)
+            if "kurs_laczny" in combined:
+                combined["kurslaczny"] = combined["kurs_laczny"]
+        if any(l.get("blad") for l in out_legs):
+            warnings.append("Część typów jest niedostępna (mecz rozegrany lub poza terminarzem) - usuń je z zestawienia.")
+        return {"legs": out_legs, "laczne": combined, "ostrzezenia": warnings,
+                "podsumowanie": sg.coupon_summary(out_legs, combined, warnings)}, None
+
+    @app.get("/coupon")
+    def coupon_page():
+        return render_template("coupon.html", title="Zestawienie", league=league_arg(), leagues=league_options(),
+                               ai_enabled=ai.enabled(), ai_left=ai.remaining())
+
+    @app.get("/api/coupon")
+    def api_coupon():
+        data, loading = compute_coupon(request.args.getlist("leg"), request.args.getlist("odds"))
+        if data is None:
+            return jsonify(komunikat=f"Liczę modele dla: {', '.join(loading)} - to potrwa chwilę, odświeżam automatycznie."), 202
+        return jsonify(data)
+
+    @app.post("/api/ai/coupon")
+    def api_ai_coupon():
+        if not ai.enabled():
+            return jsonify(error="Analiza AI jest wyłączona (brak ANTHROPIC_API_KEY lub AI_ACCESS_CODE w Render → Environment)."), 503
+        if not ai.check_code(request.headers.get("X-AI-Code", "")):
+            return jsonify(error="Nieprawidłowy kod dostępu."), 403
+        body = request.get_json(silent=True) or {}
+        data, loading = compute_coupon([str(x) for x in body.get("legs", [])], [str(x) for x in body.get("odds", [])])
+        if data is None:
+            return jsonify(error=f"Modele dla {', '.join(loading)} jeszcze się liczą - spróbuj za chwilę."), 202
+        if not [l for l in data["legs"] if not l.get("blad")]:
+            return jsonify(error="Brak poprawnych typów do analizy."), 400
+        try:
+            return jsonify(ai.analyze(data))
+        except ai.AiError as e:
+            return jsonify(error=str(e)), 502
+
+    @app.get("/suggest")
+    def suggest_page():
+        a = request.args
+        sel = a.get("leagues", request.args.get("league", config.DEFAULT_LEAGUE))
+        league_codes = [c for c, _ in league_options() if c != "DEMO"]
+        chosen = league_codes if sel == "ALL" else [x for x in sel.split(",") if x in league_codes]
+
+        def num(name, default, scale=1.0, lo=None, hi=None):
+            try:
+                v = float(a.get(name, default)) * scale
+            except ValueError:
+                v = float(default) * scale
+            return min(max(v, lo), hi) if lo is not None else v
+        keys = tuple(a.getlist("key"))
+        groups = tuple(a.getlist("group")) or ("Remisy",)
+        crit = sg.Criteria(min_p=num("min_p", 60, 0.01, 0.01, 0.99), max_p=num("max_p", 97, 0.01, 0.01, 1.0), groups=groups, keys=keys,
+                           days=int(num("days", 3, 1, 0, 14)), min_games=int(num("min_games", 12, 1, 0, 60)),
+                           skip_short_rest=a.get("skip_rest") == "1",
+                           min_edge=(num("min_edge", 0, 0.01, 0, 1.0) if a.get("min_edge") not in (None, "") else None),
+                           profile=a.get("profile", ""), balance=num("balance", 10, 0.01, 0.01, 0.4),
+                           max_per_match=int(num("per_match", 1, 1, 1, 5)), top=int(num("top", 20, 1, 1, 80)),
+                           sort="edge" if a.get("sort") == "edge" else "p")
+        frames, notes, rej_total = [], [], {}
+        for lg in chosen:
+            ready = model_nowait(lg)
+            if ready is None:
+                notes.append(f"Model ligi {lg} jeszcze się liczy - odśwież za chwilę.")
+                continue
+            P, p, df = ready
+            up = db.load_upcoming(db.connect(config.DB_PATH), lg, since=db.today())
+            if up.empty:
+                continue
+            t, rej = sg.suggestions(P, df, up, crit, p["blend_w"], lg)
+            if not t.empty:
+                t.insert(0, "liga", lg)
+                frames.append(t)
+            for k, v in rej.items():
+                rej_total[k] = rej_total.get(k, 0) + v
+        table = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+        if not table.empty:
+            col = "przewaga_%" if crit.sort == "edge" else "p_%"
+            table = table.sort_values(col, ascending=False, na_position="last").head(crit.top).reset_index(drop=True)
+        auto = sg.auto_coupon(table, int(num("legs", 3, 1, 1, 8))) if not table.empty else table
+        return render_template("suggest.html", title="Podpowiedzi modelu", league=chosen[0] if chosen else config.DEFAULT_LEAGUE,
+                               leagues=league_options(), rows=table.to_dict("records") if not table.empty else [], notes=notes,
+                               rej=rej_total, crit=crit, sel=sel, groups_all=BET_GROUPS,
+                               auto_ids=list(auto["id"]) if not auto.empty else [], auto=auto.to_dict("records") if not auto.empty else [],
+                               auto_comb=sg.combine([x / 100 for x in auto["p_%"]]) if not auto.empty else None,
+                               profiles=sg.PROFILES, building=bool(building))
+
+    @app.get("/profile")
+    def profile_page():
+        league = league_arg()
+        balance = max(0.02, min(float(request.args.get("balance", 10)) / 100, 0.4))
+        conn = db.connect(config.DB_PATH)
+        df = db.load_matches(conn, None if request.args.get("all") == "1" else league)
+        df = df[~df["league"].isin(["DEMO", "CL"])]
+        res = prof.odds_profile(df, balance)
+        scope = "wszystkie ligi w bazie" if request.args.get("all") == "1" else lg_cat.name(league)
+        if not res["n"]:
+            return page("Profil kursów", league, ("p", "Brak meczów z kursami i wynikiem do przerwy w wybranym zakresie."))
+        blocks = [("tabs", [("Ta liga", f"/profile?league={league}&balance={int(balance * 100)}"),
+                            ("Wszystkie ligi", f"/profile?league={league}&all=1&balance={int(balance * 100)}")]),
+                  ("p", f"Zakres: {scope}, {res['n']} meczów z kursami. „Wyrównane” = różnica szans gość vs gospodarz ≤ {int(balance * 100)} pp "
+                        "(parametr balance w adresie). Kursy zamknięcia bez marży."),
+                  ("p", res["werdykt"]), ("t", res["tabela"])]
+        if not res["podzial_goli"].empty:
+            blocks += [("h", "Ten sam profil, ale z podziałem na oczekiwaną liczbę goli (rynek O/U 2.5)"), ("t", res["podzial_goli"])]
+        return page("Profil kursów a remisy w połowach", league, *blocks)
 
     @app.get("/api/predict")
     def api_predict():
