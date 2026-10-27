@@ -348,3 +348,7 @@ oparte na regułach działa zawsze.
 
 **Profil kursów** (`/profile`, `python -m fbpred profile`): sprawdza na historii, czy mecze o wyrównanych kursach z lekką przewagą gości
 częściej kończą się remisem w 1. lub 2. połowie niż reszta (z przedziałami ufności) oraz czy to nie efekt samej liczby goli (podział wg rynku O/U 2.5).
+
+## Brak nadchodzących meczów (0.6.1)
+
+Jeśli lista „Nadchodzące" jest pusta lub kończy się w przeszłości: otwórz stronę **Dane** i sprawdź kroki `fixtures_csv` oraz `football-data.org`. Nieaktualny `fixtures.csv` jest teraz uzupełniany z football-data.org (wymaga `FOOTBALL_DATA_ORG_TOKEN`; te mecze nie mają kursów). Usuń sztuczną ligę: `git rm history/DEMO_*.csv`.

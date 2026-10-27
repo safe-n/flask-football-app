@@ -38,4 +38,13 @@ jobs:
           git config user.name "fbpred-bot"
           git config user.email "fbpred-bot@users.noreply.github.com"
           git add history
-          git diff --cached --quiet || (git commit -m "history: inicjalizacja lig $(date -u +%F)" && git pull --rebase && git push)
+          if git diff --cached --quiet; then
+            echo "Brak zmian do zapisania."
+          else
+            git commit -m "history: inicjalizacja lig $(date -u +%F)"
+            for n in 1 2 3; do
+              git pull --rebase --autostash && git push && exit 0
+              echo "push nieudany, próba $n"; sleep 5
+            done
+            exit 1
+          fi

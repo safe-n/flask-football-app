@@ -5,6 +5,7 @@ a sieć służy tylko do uzupełnień. Każdy krok zapisuje diagnostykę w DIAG 
 """
 from __future__ import annotations
 
+import json
 import os
 import threading
 import zlib
@@ -155,6 +156,93 @@ def settle_pending(conn, lg: str, season_rows, log=_log, days: int = 10) -> tupl
     return inserted + updated, msg + (f"; pominięto {skipped} (nierozpoznane nazwy)" if skipped else "")
 
 
+def fill_upcoming(conn, lg: str, season_rows, log=_log) -> tuple[int, str]:
+    """Dodaje przyszłe mecze z football-data.org, których nie ma w bazie (fixtures.csv bywa nieaktualny lub niepełny).
+
+    Mecze z fixtures.csv mają kursy i zostają nietknięte: pomijamy każdy mecz, który w bazie jest już (±1 dzień).
+    Identyfikator jest taki sam jak w csvdata.parse_csv, więc późniejszy CSV trafi do tego samego rekordu."""
+    known = set(_known_teams(conn, lg))
+    today = db.today()
+    added = existed = skipped = 0
+    for r in [x for x in season_rows() if x["status"] == "NS" and x["date"] >= today]:
+        if r["home"] not in known or r["away"] not in known:
+            skipped += 1
+            continue
+        d = pd.Timestamp(r["date"])
+        found = conn.execute("SELECT 1 FROM matches WHERE league=? AND home=? AND away=? AND date BETWEEN ? AND ?",
+                             (lg, r["home"], r["away"], (d - pd.Timedelta(days=1)).strftime("%Y-%m-%d"),
+                              (d + pd.Timedelta(days=1)).strftime("%Y-%m-%d"))).fetchone()
+        if found:
+            existed += 1
+            continue
+        fid = zlib.crc32(f"{lg}|{r['date']}|{r['home']}|{r['away']}".encode()) & 0x7FFFFFFF
+        db.upsert_matches(conn, [dict(fixture_id=fid, league=lg, season=r["season"], date=r["date"], home=r["home"],
+                                      away=r["away"], referee=r.get("referee"), status="NS")])
+        added += 1
+    msg = f"terminarz: dodano {added} nadchodzących (bez kursów), {existed} już było w fixtures.csv"
+    return added, msg + (f"; pominięto {skipped} (nierozpoznane nazwy)" if skipped else "")
+
+
+def _diag_path() -> Path:
+    return Path(config.DB_PATH).parent / "diag.json"
+
+
+def save_diag() -> None:
+    """Diagnostyka na dysk: przy kilku procesach (gunicorn) każdy widzi to samo, nie tylko ten, który odświeżał."""
+    try:
+        p = _diag_path()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps({"saved": datetime.now().isoformat(timespec="seconds"), "diag": DIAG}, ensure_ascii=False))
+    except Exception as e:  # noqa: BLE001
+        print(f"[diag] {e}", flush=True)
+
+
+def get_diag() -> dict[str, dict[str, str]]:
+    """Diagnostyka z pliku (świeższa), z uzupełnieniem o pamięć tego procesu."""
+    try:
+        data = json.loads(_diag_path().read_text()).get("diag", {})
+    except Exception:  # noqa: BLE001
+        data = {}
+    out = {k: dict(v) for k, v in data.items()}
+    for k, v in DIAG.items():
+        out.setdefault(k, {}).update(v)
+    return out
+
+
+_lock_fh = None
+
+
+def _acquire_lock() -> bool:
+    """Tylko jeden proces naraz odświeża dane (blokada plikowa). Bez fcntl (Windows) - zawsze True."""
+    global _lock_fh
+    try:
+        import fcntl
+        p = Path(config.DB_PATH).parent / "refresh.lock"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        fh = open(p, "w")
+        try:
+            fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            fh.close()
+            return False
+        _lock_fh = fh
+        return True
+    except ImportError:
+        return True
+
+
+def _release_lock() -> None:
+    global _lock_fh
+    if _lock_fh is not None:
+        try:
+            import fcntl
+            fcntl.flock(_lock_fh, fcntl.LOCK_UN)
+            _lock_fh.close()
+        except Exception:  # noqa: BLE001
+            pass
+        _lock_fh = None
+
+
 def refresh(leagues_: list[str] | None = None, log_predictions: bool = True, log=_log) -> None:
     """Bieżący sezon + terminarz (z kursami, jeśli są), sprzątanie, zapis prognoz do dziennika."""
     lgs = leagues_ or leagues()
@@ -191,8 +279,9 @@ def refresh(leagues_: list[str] | None = None, log_predictions: bool = True, log
         try:                                                                  # terminarz + kursy (football-data.co.uk)
             fixtures = history.apply_aliases(csvdata.parse_csv(csvdata.download_fixtures(), lg, None, only_div=True))
             db.upsert_matches(conn, fixtures)
-            d["fixtures_csv"] = f"{len(fixtures)} nadchodzących meczów" if fixtures else \
-                "plik pobrany, ale bez nadchodzących meczów tej ligi"
+            n_up = sum(1 for f in fixtures if str(f.get("date", "")) >= db.today())
+            d["fixtures_csv"] = (f"{len(fixtures)} meczów, w tym {n_up} od dziś" + ("" if n_up else " - plik jest nieaktualny")
+                                 ) if fixtures else "plik pobrany, ale bez meczów tej ligi"
             if config.ARCHIVE_ODDS and fixtures:
                 log(f"[refresh] archiwum kursów {lg}: +{history.archive_odds(fixtures, config.HISTORY_DIR)}")
         except Exception as e:  # noqa: BLE001
@@ -203,18 +292,17 @@ def refresh(leagues_: list[str] | None = None, log_predictions: bool = True, log
         except Exception as e:  # noqa: BLE001
             d["wyniki_szybkie"] = f"błąd: {e}"
             log(f"[refresh] wyniki {lg}: {e}")
-        if not fixtures:                                                      # zapasowe źródło terminarza
-            if fdorg.enabled() and fdorg.supports(lg):
-                try:
-                    rows = [r for r in fd_season() if r["status"] == "NS"]
-                    db.upsert_matches(conn, rows)
-                    d["football-data.org"] = f"ok: {len(rows)} nadchodzących (bez kursów)"
-                except Exception as e:  # noqa: BLE001
-                    d["football-data.org"] = f"błąd: {e}"
-                    log(f"[refresh] fdorg {lg}: {e}")
-            elif not fdorg.enabled():
-                d["football-data.org"] = "zapas wyłączony: brak tokenu FOOTBALL_DATA_ORG_TOKEN"
+        if fdorg.enabled() and fdorg.supports(lg):                           # uzupełnienie terminarza - ZAWSZE
+            try:
+                d["football-data.org"] = fill_upcoming(conn, lg, fd_season)[1]
+            except Exception as e:  # noqa: BLE001
+                d["football-data.org"] = f"błąd: {e}"
+                log(f"[refresh] fdorg {lg}: {e}")
+        elif not fdorg.enabled():
+            d["football-data.org"] = "terminarz tylko z fixtures.csv: brak tokenu FOOTBALL_DATA_ORG_TOKEN"
+        save_diag()
     db.purge_stale_upcoming(conn)
+    save_diag()
     if not log_predictions:
         return
     from . import ledger, params as prm
@@ -267,7 +355,13 @@ def run_once(leagues_: list[str] | None = None, years: int | None = None, log=_l
             if n_imp:
                 log(f"[bootstrap] wczytano {n_imp} prognoz z {config.LEDGER_CSV}")
             _ledger_pull(conn, log)
-            refresh(lgs, log=log)
+            if _acquire_lock():
+                try:
+                    refresh(lgs, log=log)
+                finally:
+                    _release_lock()
+            else:
+                DIAG.setdefault("dziennik", {})["blokada"] = "odświeżanie wykonuje inny proces serwisu"
             _ledger_push(conn, log)
             if export_ledger:
                 log(f"[bootstrap] zapisano {ledger.export_csv(conn, config.LEDGER_CSV)} prognoz do {config.LEDGER_CSV}")
@@ -299,7 +393,11 @@ def start_background() -> None:
             time.sleep(config.REFRESH_HOURS * 3600)
             with _work_lock:
                 try:
-                    refresh()
+                    if _acquire_lock():
+                        try:
+                            refresh()
+                        finally:
+                            _release_lock()
                     _ledger_push(db.connect(config.DB_PATH), _log)
                     _set("ready", "Odświeżono dane.")
                 except Exception as e:  # noqa: BLE001

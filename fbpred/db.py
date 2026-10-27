@@ -119,3 +119,11 @@ def purge_stale_upcoming(conn: sqlite3.Connection, days: int = 3) -> int:
     cur = conn.execute("DELETE FROM matches WHERE hg IS NULL AND date < date('now', ?)", (f"-{days} day",))
     conn.commit()
     return cur.rowcount
+
+
+def integrity(conn: sqlite3.Connection) -> str:
+    """Wynik PRAGMA quick_check ('ok' albo opis uszkodzenia)."""
+    try:
+        return "; ".join(str(r[0]) for r in conn.execute("PRAGMA quick_check").fetchall())
+    except Exception as e:  # noqa: BLE001
+        return f"błąd: {e}"

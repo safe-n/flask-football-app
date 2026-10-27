@@ -133,7 +133,12 @@ def create_app() -> Flask:
 
     def league_options() -> list[tuple[str, str]]:
         conn = db.connect(config.DB_PATH)
-        codes = [r[0] for r in conn.execute("SELECT DISTINCT league FROM matches ORDER BY 1")]
+        codes: list[str] = []
+        for r in conn.execute("SELECT DISTINCT league FROM matches ORDER BY 1"):
+            c = r[0].decode() if isinstance(r[0], bytes) else r[0]
+            c = str(c).strip() if c is not None else ""
+            if c and c not in codes:
+                codes.append(c)
         return [(c, lg_cat.label(c)) for c in codes]
 
     def page(title, league, *blocks, refresh=False):
@@ -281,7 +286,7 @@ def create_app() -> Flask:
             return page("Ostatnie mecze", league, ("p", f"Brak rozegranych meczów z ostatnich {days} dni w bazie."))
         tabs = ("tabs", [(f"{d} dni", f"/recent?league={league}&days={d}") for d in (7, 14, 30)])
         last = str(pd.to_datetime(res["date"]).max())[:10]
-        fast = bootstrap.DIAG.get(league, {}).get("wyniki_szybkie", "brak informacji (odświeżanie jeszcze się nie wykonało)")
+        fast = bootstrap.get_diag().get(league, {}).get("wyniki_szybkie", "brak informacji (odświeżanie jeszcze się nie wykonało)")
         return page(f"Ostatnie mecze · {lg_cat.name(league)}", league, tabs,
                     ("p", "Retrospektywa: model uczony wyłącznie na meczach sprzed danej kolejki (bez zaglądania w przyszłość). "
                           "To nie jest dziennik na żywo, tylko podgląd, jak model poradziłby sobie z ostatnimi meczami."),
@@ -294,7 +299,7 @@ def create_app() -> Flask:
         league = league_arg()
         conn = db.connect(config.DB_PATH)
         st = ledger.stats(conn, league)
-        d = bootstrap.DIAG.get("dziennik", {})
+        d = bootstrap.get_diag().get("dziennik", {})
         diag = ("p", f"W bazie: {st['w_bazie']} prognoz (rozliczone {st['rozliczone']}, oczekujące {st['oczekujace']}). "
                      f"Trwałość: {d.get('trwalosc', 'brak informacji (ten proces serwera jeszcze nie odświeżał danych; jeśli to się utrzymuje, serwis ma kilka procesów - ustaw Start Command na gunicorn fbpred.web:app --workers 1 --threads 4 --timeout 120)')}. "
                      f"Ostatni zapis do GitHuba: {d.get('zapis', '-')}.")
@@ -324,10 +329,11 @@ def create_app() -> Flask:
             "ROUND(100.0*SUM(hg_ht IS NOT NULL)/COUNT(*)) AS 'HT_%', ROUND(100.0*SUM(h_yellow IS NOT NULL)/COUNT(*)) AS 'kartki_%', "
             "ROUND(100.0*SUM(h_sot IS NOT NULL)/COUNT(*)) AS 'sot_%', ROUND(100.0*SUM(o_home IS NOT NULL)/COUNT(*)) AS 'kursy_%' "
             "FROM matches GROUP BY league, season ORDER BY league, season", conn)
-        diag = pd.DataFrame([{"liga": lg, "krok": k, "wynik": v} for lg, d in bootstrap.DIAG.items() for k, v in d.items()])
+        diag = pd.DataFrame([{"liga": lg, "krok": k, "wynik": v} for lg, d in bootstrap.get_diag().items() for k, v in d.items()])
         hist = history.status(config.HISTORY_DIR)
         blocks = [("p", f"Stan zasilania: {bootstrap.STATUS['state']} - {bootstrap.STATUS['message']}"),
                   ("p", "Konfiguracja: " + ", ".join(f"{k}={v}" for k, v in bootstrap.describe().items()))]
+        blocks.append(("p", f"Kontrola integralności bazy SQLite: {db.integrity(conn)}"))
         if not config.AUTO_BOOTSTRAP:
             blocks.append(("p", "Odświeżanie z internetu jest WYŁĄCZONE. Ustaw AUTO_BOOTSTRAP=1 w Render → Environment "
                                 "(render.yaml działa tylko dla usług utworzonych z Blueprintu). Dane z history/ i tak działają."))

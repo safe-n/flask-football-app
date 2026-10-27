@@ -146,8 +146,8 @@ class TestBootstrapScenarios(Env):
         self.assertEqual(len(up), 1)
         self.assertEqual((up.iloc[0]["home"], up.iloc[0]["away"]), (team_a, team_b))   # nazwy zgodne z bazą
         d = bootstrap.DIAG["E0"]
-        self.assertIn("bez nadchodzących", d["fixtures_csv"])
-        self.assertIn("ok: 1", d["football-data.org"])
+        self.assertIn("bez meczów tej ligi", d["fixtures_csv"])
+        self.assertIn("dodano 1 nadchodzących", d["football-data.org"])
 
     def test_diag_explains_missing_token(self):
         sy = bootstrap.season_now()
