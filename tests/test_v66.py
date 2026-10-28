@@ -85,6 +85,13 @@ class TestAvail(unittest.TestCase):
         r = avail.for_match("I1", "Milan", "Bologna", "2026-10-30", client=Boom({}), budget=self.budget)
         self.assertFalse(r["ok"]); self.assertIn("403", r["uwagi"][0])        # błąd nie wywraca strony
 
+    def test_free_plan_error_is_explained(self):
+        class Free(Fake):
+            def get(self, *a, **k):
+                raise RuntimeError("API zwróciło błąd: {'plan': 'Free plans do not have access to this season, try from 2021 to 2023.'}")
+        r = avail.for_match("I1", "Milan", "Bologna", "2026-10-30", client=Free({}), budget=self.budget)
+        self.assertFalse(r["ok"]); self.assertIn("płatnego planu", r["uwagi"][0])
+
     def test_season_of(self):
         self.assertEqual((avail.season_of("2026-10-30"), avail.season_of("2027-03-01")), (2026, 2026))
 
@@ -98,13 +105,26 @@ class TestAvail(unittest.TestCase):
 
     def test_probe_prints_report(self):
         data = {"/status": {"subscription": {"plan": "Free"}, "requests": {"current": 3, "limit_day": 100}},
-                "/odds/bets": [{"id": 1, "name": "Match Winner"}, {"id": 13, "name": "First Half Winner"}, {"id": 5, "name": "Goals Over/Under"}],
-                "/fixtures": FIX, "/odds": [{"bookmakers": [{"bets": [{"name": "Match Winner"}, {"name": "Double Chance - First Half"}]}]}],
+                "/odds/bets": [{"id": 99, "name": None}, {"id": 1, "name": "Match Winner"}, {"id": 13, "name": "First Half Winner"}, {"id": 5, "name": "Goals Over/Under"}],
+                "/fixtures": FIX, "/odds": [{"bookmakers": [{"bets": [{"id": 1, "name": "Match Winner"}, {"id": 20, "name": "Double Chance - First Half"}, {"id": 13, "name": "First Half Winner", "values": [{"value": "Home", "odd": "2.5"}, {"value": "Draw", "odd": "2.1"}, {"value": "Away", "odd": "3.4"}]}, {"id": 0, "name": None}]}]}],
                 "/injuries": INJ}
         lines = []
         avail.probe("I1", client=Fake(data), out=lines.append)
         text = "\n".join(lines)
-        self.assertIn("plan=Free", text); self.assertIn("First Half Winner", text); self.assertIn("Double Chance - First Half", text)
+        self.assertIn("plan=Free", text); self.assertIn("First Half Winner", text); self.assertIn("Double Chance - First Half", text); self.assertIn("Draw=2.1", text)
+
+    def test_probe_continues_after_api_error(self):
+        class Err(Fake):
+            def get(self, path, params, ttl=None):
+                if path == "/fixtures":
+                    raise RuntimeError("API zwróciło błąd: {'plan': 'Free plans do not have access to this season'}")
+                return super().get(path, params, ttl)
+        lines = []
+        avail.probe("I1", client=Err({"/status": {}, "/odds/bets": [{"id": 1, "name": "Match Winner"}]}), out=lines.append)
+        text = "\n".join(lines)
+        self.assertIn("BŁĄD w kroku 'najbliższe mecze'", text)
+        self.assertIn("Free plans do not have access", text)
+        self.assertIn("zużyto zapytań", text)                               # raport doszedł do końca
 
     def test_match_page_shows_block_when_enabled(self):
         from tests.test_v4 import Env

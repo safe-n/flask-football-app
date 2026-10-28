@@ -1,4 +1,23 @@
 
+## 0.7.3 - AKO w Zestawieniu liczy się na żywo
+
+- Zestawienie: panel AKO - kursy, które wpisujesz, mnożą się na bieżąco (także gdy baza nie ma kursów, np. remisy w połowach);
+  pokazuje też szansę wszystkich typów wg modelu, uczciwy kurs AKO z prognoz, wartość oczekiwaną oraz wygraną dla stawki
+  (stawka zapamiętywana w przeglądarce). Przy typach z tego samego meczu szansa łączna nie jest liczona (brak niezależności).
+- Podpowiedzi: „nóg” = jeden typ na kuponie; opis w podpowiedzi pola.
+
+## 0.7.2 - avail-probe nie przerywa się przy błędzie API
+
+- Na stronie Mecz błąd „Free plans do not have access to this season” jest wyjaśniony po polsku (darmowy plan nie obejmuje bieżącego sezonu).
+- Każdy krok diagnostyki jest osobno: błąd (np. ograniczenie darmowego planu do części sezonów) jest wypisany w całości
+  („BŁĄD w kroku …: …”), a raport idzie dalej. Mecze na najbliższe 7 dni pobierane zakresem dat zamiast parametru `next`.
+
+## 0.7.1 - avail-probe: poprawka błędu i kursy na rynki połówkowe
+
+- `avail-probe` wywracał się na wpisie rynku bez nazwy (`null` z API). Naprawione.
+- Probe wypisuje teraz kursy na kluczowe rynki: First Half Winner (id 13, zawiera remis do przerwy), Second Half Winner (id 3),
+  HT/FT Double (id 7), Double Chance 1H, BTTS 1H, DNB 1H - żeby sprawdzić, co zwraca konto, zanim zaczniemy zbierać historię kursów.
+
 ## 0.7.0 - Kontuzje, zawieszenia i składy (API-Football, opcjonalnie)
 
 - Nowy moduł `fbpred/avail.py` + blok „Dostępność zawodników” na stronie Mecz (gdy podana data i ustawiony `API_KEY`).

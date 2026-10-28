@@ -135,7 +135,7 @@ def coupon_summary(legs: list[dict], combined: dict | None, warnings: list[str])
         return "Brak poprawnych typów w zestawieniu."
     L = [f"Typów: {len(ok)}."]
     weakest = min(ok, key=lambda l: l["p"])
-    L.append(f"Najsłabsza noga: {weakest['mecz']} - {weakest['rynek']} ({100 * weakest['p']:.0f}%).")
+    L.append(f"Najsłabszy typ (noga): {weakest['mecz']} - {weakest['rynek']} ({100 * weakest['p']:.0f}%).")
     if combined:
         L.append(f"Szansa całego kuponu wg modelu: {100 * combined['p']:.1f}% (uczciwy kurs {combined['kurs_fair']:.2f}; "
                  f"sensowny dopiero od ok. {combined['min_sensowny_kurs']:.2f}).")

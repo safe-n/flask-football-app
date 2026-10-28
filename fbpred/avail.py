@@ -8,7 +8,7 @@ Dzienny limit własny (AVAIL_DAILY_CAP) chroni resztę darmowych 100 zapytań.
 from __future__ import annotations
 
 import json
-from datetime import date as _date
+from datetime import date as _date, timedelta
 from pathlib import Path
 
 from . import config, names
@@ -128,7 +128,11 @@ def for_match(league: str, home: str, away: str, day: str, with_lineups: bool = 
     except QuotaExhausted as e:
         res["uwagi"].append(str(e))
     except Exception as e:  # noqa: BLE001 - brak sieci, zły klucz itp. nie mogą psuć strony meczu
-        res["uwagi"].append(f"API-Football: {e}")
+        if "Free plans" in str(e):
+            res["uwagi"].append("Darmowy plan API-Football nie obejmuje bieżącego sezonu - kontuzje i składy wymagają płatnego planu "
+                                "(Pro). Do tego czasu używaj ręcznej korekty xG.")
+        else:
+            res["uwagi"].append(f"API-Football: {e}")
     res["limit_dzis"] = f"{(budget.used() if budget else 0)}/{config.AVAIL_DAILY_CAP}"
     return res
 
@@ -145,23 +149,50 @@ def probe(league: str, client=None, out=print) -> None:
     kw = ("half", "1st", "2nd", "first", "second", "draw", "both teams", "double")
     out(f"rynków kursów w API: {len(bets)}; związane z połowami/remisem/BTTS:")
     for b in bets:
-        if any(k in b["name"].lower() for k in kw):
-            out(f"   {b['id']:>4}  {b['name']}")
+        nm = b.get("name") or ""                                   # API bywa zwraca wpis bez nazwy (null)
+        if any(k in nm.lower() for k in kw):
+            out(f"   {b.get('id')!s:>4}  {nm}")
     lid = LEAGUE_IDS.get(league)
     if not lid:
         out(f"liga {league} bez id w API-Football")
         return
-    season = season_of(_date.today().isoformat())
-    nxt = client.get("/fixtures", {"league": lid, "season": season, "next": 3}, ttl=3600)
-    out(f"najbliższe mecze {league}: " + "; ".join(f"{i['teams']['home']['name']}–{i['teams']['away']['name']} ({i['fixture']['date'][:10]})" for i in nxt))
+    today = _date.today()
+    season = season_of(today.isoformat())
+
+    def step(label, fn):
+        """Każdy krok osobno: błąd (np. ograniczenie planu) jest wypisany w całości, a diagnostyka idzie dalej."""
+        try:
+            return fn()
+        except Exception as e:  # noqa: BLE001
+            out(f"BŁĄD w kroku '{label}': {e}")
+            return None
+
+    nxt = step("najbliższe mecze", lambda: client.get(
+        "/fixtures", {"league": lid, "season": season, "from": today.isoformat(),
+                      "to": (today + timedelta(days=7)).isoformat()}, ttl=3600))
     if nxt:
+        out(f"najbliższe mecze {league} (sezon {season}): " + "; ".join(
+            f"{i['teams']['home']['name']}–{i['teams']['away']['name']} ({i['fixture']['date'][:10]})" for i in nxt[:5]))
         fx = nxt[0]["fixture"]["id"]
-        o = client.get("/odds", {"fixture": fx, "bookmaker": config.ODDS_BOOKMAKER_ID}, ttl=3600)
-        names_ = sorted({b["name"] for it in o for bm in it.get("bookmakers", []) for b in bm.get("bets", [])})
-        out(f"rynki kursów dla pierwszego meczu (bukmacher {config.ODDS_BOOKMAKER_ID}): {len(names_)}")
-        for n in names_:
-            out(f"   {n}")
+        o = step("kursy meczu", lambda: client.get("/odds", {"fixture": fx, "bookmaker": config.ODDS_BOOKMAKER_ID}, ttl=3600))
+        if o is not None:
+            allbets = [b for it in o for bm in it.get("bookmakers", []) for b in bm.get("bets", [])]
+            names_ = sorted({b.get("name") or "?" for b in allbets})
+            out(f"rynki kursów dla pierwszego meczu (bukmacher {config.ODDS_BOOKMAKER_ID}): {len(names_)}")
+            for n in names_:
+                out(f"   {n}")
+            key_ids = {3: "Second Half Winner", 13: "First Half Winner", 7: "HT/FT Double", 20: "Double Chance - First Half",
+                       34: "Both Teams Score - First Half", 109: "Draw No Bet (1st Half)"}
+            out("kursy na kluczowe rynki (remisy w połowach):")
+            for b in allbets:
+                if b.get("id") in key_ids:
+                    out(f"   [{b['id']}] {key_ids[b['id']]}: " + ", ".join(f"{v.get('value')}={v.get('odd')}" for v in b.get("values", [])))
+            if not any(b.get("id") in key_ids for b in allbets):
+                out("   brak tych rynków u tego bukmachera dla tego meczu (spróbuj innego ODDS_BOOKMAKER_ID)")
         d = nxt[0]["fixture"]["date"][:10]
-        inj = client.get("/injuries", {"league": lid, "season": season, "date": d}, ttl=3600)
-        out(f"kontuzje/zawieszenia w {league} na {d}: {len(inj)} wpisów")
+        inj = step("kontuzje", lambda: client.get("/injuries", {"league": lid, "season": season, "date": d}, ttl=3600))
+        if inj is not None:
+            out(f"kontuzje/zawieszenia w {league} na {d}: {len(inj)} wpisów")
+    elif nxt is not None:
+        out(f"brak meczów {league} w najbliższych 7 dniach (sezon {season})")
     out(f"zużyto zapytań w tym uruchomieniu: {client.used}, zostało: {client.remaining}")
