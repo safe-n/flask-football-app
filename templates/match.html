@@ -22,6 +22,20 @@
 {% endfor %}
 </div>
 {% for note in notes %}<p class="m">{{ note }}</p>{% endfor %}
+{% if avail %}
+<div class="card"><div class="t">Dostępność zawodników <span class="m">(API-Football, informacyjnie - nie zmienia prognozy; użyj korekty xG powyżej)</span></div>
+{% if avail.ok %}<div class="grid">
+{% for side, name in [('home', head.title.split(' – ')[0]), ('away', head.title.split(' – ')[1])] %}
+  <div><div class="t">{{ name }}</div>
+  {% if avail.kontuzje[side] %}<table>{% for k in avail.kontuzje[side] %}<tr><td>{{ k.gracz }}</td><td>{{ k.status }}{% if k.powod %}: {{ k.powod }}{% endif %}</td></tr>{% endfor %}</table>
+  {% else %}<p class="m">brak zgłoszonych nieobecności</p>{% endif %}
+  {% if avail.sklady and avail.sklady[side] %}<p class="m"><b>{{ avail.sklady[side].formacja }}</b> · {{ avail.sklady[side].pierwsza_jedenastka|join(', ') }}</p>{% endif %}</div>
+{% endfor %}</div>
+{% if not avail.sklady %}<p class="m"><a href="{{ avail_link }}">Pokaż składy (1 zapytanie do API, dostępne ok. godziny przed meczem)</a></p>{% endif %}
+{% endif %}
+{% for u in avail.uwagi %}<p class="warn" style="font-size:12px">{{ u }}</p>{% endfor %}
+<p class="small">Zapytań dziś (kontuzje/składy): {{ avail.limit_dzis }}.</p></div>
+{% endif %}
 {% if addable %}
 <div class="card"><div class="t">Dodaj do zestawienia</div>
 <table><tr><th>rynek</th><th>szansa</th><th>fair</th><th>kurs</th><th></th></tr>

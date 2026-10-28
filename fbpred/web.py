@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from flask import Flask, abort, jsonify, render_template, request
 
-from . import ai, bootstrap, config, db, draws, gh_store, history, ledger, leagues as lg_cat, params as prm, profile as prof, recent as recent_mod, stats, suggest as sg
+from . import ai, avail, bootstrap, config, db, draws, gh_store, history, ledger, leagues as lg_cat, params as prm, profile as prof, recent as recent_mod, stats, suggest as sg
 from .betmarkets import GROUPS as BET_GROUPS, book_odds, catalogue, parse_leg
 from .odds import apply_blend, value_picks
 from .simulate import simulate_table
@@ -164,13 +164,18 @@ def create_app() -> Flask:
         all_up = db.load_upcoming(conn, league)
         up = db.load_upcoming(conn, league, since=db.today())
         skipped = len(all_up) - len(up)       # rozegrane, ale bez wyniku w źródle danych - nie pokazujemy jako "nadchodzące"
-        items = []
+        items, base = [], {}
+        try:
+            margin = min(max(float(request.args.get("hl", 8)), 1.0), 30.0) / 100
+        except ValueError:
+            margin = 0.08
         if not up.empty:
-            P, p, _ = model(league)
+            P, p, hist_df = model(league)
+            base = stats.base_rates(hist_df)
             for r in up.head(40).to_dict("records"):
                 pred = apply_blend(P.predict(r["home"], r["away"], r.get("referee"), date=r["date"]), r, p["blend_w"])
-                items.append({"row": r, "p": pred, "picks": value_picks(pred, r)})
-        return render_template("index.html", items=items, league=league, leagues=league_options(), skipped=skipped,
+                items.append({"row": r, "p": pred, "picks": value_picks(pred, r), "hl": stats.highlights(pred, base, margin)})
+        return render_template("index.html", items=items, base=base, margin=margin, league=league, leagues=league_options(), skipped=skipped,
                                title=f"Mecze · {lg_cat.name(league)}")
 
     @app.get("/match")
@@ -201,6 +206,9 @@ def create_app() -> Flask:
                 pred = _ab(pred, row, prm.load(league).get("blend_w"))
             head, sections, notes = match_sections(pred)
             ctx.update(head=head, sections=sections, notes=notes, addable=None)
+            if date and avail.enabled():
+                ctx["avail"] = avail.for_match(league, home, away, date, with_lineups=request.args.get("lineups") == "1")
+                ctx["avail_link"] = request.full_path.rstrip("?") + ("" if "lineups=1" in request.full_path else "&lineups=1")
             if date:
                 ctx["addable"] = [{"group": m["group"], "label": m["label"], "p": 100 * m["p"], "fair": 1 / m["p"],
                                    "odds": book_odds(row or {}, k), "id": sg.leg_id(league, date, home, away, k)}

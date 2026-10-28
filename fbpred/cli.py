@@ -97,6 +97,11 @@ def cmd_fetch_api(a):
     print("  (uruchom ponownie jutro, aby dociągnąć kolejne - pobieranie jest wznawialne)")
 
 
+def cmd_avail_probe(a):
+    from . import avail
+    avail.probe(a.league)
+
+
 def cmd_upcoming(a):
     from .fetch import ApiClient, fetch_upcoming
     conn = db.connect(config.DB_PATH)
@@ -516,6 +521,7 @@ def main(argv=None):
     s = add("fetch-api", cmd_fetch_api, "pobierz mecze+statystyki z API-Football")
     s.add_argument("--seasons", default="2023")
     s.add_argument("--stats-limit", type=int, default=80)
+    add("avail-probe", cmd_avail_probe, "sprawdź klucz API-Football i dostępne rynki kursów/kontuzje (kilka zapytań)")
     s = add("upcoming", cmd_upcoming, "pobierz nadchodzące mecze i kursy (API)")
     s.add_argument("--days", type=int, default=7)
     add("check", cmd_check, "kontrola jakości danych")

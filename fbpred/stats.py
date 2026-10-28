@@ -62,3 +62,33 @@ def team_table(df: pd.DataFrame, P=None, seasons: int = 1) -> pd.DataFrame:
             out["rozne_x"] = [float(np.exp(P.corners.f.get(t, 0.0))) for t in out.index]
     out = out.loc[[t for t in out.index if t in teams]]
     return out.sort_values("gole_za", ascending=False).round(2).reset_index().rename(columns={"team": "druzyna"})
+
+
+HL_KEYS = ("btts", "draw_ht", "draw_2h", "draw_either_half", "draw_ht_or_ft", "draw_ft")
+
+
+def base_rates(df: pd.DataFrame, seasons: int = 3) -> dict[str, float]:
+    """Średnia częstość zdarzeń w lidze (ostatnie sezony) - punkt odniesienia dla wyróżnień na stronie Mecze."""
+    d = season_slice(df[df["hg"].notna()], seasons)
+    out: dict[str, float] = {}
+    if d.empty:
+        return out
+    out["btts"] = float(((d["hg"] > 0) & (d["ag"] > 0)).mean())
+    out["draw_ft"] = float((d["hg"] == d["ag"]).mean())
+    h = d[d["hg_ht"].notna() & d["ag_ht"].notna()]
+    if len(h) >= 100:
+        ht = h["hg_ht"] == h["ag_ht"]
+        h2 = (h["hg"] - h["hg_ht"]) == (h["ag"] - h["ag_ht"])
+        ft = h["hg"] == h["ag"]
+        out.update(draw_ht=float(ht.mean()), draw_2h=float(h2.mean()), draw_either_half=float((ht | h2).mean()),
+                   draw_ht_or_ft=float((ht | ft).mean()))
+    return out
+
+
+def highlights(pred: dict, base: dict[str, float], margin: float = 0.08) -> dict[str, bool]:
+    """Które wartości są 'godne uwagi': co najmniej `margin` (domyślnie 8 pp) powyżej średniej ligi dla danego rynku."""
+    vals = {"btts": pred["goals"]["btts_yes"]}
+    for k in ("draw_ht", "draw_2h", "draw_either_half", "draw_ht_or_ft", "draw_ft"):
+        if pred.get("halves") and k in pred["halves"]:
+            vals[k] = pred["halves"][k]
+    return {k: (k in base and v >= base[k] + margin) for k, v in vals.items()}

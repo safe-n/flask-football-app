@@ -1,4 +1,20 @@
 
+## 0.7.0 - Kontuzje, zawieszenia i składy (API-Football, opcjonalnie)
+
+- Nowy moduł `fbpred/avail.py` + blok „Dostępność zawodników” na stronie Mecz (gdy podana data i ustawiony `API_KEY`).
+  Informacyjnie: NIE zmienia prognozy, wspiera ręczną korektę xG.
+- Oszczędność limitu: kontuzje = 1 zapytanie na ligę i dzień (cache 3 h, wspólne dla meczów), dopasowanie meczu = 1 zapytanie
+  na ligę i dzień, składy = 1 zapytanie na mecz i tylko na kliknięcie. Dzienny limit własny `AVAIL_DAILY_CAP` (domyślnie 40).
+- `python -m fbpred avail-probe --league I1`: sprawdza klucz i wypisuje, jakie rynki kursów (m.in. połówkowe) oraz kontuzje
+  zwraca konto - do dalszej rozbudowy (zbieranie kursów na remisy w połowach).
+- `ApiClient.cached()`; testy: `tests/test_v66.py` (na podstawionych odpowiedziach - API nie było testowane na żywo).
+
+## 0.6.5 - Wyróżnienia na stronie Mecze
+
+- Zielona ramka także przy BTTS i remisach (HT, 2H, HT lub 2H, HT lub FT, FT), gdy wartość jest co najmniej 8 pp powyżej
+  ŚREDNIEJ LIGI (ostatnie 3 sezony) dla danego rynku - próg względem bazy, bo np. „HT lub 2H” zdarza się w ok. 64% meczów.
+  Zmiana progu: `?hl=6`. Najechanie na pole pokazuje średnią ligi; pod listą jest legenda.
+
 ## 0.6.4 - Zestawienie, odznaczanie typów, pełna lista przy wielu rynkach
 
 - **Zestawienie wisiało na „Ładowanie…”:** funkcje koszyka (`fbLoad`…) były w `base.html` pod treścią strony, więc skrypt Zestawienia

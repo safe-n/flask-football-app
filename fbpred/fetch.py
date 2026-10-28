@@ -45,11 +45,18 @@ class ApiClient:
             return {"x-apisports-key": self.key}
         return {"x-rapidapi-key": self.key, "x-rapidapi-host": config.API_HOST}
 
+    def _file(self, path: str, params: dict) -> Path:
+        return self.cache_dir / (hashlib.sha1((path + json.dumps(params, sort_keys=True)).encode()).hexdigest() + ".json")
+
+    def cached(self, path: str, params: dict, ttl: int | None = None) -> bool:
+        """Czy odpowiedź jest w cache (wtedy get() nie zużyje limitu)."""
+        f = self._file(path, params)
+        return f.exists() and (ttl is None or time.time() - f.stat().st_mtime < ttl)
+
     def get(self, path: str, params: dict, ttl: int | None = None) -> list:
         """Zwraca pole `response`. ttl=None -> cache bezterminowy; ttl=sekundy -> odświeżaj."""
-        key = hashlib.sha1((path + json.dumps(params, sort_keys=True)).encode()).hexdigest()
-        f = self.cache_dir / f"{key}.json"
-        if f.exists() and (ttl is None or time.time() - f.stat().st_mtime < ttl):
+        f = self._file(path, params)
+        if self.cached(path, params, ttl):
             return json.loads(f.read_text())["response"]
         if self.remaining is not None and self.remaining <= self.reserve:
             raise QuotaExhausted(f"Zostało {self.remaining} zapytań (rezerwa {self.reserve}).")

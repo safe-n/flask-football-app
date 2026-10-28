@@ -352,3 +352,10 @@ częściej kończą się remisem w 1. lub 2. połowie niż reszta (z przedziała
 ## Brak nadchodzących meczów (0.6.1)
 
 Jeśli lista „Nadchodzące" jest pusta lub kończy się w przeszłości: otwórz stronę **Dane** i sprawdź kroki `fixtures_csv` oraz `football-data.org`. Nieaktualny `fixtures.csv` jest teraz uzupełniany z football-data.org (wymaga `FOOTBALL_DATA_ORG_TOKEN`; te mecze nie mają kursów). Usuń sztuczną ligę: `git rm history/DEMO_*.csv`.
+
+## Kontuzje i składy (0.7.0, opcjonalnie)
+
+1. Na Renderze ustaw `API_KEY` (klucz z RapidAPI albo z dashboard.api-football.com) i `API_PROVIDER` (`rapidapi` albo `apisports`).
+2. Strona **Mecz** z datą (wejście z listy Mecze) pokaże nieobecnych zawodników; składy po kliknięciu (ok. godziny przed meczem).
+3. Lokalnie: `python -m fbpred avail-probe --league I1` - test klucza i lista dostępnych rynków kursów.
+To informacja pomocnicza; nie zmienia prognozy. Limit dzienny: `AVAIL_DAILY_CAP`.

@@ -30,6 +30,10 @@ services:
         sync: false                    # token (Contents: write, tylko to repo) - trwały dziennik bez Actions
       - key: GITHUB_REPO
         sync: false                    # np. uzytkownik/flask-football-app
+      - key: API_KEY
+        sync: false                    # opcjonalnie: klucz API-Football (kontuzje, składy) - RapidAPI albo api-sports
+      - key: API_PROVIDER
+        value: rapidapi                # albo apisports, jeśli klucz jest z dashboard.api-football.com
       - key: ANTHROPIC_API_KEY
         sync: false                    # opcjonalnie: analiza AI zestawienia (płatna za użycie)
       - key: AI_ACCESS_CODE
