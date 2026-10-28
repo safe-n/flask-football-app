@@ -13,11 +13,11 @@
     <label>Maks. szansa %<input name="max_p" type="number" step="1" value="{{ (crit.max_p * 100)|round|int }}"></label>
     <label>Dni naprzód<input name="days" type="number" value="{{ crit.days }}"></label>
     <label>Min. meczów drużyny<input name="min_games" type="number" value="{{ crit.min_games }}"></label>
-    <label>Ile wyników<input name="top" type="number" value="{{ crit.top }}"></label>
-    <label>Typów z meczu<input name="per_match" type="number" value="{{ crit.max_per_match }}"></label>
+    <label>Ile wyników (puste = auto)<input name="top" type="number" value="{{ crit.top if top_given else '' }}" placeholder="auto: {{ crit.top }}"></label>
+    <label>Typów z meczu (puste = auto)<input name="per_match" type="number" value="{{ crit.max_per_match if pm_given else '' }}" placeholder="auto: {{ crit.max_per_match }}"></label>
     <label>Nóg w auto-kuponie<input name="legs" type="number" value="{{ auto|length if auto else 3 }}"></label>
     <label>Min. przewaga % (wymaga kursu)<input name="min_edge" type="number" value="{{ (crit.min_edge * 100)|round|int if crit.min_edge is not none else '' }}"></label>
-    <label>Sortuj<select name="sort"><option value="p">po szansie</option><option value="edge" {{ 'selected' if crit.sort == 'edge' }}>po przewadze nad kursem</option></select></label>
+    <label>Sortuj<select name="sort"><option value="p">po szansie</option><option value="edge" {{ 'selected' if crit.sort == 'edge' }}>po przewadze nad kursem</option><option value="match" {{ 'selected' if crit.sort == 'match' }}>po meczu (wszystkie typy meczu razem)</option></select></label>
     <label>Profil kursów<select name="profile">
       <option value="">dowolny</option><option value="balanced_away" {{ 'selected' if crit.profile == 'balanced_away' }}>wyrównane, lekka przewaga gości</option>
       <option value="balanced" {{ 'selected' if crit.profile == 'balanced' }}>wyrównane (dowolna strona)</option></select></label>

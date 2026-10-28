@@ -453,13 +453,17 @@ def create_app() -> Flask:
             return min(max(v, lo), hi) if lo is not None else v
         keys = tuple(a.getlist("key"))
         groups = tuple(a.getlist("group")) or ("Remisy",)
+        given = lambda n: a.get(n) not in (None, "")                     # puste pole = tryb automatyczny
+        multi = len(groups) > 1 and not keys                              # wiele rynków: pokaż możliwie wszystkie typy
+        per_match = int(num("per_match", 1, 1, 1, 12)) if given("per_match") else (12 if multi else 1)
+        top = int(num("top", 20, 1, 1, 400)) if given("top") else (300 if multi else 20)
         crit = sg.Criteria(min_p=num("min_p", 60, 0.01, 0.01, 0.99), max_p=num("max_p", 97, 0.01, 0.01, 1.0), groups=groups, keys=keys,
                            days=int(num("days", 3, 1, 0, 14)), min_games=int(num("min_games", 12, 1, 0, 60)),
                            skip_short_rest=a.get("skip_rest") == "1",
                            min_edge=(num("min_edge", 0, 0.01, 0, 1.0) if a.get("min_edge") not in (None, "") else None),
                            profile=a.get("profile", ""), balance=num("balance", 10, 0.01, 0.01, 0.4),
-                           max_per_match=int(num("per_match", 1, 1, 1, 5)), top=int(num("top", 20, 1, 1, 80)),
-                           sort="edge" if a.get("sort") == "edge" else "p")
+                           max_per_match=per_match, top=top,
+                           sort=a.get("sort") if a.get("sort") in ("edge", "match") else "p")
         frames, notes, rej_total = [], [], {}
         for lg in chosen:
             ready = model_nowait(lg)
@@ -480,10 +484,12 @@ def create_app() -> Flask:
         if not table.empty:
             col = "przewaga_%" if crit.sort == "edge" else "p_%"
             table = table.sort_values(col, ascending=False, na_position="last").head(crit.top).reset_index(drop=True)
+            if crit.sort == "match":                                      # grupowanie po meczu: data, mecz, potem szansa malejąco
+                table = table.sort_values(["data", "mecz", "p_%"], ascending=[True, True, False]).reset_index(drop=True)
         auto = sg.auto_coupon(table, int(num("legs", 3, 1, 1, 8))) if not table.empty else table
         return render_template("suggest.html", title="Podpowiedzi modelu", league=chosen[0] if chosen else config.DEFAULT_LEAGUE,
                                leagues=league_options(), rows=table.to_dict("records") if not table.empty else [], notes=notes,
-                               rej=rej_total, crit=crit, sel=sel, groups_all=BET_GROUPS,
+                               rej=rej_total, crit=crit, sel=sel, top_given=given("top"), pm_given=given("per_match"), groups_all=BET_GROUPS,
                                auto_ids=list(auto["id"]) if not auto.empty else [], auto=auto.to_dict("records") if not auto.empty else [],
                                auto_comb=sg.combine([x / 100 for x in auto["p_%"]]) if not auto.empty else None,
                                profiles=sg.PROFILES, building=bool(building))

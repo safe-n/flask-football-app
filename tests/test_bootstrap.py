@@ -22,13 +22,14 @@ def fd_csv(year: int, league: str = "E0") -> str:
 class TestBootstrap(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.old = (config.DB_PATH, config.AUTO_BOOTSTRAP)
+        self.old = (config.DB_PATH, config.AUTO_BOOTSTRAP, config.HISTORY_DIR)
         config.DB_PATH = Path(self.tmp.name) / "football.db"
+        config.HISTORY_DIR = Path(self.tmp.name) / "history"      # pusta historia: test nie zależy od plików w repo
         config.AUTO_BOOTSTRAP = True
         bootstrap.STATUS.update(state="idle", message="Dane nie zostały jeszcze załadowane.")
 
     def tearDown(self):
-        config.DB_PATH, config.AUTO_BOOTSTRAP = self.old
+        config.DB_PATH, config.AUTO_BOOTSTRAP, config.HISTORY_DIR = self.old
         self.tmp.cleanup()
 
     def _patches(self):
