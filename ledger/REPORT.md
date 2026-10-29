@@ -2,7 +2,7 @@
 
 ## D1
 
-Rozliczone prognozy: **2**, oczekujące: **15**
+Rozliczone prognozy: **2**, oczekujące: **18**
 
 Log-loss na żywo (mniej = lepiej):
 
@@ -19,7 +19,7 @@ Symulacja typów (edge ≥ 3%): zakłady 4, ROI -100.0% _(mała próba = główn
 
 ## E0
 
-Rozliczone prognozy: **5**, oczekujące: **15**
+Rozliczone prognozy: **5**, oczekujące: **20**
 
 Log-loss na żywo (mniej = lepiej):
 
@@ -36,7 +36,7 @@ Symulacja typów (edge ≥ 3%): zakłady 2, ROI 129.0% _(mała próba = główni
 
 ## F1
 
-Rozliczone prognozy: **7**, oczekujące: **12**
+Rozliczone prognozy: **7**, oczekujące: **18**
 
 Log-loss na żywo (mniej = lepiej):
 
@@ -53,24 +53,24 @@ Symulacja typów (edge ≥ 3%): zakłady 6, ROI -50.0% _(mała próba = główni
 
 ## I1
 
-Rozliczone prognozy: **8**, oczekujące: **22**
+Rozliczone prognozy: **13**, oczekujące: **22**
 
 Log-loss na żywo (mniej = lepiej):
 
 | rynek | n | model | baseline | rynek_ll | model_na_tych_samych | brier |
 |---|---|---|---|---|---|---|
-| 1X2 | 8 | 0.7471 | 1.0617 | 0.6481 | 0.7471 | – |
-| Over 2.5 | 8 | 0.6124 | 0.6908 | – | – | 0.2103 |
-| BTTS | 8 | 0.6439 | 0.6803 | – | – | 0.2256 |
-| Remis do przerwy | 8 | 0.6266 | 0.5669 | – | – | 0.2166 |
-| Remis HT lub 2H | 8 | 0.7951 | 0.7588 | – | – | 0.2998 |
-| Remis HT lub FT | 8 | 0.7839 | 0.7128 | – | – | 0.2952 |
+| 1X2 | 13 | 0.8482 | 1.0823 | 0.8460 | 0.8482 | – |
+| Over 2.5 | 13 | 0.6339 | 0.6924 | – | – | 0.2207 |
+| BTTS | 13 | 0.6420 | 0.6904 | – | – | 0.2246 |
+| Remis do przerwy | 13 | 0.6864 | 0.6374 | – | – | 0.2461 |
+| Remis HT lub 2H | 13 | 0.7135 | 0.6965 | – | – | 0.2601 |
+| Remis HT lub FT | 13 | 0.7701 | 0.7026 | – | – | 0.2883 |
 
-Symulacja typów (edge ≥ 3%): zakłady 9, ROI -56.56% _(mała próba = głównie szum)_
+Symulacja typów (edge ≥ 3%): zakłady 12, ROI -26.33% _(mała próba = głównie szum)_
 
 ## N1
 
-Rozliczone prognozy: **5**, oczekujące: **12**
+Rozliczone prognozy: **5**, oczekujące: **16**
 
 Log-loss na żywo (mniej = lepiej):
 
@@ -87,7 +87,7 @@ Symulacja typów (edge ≥ 3%): zakłady 7, ROI -61.43% _(mała próba = główn
 
 ## P1
 
-Rozliczone prognozy: **5**, oczekujące: **12**
+Rozliczone prognozy: **5**, oczekujące: **16**
 
 Log-loss na żywo (mniej = lepiej):
 
@@ -104,7 +104,7 @@ Symulacja typów (edge ≥ 3%): zakłady 5, ROI 314.0% _(mała próba = główni
 
 ## SP1
 
-Rozliczone prognozy: **5**, oczekujące: **15**
+Rozliczone prognozy: **5**, oczekujące: **20**
 
 Log-loss na żywo (mniej = lepiej):
 
