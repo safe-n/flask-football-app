@@ -1,14 +1,15 @@
 """Aplikacja Flask: mecze, podgląd meczu, statystyki sędziów/drużyn, tabela, siła drużyn, dziennik, dane + JSON API."""
 from __future__ import annotations
 
+import json
 import threading
 import time
 
 import numpy as np
 import pandas as pd
-from flask import Flask, abort, jsonify, render_template, request
+from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
 
-from . import ai, avail, bootstrap, h2h as h2h_mod, config, db, draws, gh_store, history, ledger, leagues as lg_cat, params as prm, profile as prof, recent as recent_mod, recent_vis, stats, suggest as sg
+from . import ai, avail, bets as bets_mod, bootstrap, h2h as h2h_mod, config, db, draws, gh_store, history, ledger, leagues as lg_cat, params as prm, profile as prof, recent as recent_mod, recent_vis, stats, suggest as sg
 from .betmarkets import GROUPS as BET_GROUPS, book_odds, catalogue, parse_leg
 from .odds import apply_blend, value_picks
 from .simulate import simulate_table
@@ -424,6 +425,68 @@ def create_app() -> Flask:
             warnings.append("Część typów jest niedostępna (mecz rozegrany lub poza terminarzem) - usuń je z zestawienia.")
         return {"legs": out_legs, "laczne": combined, "ostrzezenia": warnings,
                 "podsumowanie": sg.coupon_summary(out_legs, combined, warnings)}, None
+
+
+    def persist_bets():
+        """Wysyła zakłady do GitHuba w tle (nie blokuje odpowiedzi); wynik w diagnostyce."""
+        if not gh_store.enabled():
+            return
+
+        def run():
+            try:
+                bootstrap.DIAG.setdefault("dziennik", {})["zaklady"] = gh_store.bets_sync_up(db.connect(config.DB_PATH))
+            except Exception as e:  # noqa: BLE001
+                bootstrap.DIAG.setdefault("dziennik", {})["zaklady"] = f"błąd zapisu zakładów: {e}"
+        threading.Thread(target=run, daemon=True).start()
+
+    @app.get("/bets")
+    def bets_page():
+        conn = db.connect(config.DB_PATH)
+        if bets_mod.settle_open(conn, match_row):
+            persist_bets()
+        df = bets_mod.load(conn)
+        s = bets_mod.summary(df) if len(df) else {}
+        rows = []
+        for r in df.to_dict("records"):
+            rows.append({**r, "legs": json.loads(r["legs"]), "date": str(r["placed_at"])[:10]})
+        persisted = gh_store.enabled()
+        return render_template("bets.html", title="Moje zakłady", league=league_arg(), leagues=league_options(), bets=rows, s=s,
+                               spark=bets_mod.sparkline(bets_mod.cumulative(df)), persisted=persisted)
+
+    @app.post("/api/bets")
+    def api_bets_add():
+        body = request.get_json(silent=True) or {}
+        ids, odds_in = [str(x) for x in body.get("legs", [])], [str(x) for x in body.get("odds", [])]
+        if not ids:
+            return jsonify({"ok": False, "blad": "brak typów"}), 400
+        data, loading = compute_coupon(ids, odds_in)
+        if data is None:
+            return jsonify({"ok": False, "blad": "model się jeszcze liczy: " + ", ".join(loading)}), 202
+        good = [l for l in data["legs"] if not l.get("blad")]
+        if len(good) != len(ids) or any(not l.get("kurs_uzyty") for l in good):
+            return jsonify({"ok": False, "blad": "każdy typ musi mieć kurs i być jeszcze do rozegrania"}), 400
+        total = float(np.prod([l["kurs_uzyty"] for l in good]))
+        try:
+            stake = float(str(body.get("stake", "")).replace(",", "."))
+            bid = bets_mod.add_bet(db.connect(config.DB_PATH),
+                                   [{"id": l["id"], "mecz": l["mecz"], "rynek": l["rynek"], "p": l["p"], "kurs": l["kurs_uzyty"]} for l in good],
+                                   total, stake)
+        except ValueError as e:
+            return jsonify({"ok": False, "blad": str(e)}), 400
+        persist_bets()
+        return jsonify({"ok": True, "id": bid, "kurs": total})
+
+    @app.post("/bets/<int:bet_id>/<action>")
+    def bets_action(bet_id, action):
+        conn = db.connect(config.DB_PATH)
+        if action == "delete":
+            bets_mod.delete(conn, bet_id)
+        elif action in ("won", "lost", "void", "open"):
+            bets_mod.set_status(conn, bet_id, action)
+        else:
+            abort(404)
+        persist_bets()
+        return redirect(url_for("bets_page", league=league_arg()))
 
     @app.get("/coupon")
     def coupon_page():

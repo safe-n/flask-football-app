@@ -39,6 +39,10 @@ th:first-child,td:first-child{text-align:left}.m{color:var(--mut);font-size:13px
 .rt td.sc{font-weight:700}.rt td.mc{border-radius:6px;font-weight:700}.rt td.mc i{font-style:normal;margin-left:4px;font-size:11px}.rt td.mc small{font-weight:500;opacity:.8}
 .rt td.yes,.fc.yes.x{background:rgba(31,157,92,.24);color:var(--up)}.rt td.no{background:rgba(217,83,79,.2);color:var(--dn)}
 .rt tr.pr td{padding:0 6px 6px}.pbar{height:6px;border-radius:3px;background:var(--p);overflow:hidden;min-width:44px}.pg1{display:block;height:100%;background:var(--w)}.pn{font-size:10px;color:var(--mut)}
+.bk{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}.bet{background:var(--card);border-radius:12px;padding:10px;margin:8px 0}
+.bet .hd{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-weight:700}.st{border-radius:6px;padding:2px 8px;font-size:12px;font-weight:700;color:#fff}
+.st.won{background:var(--w)}.st.lost{background:var(--p)}.st.void,.st.open{background:var(--r)}.bet ul{margin:6px 0;padding-left:18px;font-size:13px}
+.bet form{display:inline}.bet button{font-size:12px;padding:3px 8px;margin-right:4px}.pos{color:var(--up)}.neg{color:var(--dn)}
 .pg.W{background:var(--w)}.pg.R{background:var(--r)}.pg.P{background:var(--p)}
 .hl{outline:2px solid var(--acc)}.pick{color:var(--warn);font-size:13px;margin-top:6px}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}.t{font-weight:600}
@@ -70,7 +74,7 @@ window.addEventListener('pageshow',function(){fbBadge();fbSync();});
 <h1>{{ title }}</h1>
 <nav><a href="/?league={{ league }}">Mecze</a><a href="/match?league={{ league }}">Mecz</a><a href="/suggest?league={{ league }}">Podpowiedzi</a><a href="/coupon?league={{ league }}">Zestawienie<span id="fb-badge"></span></a><a href="/draws?league={{ league }}">Remisy</a><a href="/stats?league={{ league }}">Statystyki</a>
 <a href="/table?league={{ league }}">Tabela</a><a href="/strengths?league={{ league }}">Siła drużyn</a>
-<a href="/recent?league={{ league }}">Ostatnie</a><a href="/track?league={{ league }}">Dziennik</a><a href="/data?league={{ league }}">Dane</a></nav>
+<a href="/recent?league={{ league }}">Ostatnie</a><a href="/track?league={{ league }}">Dziennik</a><a href="/bets?league={{ league }}">Moje zakłady</a><a href="/data?league={{ league }}">Dane</a></nav>
 <form method="get" action="{{ request.path }}"><select name="league" onchange="this.form.submit()">
 {% for code, lab in leagues %}<option value="{{ code }}" {{ 'selected' if code == league }}>{{ lab }}</option>{% endfor %}
 </select></form>

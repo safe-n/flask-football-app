@@ -14,7 +14,7 @@ from pathlib import Path
 import pandas as pd
 import requests
 
-from . import config, ledger
+from . import bets as bets_mod, config, ledger
 
 API = "https://api.github.com"
 
@@ -110,3 +110,28 @@ def sync_up(conn) -> str:
         return f"bez zmian ({n} prognoz)"
     push(local, message=f"ledger: {n} prognoz")
     return f"zapisano {n} prognoz w gałęzi {config.LEDGER_BRANCH}"
+
+
+BETS_PATH = "ledger/bets.csv"
+
+
+def bets_sync_down(conn) -> int:
+    text, _ = pull(BETS_PATH)
+    if not text:
+        return 0
+    with tempfile.TemporaryDirectory() as tmp:
+        f = Path(tmp) / "b.csv"
+        f.write_text(text, encoding="utf-8")
+        return bets_mod.import_csv(conn, f)
+
+
+def bets_sync_up(conn) -> str:
+    with tempfile.TemporaryDirectory() as tmp:
+        f = Path(tmp) / "b.csv"
+        n = bets_mod.export_csv(conn, f)
+        local = f.read_text(encoding="utf-8")
+    remote, _ = pull(BETS_PATH)
+    if (remote or "").strip() == local.strip():
+        return f"bez zmian ({n} zakładów)"
+    push(local, path=BETS_PATH, message=f"bets: {n} zakładów")
+    return f"zapisano {n} zakładów"

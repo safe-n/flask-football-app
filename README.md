@@ -359,3 +359,9 @@ Jeśli lista „Nadchodzące" jest pusta lub kończy się w przeszłości: otwó
 2. Strona **Mecz** z datą (wejście z listy Mecze) pokaże nieobecnych zawodników; składy po kliknięciu (ok. godziny przed meczem).
 3. Lokalnie: `python -m fbpred avail-probe --league I1` - test klucza i lista dostępnych rynków kursów.
 To informacja pomocnicza; nie zmienia prognozy. Limit dzienny: `AVAIL_DAILY_CAP`.
+
+
+## Moje zakłady i test H2H (0.9.0)
+- Zakładka **Moje zakłady**: w Zestawieniu wpisz kursy i stawkę, kliknij „Zapisz w dzienniku zakładów”. Zakłady rozliczają się same po wynikach.
+  Trwałość: tak samo jak dziennik prognoz (GITHUB_TOKEN + GITHUB_REPO na Renderze), plik `ledger/bets.csv` w gałęzi `ledger-data`.
+- `python -m fbpred h2h-test [--leagues E0,D1] [--last 5] [--min-meetings 3] [--fav 0.45]` - czy H2H faworyta wnosi coś ponad kursy.

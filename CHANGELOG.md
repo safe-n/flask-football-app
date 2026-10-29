@@ -1,4 +1,8 @@
 
+## 0.9.0 - dziennik własnych zakładów i test H2H
+- Nowa zakładka „Moje zakłady”: zapis zakładu (pojedynczy lub AKO) przyciskiem w Zestawieniu, automatyczne rozliczanie po wynikach meczów (także rynki remisów w połowach, kartki, rożne), ręczne rozliczenie/zwrot/usuwanie, zysk, ROI, trafność, wykres skumulowanego zysku oraz porównanie z tym, co obiecywał model. Zapis trwały w gałęzi ledger-data (ledger/bets.csv), jeśli ustawiono GITHUB_TOKEN/GITHUB_REPO.
+- Nowa komenda `python -m fbpred h2h-test`: sprawdza na historii, czy H2H wnosi informację ponad kursy bukmachera (kubełki wg bilansu faworyta w H2H, test nachylenia, ROI faworyta/underdoga).
+
 ## 0.8.1 - „Ostatnie” w wersji wizualnej
 - Ostatnie: pierścień trafności 1X2, kafelki log-loss, pasek formy modelu (✓/✗), wykres trafności rynków (słupek = ile razy zaszło, kreska = model, kropka = średnia ligi), tabela mecz po meczu w zielono-czerwonych polach z paskiem proporcji TAK/NIE nad kolumnami. Pełna tabela liczb zostaje pod spodem.
 - Podpowiedzi: usunięto słowo „noga” (teraz „Typów w auto-kuponie” / „Najsłabszy typ na kuponie”).

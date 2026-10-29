@@ -326,6 +326,7 @@ def _ledger_pull(conn, log) -> None:
         return
     try:
         d["trwalosc"] = f"GitHub, gałąź {config.LEDGER_BRANCH}: wczytano {gh_store.sync_down(conn)} prognoz przy starcie"
+        d["zaklady"] = f"wczytano {gh_store.bets_sync_down(conn)} zakładów z GitHuba"
     except Exception as e:  # noqa: BLE001 - problem z GitHubem nie może zatrzymać aplikacji
         d["trwalosc"] = f"błąd odczytu z GitHuba: {e}"
         log(f"[ledger] {e}")

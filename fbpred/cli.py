@@ -195,6 +195,28 @@ def cmd_fatigue(a):
         print("(użyj --apply, aby zapisać istotne współczynniki do modelu)")
 
 
+def cmd_h2h(a):
+    """Czy H2H (bezpośrednie spotkania) mówi coś ponad kursy bukmachera? Test na historii z bazy."""
+    from . import h2h as h2h_mod
+    conn = db.connect(config.DB_PATH)
+    obs = []
+    for lg in history.resolve_leagues(a.leagues):
+        df = db.load_matches(conn, lg)
+        o = h2h_mod.study(df, n_last=a.last, min_n=a.min_meetings, fav_min=a.fav)
+        print(f"  {lg}: {len(df)} meczów, {len(o)} obserwacji (faworyt + min. {a.min_meetings} spotkań H2H)")
+        if len(o):
+            obs.append(o)
+    if not obs:
+        sys.exit("Brak danych z kursami i historią H2H - najpierw fetch-csv.")
+    s = h2h_mod.summarize(pd.concat(obs, ignore_index=True))
+    print(f"\nRazem {s['n']} obserwacji. Faworyt = szansa >= {a.fav:.0%} wg kursów bez marży; H2H = ostatnie {a.last} spotkań.\n")
+    print(s["tabela"].to_string(index=False))
+    if "slope" in s:
+        print(f"\nNachylenie: każde +100 pp odsetka wygranych faworyta w H2H zmienia jego wynik o {100 * s['slope']:+.1f} pp ponad kursy (t = {s['t']:+.2f}).")
+    print("\n" + h2h_mod.verdict(s))
+    print("(ROI liczone po kursach z bazy; dodatni ROI w małym kubełku to zwykle szum - patrz kolumna z.)")
+
+
 def cmd_recent(a):
     df = _load(a)
     p = prm.load(a.league)
@@ -537,6 +559,11 @@ def main(argv=None):
     s.add_argument("--min-train", type=int, default=300)
     s.add_argument("--step", type=int, default=28)
     s.add_argument("--apply", action="store_true", help="zapisz istotne współczynniki do params_<liga>.json")
+    s = add("h2h-test", cmd_h2h, "czy H2H wnosi coś ponad kursy bukmachera? (test na historii)", league=False)
+    s.add_argument("--leagues", default="auto", help="auto = wszystkie ligi z bazy/history albo np. E0,D1")
+    s.add_argument("--last", type=int, default=5, help="ile ostatnich spotkań liczyć")
+    s.add_argument("--min-meetings", type=int, default=3)
+    s.add_argument("--fav", type=float, default=0.45, help="próg faworyta (szansa wg kursów)")
     s = add("recent", cmd_recent, "retrospektywa: co model przewidziałby przed ostatnimi meczami")
     s.add_argument("--days", type=int, default=10)
     s = add("profile", cmd_profile, "test metody: wyrównane kursy + przewaga gości => remis w 1. lub 2. połowie", league=False)
