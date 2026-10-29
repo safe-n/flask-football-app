@@ -1,4 +1,8 @@
 
+## 0.8.1 - „Ostatnie” w wersji wizualnej
+- Ostatnie: pierścień trafności 1X2, kafelki log-loss, pasek formy modelu (✓/✗), wykres trafności rynków (słupek = ile razy zaszło, kreska = model, kropka = średnia ligi), tabela mecz po meczu w zielono-czerwonych polach z paskiem proporcji TAK/NIE nad kolumnami. Pełna tabela liczb zostaje pod spodem.
+- Podpowiedzi: usunięto słowo „noga” (teraz „Typów w auto-kuponie” / „Najsłabszy typ na kuponie”).
+
 ## 0.8.0
 - Mecze: kafelki z widoczną średnią ligi i różnicą (w nawiasie, pp), kolor tekstu zielony/czerwony wg odchylenia od średniej (próg `?hl=`).
 - Mecze: kafelki dla żółtych kartek i rożnych (O3.5 / średnia, O9.5 / średnia).

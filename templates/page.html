@@ -3,6 +3,7 @@
 {% for kind, val in blocks %}
   {% if kind == 'p' %}<p class="m">{{ val }}</p>
   {% elif kind == 'h' %}<h2>{{ val }}</h2>
+  {% elif kind == 'html' %}{{ val|safe }}
   {% elif kind == 'tabs' %}<p class="tabs">{% for lab, href in val %}<a href="{{ href }}">{{ lab }}</a>{% endfor %}</p>
   {% else %}<div class="card">{{ val.to_html(index=False, border=0, na_rep='–', float_format=fmt)|safe }}</div>{% endif %}
 {% endfor %}

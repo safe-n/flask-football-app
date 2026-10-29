@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from flask import Flask, abort, jsonify, render_template, request
 
-from . import ai, avail, bootstrap, h2h as h2h_mod, config, db, draws, gh_store, history, ledger, leagues as lg_cat, params as prm, profile as prof, recent as recent_mod, stats, suggest as sg
+from . import ai, avail, bootstrap, h2h as h2h_mod, config, db, draws, gh_store, history, ledger, leagues as lg_cat, params as prm, profile as prof, recent as recent_mod, recent_vis, stats, suggest as sg
 from .betmarkets import GROUPS as BET_GROUPS, book_odds, catalogue, parse_leg
 from .odds import apply_blend, value_picks
 from .simulate import simulate_table
@@ -306,6 +306,8 @@ def create_app() -> Flask:
                           "To nie jest dziennik na żywo, tylko podgląd, jak model poradziłby sobie z ostatnimi meczami."),
                     ("p", recent_mod.summary(res)),
                     ("p", f"Najnowszy wynik w bazie: {last}. Szybkie wyniki: {fast}."),
+                    ("html", recent_vis.dashboard(res)),
+                    ("h", "Pełna tabela (liczby)"),
                     ("t", recent_mod.show_table(res).iloc[::-1].reset_index(drop=True)))
 
     @app.get("/track")

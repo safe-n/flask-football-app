@@ -339,7 +339,7 @@ więc wtedy łącznej szansy nie liczy. Zestawienie jest zapamiętywane **w prze
 każdym urządzeniu).
 
 **Analiza AI (opcjonalna).** Przycisk „Analiza AI” na stronie Zestawienie wysyła do Claude API policzone dane kuponu (nie Twój tekst) i prosi o
-ocenę nóg oraz sprawdzenie wiadomości o składach, kontuzjach, pauzach za kartki i rotacji (narzędzie wyszukiwania; podaje źródła).
+ocenę poszczególnych typów oraz sprawdzenie wiadomości o składach, kontuzjach, pauzach za kartki i rotacji (narzędzie wyszukiwania; podaje źródła).
 Włączenie: w Renderze `ANTHROPIC_API_KEY` (klucz z konta Claude Console, płatny za użycie) i `AI_ACCESS_CODE` (dowolny Twój kod, który wpisujesz w
 aplikacji; bez niego obcy nie wydadzą Twoich pieniędzy). Domyślny model to tani `claude-haiku-5-5` (`AI_MODEL`), limit `AI_DAILY_LIMIT=20` analiz na dobę,
 wyniki są trzymane w pamięci 6 godzin. Wyszukiwanie w sieci jest dodatkowo płatne i może wymagać włączenia w ustawieniach konsoli, a cennik sprawdź w

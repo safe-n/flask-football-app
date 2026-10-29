@@ -61,3 +61,21 @@ class TestTiles(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestRecentVisual(unittest.TestCase):
+    def test_dashboard_has_charts_and_colours(self):
+        from fbpred import recent, recent_vis
+        df = generate(n_seasons=2, seed=4, league="E0", start_year=2024, with_upcoming=False)
+        res = recent.recent_predictions(df, days=14)
+        html = recent_vis.dashboard(res)
+        for part in ("ring", "fstrip", "Trafność rynków", "Mecz po meczu", "pbar", 'class="mc yes"', 'class="mc no"'):
+            self.assertIn(part, html)
+        rows = recent_vis.stats_rows(res)
+        self.assertTrue(all(0 <= r["k"] <= r["n"] for r in rows))
+        self.assertEqual(recent_vis.dashboard(res.iloc[0:0]), "")
+
+    def test_no_more_noga_in_suggest_label(self):
+        import pathlib
+        t = pathlib.Path("templates/suggest.html").read_text(encoding="utf-8")
+        self.assertNotIn("nóg", t)

@@ -15,7 +15,8 @@ class TestAkoPanel(Env):
     def test_legs_label_explained(self):
         from fbpred.web import create_app
         html = create_app().test_client().get("/suggest?league=E0").get_data(as_text=True)
-        self.assertIn("Noga = jeden typ", html)
+        self.assertIn("Typów w auto-kuponie", html)
+        self.assertNotIn("nóg", html)
 
 
 if __name__ == "__main__":
