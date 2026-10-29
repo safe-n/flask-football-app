@@ -1,4 +1,17 @@
 
+## 0.8.0
+- Mecze: kafelki z widoczną średnią ligi i różnicą (w nawiasie, pp), kolor tekstu zielony/czerwony wg odchylenia od średniej (próg `?hl=`).
+- Mecze: kafelki dla żółtych kartek i rożnych (O3.5 / średnia, O9.5 / średnia).
+- Mecze: piktogramy H2H (ostatnie 5 spotkań, wynik z perspektywy gospodarza, bilans), forma ogółem i u siebie/na wyjeździe, flaga ⚑ gdy faworyt rzadko wygrywa z tym rywalem.
+- Nowy moduł `fbpred/h2h.py`, testy `tests/test_v80.py`.
+
+## 0.7.4 - „Ostatnie”: kolumny dla remisu w 2. połowie i „HT lub 2H”
+
+- Tabela „Ostatnie” pokazywała tylko „remis HT” i „HT lub FT”, więc mecz z remisem w 2. połowie (np. Genoa–Juventus 2–0,
+  do przerwy 2–0) wyglądał na nietrafiony. Dodane kolumny: remis_2H, HT_lub_2H (rynek „remis w dowolnej połowie”) z wynikiem TAK/nie.
+  Wyliczenia w kodzie były poprawne (Dziennik też), brakowało ich tylko w widoku. Podsumowanie pokazuje, ile razy zaszedł każdy
+  z remisów w połowach i ile średnio przewidywał model.
+
 ## 0.7.3 - AKO w Zestawieniu liczy się na żywo
 
 - Zestawienie: panel AKO - kursy, które wpisujesz, mnożą się na bieżąco (także gdy baza nie ma kursów, np. remisy w połowach);

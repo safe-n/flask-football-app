@@ -74,6 +74,14 @@ def base_rates(df: pd.DataFrame, seasons: int = 3) -> dict[str, float]:
     if d.empty:
         return out
     out["btts"] = float(((d["hg"] > 0) & (d["ag"] > 0)).mean())
+    out["over25"] = float(((d["hg"] + d["ag"]) > 2.5).mean())
+    for col_h, col_a, mean_k, share_k, line in (("h_yellow", "a_yellow", "yellow_mean", "yellow35", 3.5),
+                                                ("h_corners", "a_corners", "corners_mean", "corners95", 9.5)):
+        if col_h in d and col_a in d:
+            c = d[d[col_h].notna() & d[col_a].notna()]
+            if len(c) >= 100:
+                tot = c[col_h] + c[col_a]
+                out[mean_k], out[share_k] = float(tot.mean()), float((tot > line).mean())
     out["draw_ft"] = float((d["hg"] == d["ag"]).mean())
     h = d[d["hg_ht"].notna() & d["ag_ht"].notna()]
     if len(h) >= 100:
@@ -92,3 +100,60 @@ def highlights(pred: dict, base: dict[str, float], margin: float = 0.08) -> dict
         if pred.get("halves") and k in pred["halves"]:
             vals[k] = pred["halves"][k]
     return {k: (k in base and v >= base[k] + margin) for k, v in vals.items()}
+
+
+def grade(diff: float, big: float, small: float) -> str:
+    """Klasa koloru: up2/up1 = wyraźnie/lekko powyżej średniej, dn2/dn1 = poniżej, '' = blisko średniej."""
+    if diff >= big:
+        return "up2"
+    if diff >= small:
+        return "up1"
+    if diff <= -big:
+        return "dn2"
+    if diff <= -small:
+        return "dn1"
+    return ""
+
+
+def tiles(pred: dict, base: dict[str, float], margin: float = 0.08) -> dict[str, dict]:
+    """Kafelki do listy Mecze: wartość, średnia ligi i klasa koloru (zielone = ponad średnią, czerwone = poniżej).
+
+    Progi: dla szans w punktach procentowych (duży = `margin`, mały = min(3 pp, margin/2)); dla średnich liczb (kartki, rożne)
+    względnie: duży = 12%, mały = 5%."""
+    small = min(0.03, margin / 2)
+    out: dict[str, dict] = {}
+
+    def pct(key, label, p, b):
+        if p is None:
+            return
+        d = {"label": label, "txt": f"{100 * p:.0f}%", "cls": "", "base_txt": "", "d_txt": "", "short": ""}
+        if b is not None:
+            diff = p - b
+            dd = round(100 * diff)
+            d.update(cls=grade(diff, margin, small), base_txt=f"liga {100 * b:.0f}%", d_txt=f"{dd:+d} pp" if dd else "0 pp",
+                     short=f"{dd:+d}" if dd else "0")
+        out[key] = d
+
+    def mean(key, label, v, b):
+        if v is None:
+            return
+        d = {"label": label, "txt": f"{v:.1f}", "cls": "", "base_txt": "", "d_txt": "", "short": ""}
+        if b:
+            rel = v / b - 1
+            dd = round(100 * rel)
+            d.update(cls=grade(rel, 0.12, 0.05), base_txt=f"liga {b:.1f}", d_txt=f"{dd:+d}%" if dd else "0%",
+                     short=f"{dd:+d}%" if dd else "0")
+        out[key] = d
+
+    g, h = pred.get("goals", {}), pred.get("halves") or {}
+    pct("over25", "O2.5", g.get("over_2.5"), base.get("over25"))
+    pct("btts", "BTTS", g.get("btts_yes"), base.get("btts"))
+    for k, label in (("draw_ht", "Remis HT"), ("draw_2h", "Remis 2H"), ("draw_either_half", "HT lub 2H"),
+                     ("draw_ht_or_ft", "HT lub FT"), ("draw_ft", "Remis FT")):
+        pct(k, label, h.get(k), base.get(k))
+    y, c = pred.get("yellow") or {}, pred.get("corners") or {}
+    pct("yellow35", "Żółte O3.5", (y.get("over") or {}).get("3.5"), base.get("yellow35"))
+    mean("yellow_mean", "Żółte śr.", y.get("total_mean"), base.get("yellow_mean"))
+    pct("corners95", "Rożne O9.5", (c.get("over") or {}).get("9.5"), base.get("corners95"))
+    mean("corners_mean", "Rożne śr.", c.get("total_mean"), base.get("corners_mean"))
+    return out

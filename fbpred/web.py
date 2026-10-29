@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from flask import Flask, abort, jsonify, render_template, request
 
-from . import ai, avail, bootstrap, config, db, draws, gh_store, history, ledger, leagues as lg_cat, params as prm, profile as prof, recent as recent_mod, stats, suggest as sg
+from . import ai, avail, bootstrap, h2h as h2h_mod, config, db, draws, gh_store, history, ledger, leagues as lg_cat, params as prm, profile as prof, recent as recent_mod, stats, suggest as sg
 from .betmarkets import GROUPS as BET_GROUPS, book_odds, catalogue, parse_leg
 from .odds import apply_blend, value_picks
 from .simulate import simulate_table
@@ -174,7 +174,13 @@ def create_app() -> Flask:
             base = stats.base_rates(hist_df)
             for r in up.head(40).to_dict("records"):
                 pred = apply_blend(P.predict(r["home"], r["away"], r.get("referee"), date=r["date"]), r, p["blend_w"])
-                items.append({"row": r, "p": pred, "picks": value_picks(pred, r), "hl": stats.highlights(pred, base, margin)})
+                hh = h2h_mod.h2h(hist_df, r["home"], r["away"])
+                x = pred.get("1x2_blend") or pred["1x2"]
+                items.append({"row": r, "p": pred, "picks": value_picks(pred, r), "hl": stats.highlights(pred, base, margin),
+                              "tiles": stats.tiles(pred, base, margin), "h2h": hh,
+                              "h2h_flag": h2h_mod.flag(hh, x["1"], x["2"], r["home"], r["away"]),
+                              "form_h": {"all": h2h_mod.form(hist_df, r["home"]), "venue": h2h_mod.form(hist_df, r["home"], venue="home")},
+                              "form_a": {"all": h2h_mod.form(hist_df, r["away"]), "venue": h2h_mod.form(hist_df, r["away"], venue="away")}})
         return render_template("index.html", items=items, base=base, margin=margin, league=league, leagues=league_options(), skipped=skipped,
                                title=f"Mecze · {lg_cat.name(league)}")
 

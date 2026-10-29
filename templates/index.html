@@ -7,21 +7,26 @@
   {% if p.rest and (p.rest.home_short or p.rest.away_short) %}<div class="pick">⚠ krótka przerwa: {% if p.rest.home_short %}{{ p.home }} {{ p.rest.home_days }} dni{% if p.rest.home_tag == 'CL' %} (LM){% endif %}{% endif %}{% if p.rest.home_short and p.rest.away_short %}, {% endif %}{% if p.rest.away_short %}{{ p.away }} {{ p.rest.away_days }} dni{% if p.rest.away_tag == 'CL' %} (LM){% endif %}{% endif %} - mecze po takim tygodniu bywają mniej przewidywalne</div>{% endif %}
   <div class="row">{% for k in ['1','X','2'] %}<div class="b {{ 'hl' if x[k] == mx }}">{{ k }}<b>{{ '%.0f'|format(x[k]*100) }}%</b></div>{% endfor %}</div>
   {% if p['1x2_blend'] %}<div class="m">miks model+rynek · rynek: {{ '%.0f'|format(p.market_1x2['1']*100) }}/{{ '%.0f'|format(p.market_1x2['X']*100) }}/{{ '%.0f'|format(p.market_1x2['2']*100) }}%</div>{% endif %}
-  <div class="row">
-    <div class="b">O2.5<b>{{ '%.0f'|format(p.goals['over_2.5']*100) }}%</b></div>
-    <div class="b {{ 'hl' if it.hl.btts }}" title="średnia ligi: {{ '%.0f'|format((base.btts or 0)*100) }}%">BTTS<b>{{ '%.0f'|format(p.goals.btts_yes*100) }}%</b></div>
-    {% if p.halves %}<div class="b {{ 'hl' if it.hl.draw_ht }}" title="średnia ligi: {{ '%.0f'|format((base.draw_ht or 0)*100) }}%">Remis HT<b>{{ '%.0f'|format(p.halves.draw_ht*100) }}%</b></div>
-    <div class="b {{ 'hl' if it.hl.draw_2h }}" title="średnia ligi: {{ '%.0f'|format((base.draw_2h or 0)*100) }}%">Remis 2H<b>{{ '%.0f'|format(p.halves.draw_2h*100) }}%</b></div>{% endif %}
-  </div>
-  {% if p.halves %}<div class="row"><div class="b {{ 'hl' if it.hl.draw_either_half }}" title="średnia ligi: {{ '%.0f'|format((base.draw_either_half or 0)*100) }}%">HT lub 2H<b>{{ '%.0f'|format(p.halves.draw_either_half*100) }}%</b></div>
-    <div class="b {{ 'hl' if it.hl.draw_ht_or_ft }}" title="średnia ligi: {{ '%.0f'|format((base.draw_ht_or_ft or 0)*100) }}%">HT lub FT<b>{{ '%.0f'|format(p.halves.draw_ht_or_ft*100) }}%</b></div>
-    <div class="b {{ 'hl' if it.hl.draw_ft }}" title="średnia ligi: {{ '%.0f'|format((base.draw_ft or 0)*100) }}%">Remis FT<b>{{ '%.0f'|format(p.halves.draw_ft*100) }}%</b></div></div>{% endif %}
-  <div class="m">{% if p.yellow %}Żółte: śr. {{ p.yellow.total_mean }} (O3.5 {{ '%.0f'|format(p.yellow.over['3.5']*100) }}%){% endif %}
-  {% if p.corners %} · Rożne: śr. {{ p.corners.total_mean }} (O9.5 {{ '%.0f'|format(p.corners.over['9.5']*100) }}%){% endif %}</div>
+  {% macro tile(t) %}{% if t %}<div class="b {{ t.cls }}" title="{{ t.d_txt }} względem średniej ligi">{{ t.label }}<b>{{ t.txt }}</b><small>{{ t.base_txt }}{% if t.short %} ({{ t.short }}){% endif %}</small></div>{% endif %}{% endmacro %}
+  {% set T = it.tiles %}
+  <div class="row">{{ tile(T.over25) }}{{ tile(T.btts) }}{{ tile(T.draw_ht) }}{{ tile(T.draw_2h) }}</div>
+  <div class="row">{{ tile(T.draw_either_half) }}{{ tile(T.draw_ht_or_ft) }}{{ tile(T.draw_ft) }}</div>
+  {% if T.yellow35 or T.corners95 %}<div class="row">{{ tile(T.yellow35) }}{{ tile(T.yellow_mean) }}{{ tile(T.corners95) }}{{ tile(T.corners_mean) }}</div>{% endif %}
+  {% macro chips(lst) %}{% for f in lst %}<span class="pg {{ f.res }}" title="{{ f.tip }}">{{ f.score if score else f.letter }}</span>{% endfor %}{% endmacro %}
+  {% if it.h2h.matches %}<div class="pgrow"><span class="m"><b>H2H</b> (z perspektywy {{ p.home }}):</span>
+    {% for f in it.h2h.matches %}<span class="pg {{ f.res }}" title="{{ f.tip }}">{{ f.score }}</span>{% endfor %}
+    <span class="m">bilans w bazie: {{ it.h2h.w }}W {{ it.h2h.d }}R {{ it.h2h.l }}P</span></div>
+  {% else %}<div class="pgrow"><span class="m"><b>H2H</b>: brak spotkań w bazie</span></div>{% endif %}
+  {% if it.h2h_flag %}<div class="pick">⚑ {{ it.h2h_flag }}</div>{% endif %}
+  <div class="pgrow"><span class="m">{{ p.home }}:</span>{% for f in it.form_h.all %}<span class="pg {{ f.res }}" title="{{ f.tip }}">{{ f.letter }}</span>{% endfor %}
+    <span class="m">· u siebie:</span>{% for f in it.form_h.venue %}<span class="pg {{ f.res }}" title="{{ f.tip }}">{{ f.letter }}</span>{% endfor %}</div>
+  <div class="pgrow"><span class="m">{{ p.away }}:</span>{% for f in it.form_a.all %}<span class="pg {{ f.res }}" title="{{ f.tip }}">{{ f.letter }}</span>{% endfor %}
+    <span class="m">· na wyjeździe:</span>{% for f in it.form_a.venue %}<span class="pg {{ f.res }}" title="{{ f.tip }}">{{ f.letter }}</span>{% endfor %}</div>
   {% for k in it.picks %}<div class="pick">⚑ {{ k.rynek }}: kurs {{ k.kurs }}, przewaga {{ '%+.1f'|format(k.edge*100) }}%{% if k.edge > 0.15 %} ⚠ podejrzanie duża - to zwykle błąd modelu{% endif %}</div>{% endfor %}
 </div>
 {% else %}<p class="m">Brak nadchodzących meczów w bazie dla ligi {{ league }}. Sprawdź stronę <a href="/data?league={{ league }}">Dane</a> - tam jest diagnoza, skąd bierze się terminarz i dlaczego może być pusty.</p>{% endfor %}
 {% if skipped %}<p class="m">Pominięto {{ skipped }} mecz(e) z wcześniejszych dni - już się odbyły, a wyniki jeszcze nie dotarły ze źródła danych.</p>{% endif %}
-{% if base %}<p class="small">Zielona ramka przy 1/X/2 = najbardziej prawdopodobny wynik. Przy BTTS i remisach = wartość co najmniej {{ (margin*100)|round|int }} pp powyżej średniej ligi (średnie: BTTS {{ '%.0f'|format((base.btts or 0)*100) }}%{% if base.draw_either_half %}, remis HT {{ '%.0f'|format(base.draw_ht*100) }}%, 2H {{ '%.0f'|format(base.draw_2h*100) }}%, HT lub 2H {{ '%.0f'|format(base.draw_either_half*100) }}%, HT lub FT {{ '%.0f'|format(base.draw_ht_or_ft*100) }}%{% endif %}, remis FT {{ '%.0f'|format((base.draw_ft or 0)*100) }}%). Próg zmienisz w adresie: <code>?hl=6</code>.</p>{% endif %}
+{% if base %}<p class="small"><b>Jak czytać kafelki.</b> Pod procentem jest średnia ligi (ostatnie 3 sezony) i w nawiasie różnica w punktach procentowych. <span style="color:var(--up)">Zielony</span> = powyżej średniej ligi (jaśniejszy od +3 pp, z ramką od +{{ (margin*100)|round|int }} pp), <span style="color:var(--dn)">czerwony</span> = poniżej. Dla średnich (żółte, rożne) próg to ±5% i ±12%. Ramka przy 1/X/2 = najbardziej prawdopodobny wynik. Próg zmienisz w adresie: <code>?hl=6</code>.</p>
+<p class="small"><b>H2H i forma.</b> Kolory: <span class="pg W">W</span> wygrana, <span class="pg R">R</span> remis, <span class="pg P">P</span> porażka; najnowsze po lewej. H2H pokazuje ostatnie 5 spotkań z wynikiem z perspektywy gospodarza; baza sięga kilku ostatnich sezonów, więc to nie pełna historia. Najechanie/przytrzymanie chipa pokazuje datę i wynik. To wskazówka do własnej analizy - wpływ H2H na wynik bywa słaby i przy 3-5 meczach łatwo o przypadek.</p>{% endif %}
 <p class="small">Model statystyczny, nie gwarancja wyniku. Przewaga względem kursu często wynika z błędu modelu, nie z błędu bukmachera.</p>
 {% endblock %}
