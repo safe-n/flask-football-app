@@ -62,10 +62,15 @@ def show_table(res: pd.DataFrame) -> pd.DataFrame:
     out["typ_modelu"] = [("1", "X", "2")[i] for i in pick]
     out["trafiony"] = np.where(pick == res["y"].to_numpy(), "TAK", "nie")
     if "p_draw_ht" in res:
+        yn = {1: "TAK", 0: "nie"}
         out["remis_HT_%"] = (100 * res["p_draw_ht"]).round(0).astype("Int64")
-        out["był_remis_HT"] = res["y_draw_ht"].map({1: "TAK", 0: "nie"})
+        out["był_remis_HT"] = res["y_draw_ht"].map(yn)
+        out["remis_2H_%"] = (100 * res["p_draw_2h"]).round(0).astype("Int64")
+        out["był_remis_2H"] = res["y_draw_2h"].map(yn)
+        out["HT_lub_2H_%"] = (100 * res["p_draw_either"]).round(0).astype("Int64")      # rynek „remis w dowolnej połowie”
+        out["był_HT_lub_2H"] = res["y_draw_either"].map(yn)
         out["HT_lub_FT_%"] = (100 * res["p_draw_htft"]).round(0).astype("Int64")
-        out["był_HT_lub_FT"] = res["y_draw_htft"].map({1: "TAK", 0: "nie"})
+        out["był_HT_lub_FT"] = res["y_draw_htft"].map(yn)
     return out
 
 
@@ -80,5 +85,13 @@ def summary(res: pd.DataFrame) -> str:
     if "k1" in res and res["k1"].notna().all():
         txt += f" vs rynek {logloss_multi(res[['k1', 'kx', 'k2']].to_numpy(), y):.3f}"
     hit = float((res[["p1", "px", "p2"]].to_numpy().argmax(axis=1) == y).mean())
-    return txt + f" | trafione typy 1X2: {100 * hit:.0f}% | Brier {brier_multi(res[['p1', 'px', 'p2']].to_numpy(), y):.3f}. " \
-                 "To mała próba - o jakości modelu mówi dopiero backtest na tysiącach meczów."
+    txt += f" | trafione typy 1X2: {100 * hit:.0f}% | Brier {brier_multi(res[['p1', 'px', 'p2']].to_numpy(), y):.3f}. "
+    parts = []
+    for label, pc, yc in (("remis HT", "p_draw_ht", "y_draw_ht"), ("remis 2H", "p_draw_2h", "y_draw_2h"),
+                          ("HT lub 2H", "p_draw_either", "y_draw_either"), ("HT lub FT", "p_draw_htft", "y_draw_htft")):
+        if pc in res and yc in res and res[yc].notna().any():
+            ok = res[res[yc].notna()]
+            parts.append(f"{label}: zaszło {int(ok[yc].sum())}/{len(ok)} (średnio wg modelu {100 * ok[pc].mean():.0f}%)")
+    if parts:
+        txt += "Remisy w połowach - " + "; ".join(parts) + ". "
+    return txt + "To mała próba - o jakości modelu mówi dopiero backtest na tysiącach meczów."
