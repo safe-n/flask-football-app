@@ -237,6 +237,9 @@ def autotune(st: State) -> None:
     """Brak tennis_params/model.json -> dobierz parametry w tle (ok. 10-30 s) i użyj ich do końca życia procesu."""
     if load_params().get("s0"):
         return
+    if not config.AUTOTUNE:
+        st.step("strojenie modelu", True, "parametry domyślne - dobierz je u siebie: python -m tnpred fetch-history (stroi automatycznie), potem Commit/Push")
+        return
     m = st.get_model()
     if len(m.df) < 500:
         return

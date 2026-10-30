@@ -18,7 +18,7 @@ def p_hold(p: float) -> float:
     return p ** 4 * (1 + 4 * q + 10 * q * q) + 20 * p ** 3 * q ** 3 * deuce
 
 
-@lru_cache(maxsize=200_000)
+@lru_cache(maxsize=20_000)
 def p_tiebreak(pa: float, pb: float, target: int = 7) -> float:
     """Szansa, że A wygra tie-break, gdy A serwuje pierwszy punkt (potem B, B, A, A, ...)."""
     x = pa * (1 - pb)          # A wygrywa obie piłki w parze (jedna przy serwisie każdego)
@@ -50,7 +50,7 @@ def p_tiebreak(pa: float, pb: float, target: int = 7) -> float:
     return win
 
 
-@lru_cache(maxsize=200_000)
+@lru_cache(maxsize=20_000)
 def set_dist(pa: float, pb: float, a_serves_first: bool, tb_target: int = 7) -> tuple:
     """Rozkład wyniku seta: krotka ((gemy_A, gemy_B, prawd.), ...). 7-6 / 6-7 = tie-break."""
     ha, hb = p_hold(pa), p_hold(pb)
@@ -78,7 +78,7 @@ def set_dist(pa: float, pb: float, a_serves_first: bool, tb_target: int = 7) -> 
     return tuple((a, b, p) for (a, b), p in sorted(out.items()))
 
 
-@lru_cache(maxsize=50_000)
+@lru_cache(maxsize=1_500)    # każdy wpis to pełny rozkład gemów - mały cache, bo Render ma 512 MB na piłkę+tenis
 def match_dist(pa: float, pb: float, best_of: int = 3, final_tb: int = 7) -> dict:
     """Pełny rozkład meczu (średnia z dwóch możliwości, kto serwuje pierwszy).
 

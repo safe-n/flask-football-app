@@ -50,6 +50,10 @@ def cmd_fetch_history(a):
     if tdata.load_history_dir().empty:
         print("Brak jakiejkolwiek historii - przerywam.")
         raise SystemExit(1)
+    if not a.no_tune:
+        print("\nStrojenie modelu (ok. pół minuty)...")
+        cmd_tune(a)
+        print("Gotowe. Teraz Commit + Push (GitHub Desktop), żeby Render dostał nową historię i parametry.")
 
 
 def cmd_tune(a):
@@ -97,6 +101,7 @@ def main(argv=None):
     f.add_argument("--years", type=int, default=config.YEARS)
     f.add_argument("--tours", default=",".join(config.TOURS))
     f.add_argument("--force", action="store_true")
+    f.add_argument("--no-tune", action="store_true", help="nie stroj modelu po pobraniu")
     f.set_defaults(fn=cmd_fetch_history)
     t = sub.add_parser("tune", help="dobierz s0 (serwis) i wagę rynku -> tennis_params/model.json")
     t.set_defaults(fn=cmd_tune)

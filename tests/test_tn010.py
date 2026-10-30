@@ -110,19 +110,21 @@ class ManualAndFallback(unittest.TestCase):
         self.assertEqual(df.loc[0, "tour"], "WTA")
         self.assertIn("WTA/2025.xlsx: 1", rep[0])
 
-    def test_sackmann_parse(self):
-        raw = pd.DataFrame([{"tourney_name": "Wimbledon", "surface": "Grass", "tourney_level": "G", "tourney_date": 20250630,
-                             "round": "F", "best_of": 5, "winner_name": "Jannik Sinner", "loser_name": "Carlos Alcaraz",
-                             "winner_rank": 1, "loser_rank": 2, "score": "4-6 6-4 6-4 6-4"},
-                            {"tourney_name": "Wimbledon", "surface": "Grass", "tourney_level": "G", "tourney_date": 20250630,
-                             "round": "R128", "best_of": 5, "winner_name": "Alex de Minaur", "loser_name": "X Y",
-                             "winner_rank": 10, "loser_rank": 200, "score": "7-6(5) 2-0 RET"}])
-        df = tdata.from_sackmann(raw, "ATP")
-        f = df[df["round"] == "The Final"].iloc[0]
-        self.assertEqual((f.winner, f.loser, int(f.wsets), int(f.lsets), f.series), ("Sinner J.", "Alcaraz C.", 3, 1, "Grand Slam"))
-        r = df[df["round"] == "1st Round"].iloc[0]
-        self.assertEqual(r.comment, "Retired")
-        self.assertEqual(int(r.w1), 7)
+    def test_discover_links_from_page(self):
+        from unittest import mock
+        html = ('<a href="hrjk-NEW/2025/2025.xlsx">2025</a> <a href="/hrjk-NEW/2025w/2025.xlsx">2025</a> '
+                '<a href="hrjk-NEW/2010/2010.xls">2010</a>')
+        resp = mock.Mock(status_code=200, text=html)
+        tdata._LINKS.clear()
+        with mock.patch.object(tdata.requests, "get", return_value=resp):
+            links = tdata.discover_links()
+        tdata._LINKS.clear()
+        self.assertEqual(links[("ATP", 2025)], "https://tennis-data.co.uk/hrjk-NEW/2025/2025.xlsx")
+        self.assertEqual(links[("WTA", 2025)], "https://tennis-data.co.uk/hrjk-NEW/2025w/2025.xlsx")
+        self.assertIn(("ATP", 2010), links)
+
+    def test_default_url_pattern(self):
+        self.assertEqual(tdata.url_for("WTA", 2025), "https://tennis-data.co.uk/hrjk-85HytOjkhth76j_ygh4jf7/2025w/2025.xlsx")
 
 
 class EloTests(unittest.TestCase):

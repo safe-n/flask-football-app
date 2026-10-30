@@ -475,7 +475,7 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
         tour = (request.args.get("tour") or "").upper() or None
         days = int(_f(request.args.get("days")) or 365)
         m = model()
-        bt = cached(("bt", tour, days), lambda: backtest.rows(m, days=days, tour=tour, limit=1500), ttl=6 * 3600)
+        bt = cached(("bt", tour, days), lambda: backtest.rows(m, days=days, tour=tour, limit=600), ttl=6 * 3600)
         s = backtest.summary(bt)
         if not s:
             return page("Backtest", ("p", "Za mało danych."))

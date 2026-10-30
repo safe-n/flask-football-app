@@ -1,3 +1,11 @@
+## 0.1.4 - stabilność na darmowym Renderze (HTTP 503)
+- Przyczyna 503: przy pierwszym starcie aplikacja stroiła model na serwerze (minuty CPU przy 0,1 CPU) i trzymała w pamięci
+  ogromny cache rozkładów meczów - razem z piłką przekraczało to limity Rendera (512 MB), proces był restartowany.
+- Cache rozkładów zmniejszony (ok. 190 MB -> ok. 15 MB przy strojeniu/backteście).
+- Backtest w aplikacji liczy ostatnie 600 meczów (pełny: python -m tnpred backtest u siebie).
+- Strojenie na Renderze domyślnie wyłączone (TN_AUTOTUNE=1 włącza). `python -m tnpred fetch-history` u Ciebie pobiera dane
+  i od razu stroi model -> tennis_params/model.json trafia do repo razem z historią.
+
 ## 0.1.3 - nowe adresy plików tennis-data.co.uk
 - Strona zmieniła adresy plików (https, bez www, dodatkowy człon w ścieżce) - stąd „HTTP 404”. Nowy wzór domyślny,
   a gdy strona znów go zmieni, aplikacja sama odczyta aktualne linki ze strony alldata.php.

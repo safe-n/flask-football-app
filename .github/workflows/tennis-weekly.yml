@@ -23,7 +23,7 @@ jobs:
       - run: pip install -r requirements.txt openpyxl   # openpyxl jawnie - na wypadek braku w requirements.txt
       - name: Historia + strojenie
         run: |
-          python -m tnpred fetch-history --years 5
+          python -m tnpred fetch-history --years 5 --no-tune || echo "pobieranie z GitHuba niedostępne - używam historii z repo"
           python -m tnpred tune
           python -m tnpred backtest --days 365 > tennis_params/BACKTEST.txt || echo "backtest pominięty"
       - name: Zapisz zmiany w repo

@@ -63,6 +63,8 @@ ODDS_MONTHLY_BUDGET = int(os.getenv("TN_ODDS_BUDGET", "450"))  # zostaw zapas z 
 # Model
 ELO_SURFACE_WEIGHT = float(os.getenv("TN_ELO_SURFACE_WEIGHT", "0.5"))  # 0 = tylko ogólne Elo, 1 = tylko nawierzchnia
 ELO_USE_RETIRED = _flag("TN_ELO_USE_RETIRED")                          # mecze skreczowane w Elo (domyślnie nie)
+# Strojenie w aplikacji: kilka minut CPU na darmowym Renderze (0,1 CPU) blokowało stronę -> na Renderze domyślnie wyłączone.
+AUTOTUNE = _flag("TN_AUTOTUNE", "0" if os.getenv("RENDER") == "true" else "1")
 HL_PP = float(os.getenv("TN_HL_PP", "8"))                               # próg kolorowania kafelków (pp)
 LOG_HORIZON_DAYS = int(os.getenv("TN_LOG_HORIZON_DAYS", "4"))
 
