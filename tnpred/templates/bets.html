@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block body %}
+<p class="m">Tu zapisujesz swoje zakłady (przycisk „Zapisz w dzienniku zakładów” w zakładce Zestawienie). Rozliczają się same, gdy w bazie pojawią się wyniki (tennis-data.co.uk aktualizuje się co kilka dni - możesz rozliczyć ręcznie). Krecz/walkower = zwrot typu.
+{% if not persisted %}<span class="warn"> UWAGA: zapis trwały jest wyłączony (brak GITHUB_TOKEN/GITHUB_REPO) - zakłady znikną przy restarcie serwisu.</span>{% endif %}</p>
+{% if s %}
+<div class="bk">
+  <div class="kpi"><div class="kv {{ 'g' if s.zysk >= 0 else 'r' }}">{{ '%+.0f'|format(s.zysk) }}</div><div class="ks">zysk (zł)</div></div>
+  <div class="kpi"><div class="kv {{ 'g' if (s.roi or 0) >= 0 else 'r' }}">{{ ('%+.0f%%'|format(100*s.roi)) if s.roi is not none else '–' }}</div><div class="ks">ROI (zysk / obstawiono {{ '%.0f'|format(s.obstawiono) }} zł)</div></div>
+  <div class="kpi"><div class="kv">{{ s.wygranych }}/{{ s.wygranych + s.przegranych }}</div><div class="ks">wygrane zakłady{% if s.trafnosc is not none %} ({{ '%.0f'|format(100*s.trafnosc) }}%){% endif %}</div></div>
+  <div class="kpi"><div class="kv">{{ '%.2f'|format(s.sredni_kurs) if s.sredni_kurs else '–' }}</div><div class="ks">średni kurs</div></div>
+</div>
+{% if spark %}<div class="card"><div class="cap">Skumulowany zysk (zł) w kolejności stawiania</div>{{ spark|safe }}</div>{% endif %}
+{% if s.trafnosc_wg_modelu is defined %}
+<div class="card"><p class="m"><b>Czy model miał rację?</b> Średnia szansa Twoich zakładów wg modelu: {{ '%.0f'|format(100*s.trafnosc_wg_modelu) }}%, a faktycznie wygrało {{ '%.0f'|format(100*s.trafnosc) }}%.
+Gdyby model miał rację, Twój zysk byłby średnio {{ '%+.0f'|format(s.zysk_wg_modelu) }} zł (a jest {{ '%+.0f'|format(s.zysk) }} zł). Kurs „na zero” dla tych zakładów to ok. {{ '%.2f'|format(s.kurs_break_even) }}.
+Przy kilkudziesięciu zakładach to nadal głównie szum - prawdziwy obraz daje dopiero kilkaset.</p></div>
+{% endif %}
+{% endif %}
+{% if not bets %}<div class="card"><p class="m">Brak zakładów. Dodaj typy do Zestawienia, wpisz kursy i stawkę, a potem kliknij „Zapisz w dzienniku zakładów”.</p></div>{% endif %}
+{% for b in bets %}
+<div class="bet">
+  <div class="hd"><span>{{ 'AKO ' ~ b.legs|length if b.legs|length > 1 else 'Pojedynczy' }} · kurs {{ '%.2f'|format(b.odds) }} · stawka {{ '%.0f'|format(b.stake) }} zł</span>
+    <span><span class="st {{ b.status }}">{{ {'open':'w grze','won':'wygrany','lost':'przegrany','void':'zwrot'}[b.status] }}</span>
+    {% if b.profit == b.profit and b.profit is not none %} <span class="{{ 'pos' if b.profit > 0 else 'neg' if b.profit < 0 else '' }}">{{ '%+.2f'|format(b.profit) }} zł</span>{% endif %}</span></div>
+  <ul>{% for l in b.legs %}<li>{{ l.mecz }} - {{ l.rynek }}{% if l.kurs %} · kurs {{ '%.2f'|format(l.kurs) }}{% endif %} · szansa wg modelu {{ '%.0f'|format(100*l.p) }}%</li>{% endfor %}</ul>
+  <div class="m">{{ b.date }}{% if b.p_model %} · szansa całości wg modelu {{ '%.1f'|format(100*b.p_model) }}% · uczciwy kurs {{ '%.2f'|format(1/b.p_model) }}{% endif %}</div>
+  <div style="margin-top:6px">
+    {% for act, lab in (('won','Wygrany'),('lost','Przegrany'),('void','Zwrot'),('open','W grze')) if act != b.status %}
+    <form method="post" action="{{ R }}/bets/{{ b.id }}/{{ act }}"><button>{{ lab }}</button></form>{% endfor %}
+    <form method="post" action="{{ R }}/bets/{{ b.id }}/delete" onsubmit="return confirm('Usunąć ten zakład?')"><button>Usuń</button></form>
+  </div>
+</div>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+{% if refresh %}<meta http-equiv="refresh" content="10">{% endif %}
+<title>{{ title }} · Tenis</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--fg:#1b1f24;--mut:#5b6672;--acc:#0b6e9e;--bar:#e3e9ef;--warn:#9a6700;--up:#13803f;--dn:#c0392b;--w:#1a7f4b;--r:#6b7280;--p:#c0392b;--ball:#c9d82b}
+@media (prefers-color-scheme:dark){:root{--bg:#10151a;--card:#182028;--fg:#e8edf2;--mut:#9aa7b4;--acc:#4fb3e8;--bar:#2a3642;--warn:#e3b341;--up:#3ecf8e;--dn:#ff7b72;--w:#1f9d5c;--r:#7b8794;--p:#d9534f}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.4 system-ui,sans-serif;padding:12px;max-width:980px;margin-inline:auto}
+h1{font-size:20px;margin:6px 0 10px}h1 .ball{display:inline-block;width:14px;height:14px;border-radius:50%;background:var(--ball);margin-right:6px;vertical-align:-1px}
+h2{font-size:16px;margin:14px 0 6px}a{color:var(--acc)}
+nav{display:flex;gap:6px 12px;flex-wrap:wrap;margin-bottom:8px}nav a{text-decoration:none;font-weight:600}nav a.on{text-decoration:underline}
+.card{background:var(--card);border-radius:12px;padding:12px;margin:10px 0;overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:5px 8px;text-align:right;border-bottom:1px solid var(--bar);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}td.l,th.l{text-align:left}.m{color:var(--mut);font-size:13px}select,button,input{font-size:15px;padding:5px}
+.row{display:flex;gap:5px;margin:8px 0;flex-wrap:wrap}.b{flex:1 1 56px;min-width:0;text-align:center;border-radius:8px;background:var(--bar);padding:6px 1px;font-size:11px;overflow:hidden;text-overflow:ellipsis}
+.b b{display:block;font-size:16px}.b small{display:block;font-size:9.5px;font-weight:500;color:var(--mut);line-height:1.2;margin-top:1px}
+.b.up1 b,.b.up2 b,.b.up1 small,.b.up2 small{color:var(--up)}.b.dn1 b,.b.dn2 b,.b.dn1 small,.b.dn2 small{color:var(--dn)}
+.b.up2{outline:2px solid var(--up)}.b.dn2{outline:2px solid var(--dn)}
+.pgrow{margin:5px 0;font-size:12px;display:flex;flex-wrap:wrap;gap:3px;align-items:center}.pgrow .lb{min-width:92px;color:var(--mut)}
+.pg{display:inline-block;min-width:22px;text-align:center;border-radius:5px;padding:2px 5px;font-size:11px;font-weight:700;color:#fff;cursor:default}
+.pg.W{background:var(--w)}.pg.P{background:var(--p)}.flag{color:var(--warn);font-weight:700}
+.kpis{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}.kpi{flex:1 1 120px;background:var(--card);border-radius:12px;padding:10px;text-align:center}
+.ring{width:74px;height:74px;border-radius:50%;margin:0 auto 4px;display:flex;align-items:center;justify-content:center}
+.ring span{width:56px;height:56px;border-radius:50%;background:var(--card);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:17px}
+.kv{font-size:24px;font-weight:800;line-height:60px}.kv.g{color:var(--up)}.kv.r{color:var(--dn)}.ks{font-size:11px;color:var(--mut)}
+.cap{font-size:12px;color:var(--mut);margin:6px 0}.fstrip{display:flex;flex-wrap:wrap;gap:3px}
+.fc{width:22px;height:22px;border-radius:5px;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;color:#fff;cursor:default}
+.fc.yes{background:var(--w)}.fc.no{background:var(--p)}
+.mrow{display:flex;align-items:center;gap:8px;margin:7px 0;flex-wrap:wrap}.ml{flex:0 0 96px;font-size:13px;font-weight:600}
+.mt{flex:1 1 140px;height:16px;background:var(--bar);border-radius:8px;position:relative;overflow:hidden;min-width:120px}
+.mf{position:absolute;left:0;top:0;bottom:0;background:var(--w);border-radius:8px 0 0 8px}
+.mm{position:absolute;top:-2px;bottom:-2px;width:3px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.45);margin-left:-1px}
+.bd{position:absolute;top:5px;width:6px;height:6px;border-radius:50%;background:var(--warn);margin-left:-3px}
+.mv{flex:0 0 auto;font-size:12px;font-weight:600}.mv small{font-weight:500;color:var(--mut)}
+.rt{overflow-x:auto}.rt table{border-collapse:separate;border-spacing:0 3px}.rt th{font-size:11px;color:var(--mut);padding:3px 6px;text-align:center}
+.rt td{padding:4px 6px;font-size:12px;text-align:center}.rt td.mt1{text-align:left;font-weight:600}.dt{color:var(--mut);font-weight:500;margin-right:3px}
+.rt td.mc{border-radius:6px;font-weight:700}.rt td.mc small{font-weight:500;opacity:.8}
+.rt td.yes{background:rgba(31,157,92,.24);color:var(--up)}.rt td.no{background:rgba(217,83,79,.2);color:var(--dn)}
+.match{background:var(--card);border-radius:12px;padding:10px 12px;margin:10px 0}
+.match .hd{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}.match .pl{font-weight:700;font-size:15px}.match .pl small{font-weight:500;color:var(--mut)}
+.bar2{height:8px;border-radius:4px;background:var(--p);overflow:hidden;margin:6px 0}.bar2 i{display:block;height:100%;background:var(--w)}
+.gpmf{display:flex;align-items:flex-end;gap:2px;height:70px;margin-top:6px}.gpmf i{flex:1;background:var(--acc);opacity:.75;border-radius:2px 2px 0 0;min-width:4px}
+.gpmf i.hi{background:var(--up);opacity:1}.gax{display:flex;justify-content:space-between;font-size:10px;color:var(--mut)}
+.bk{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}.bet{background:var(--card);border-radius:12px;padding:10px;margin:8px 0}
+.bet .hd{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-weight:700}.st{border-radius:6px;padding:2px 8px;font-size:12px;font-weight:700;color:#fff}
+.st.won{background:var(--w)}.st.lost{background:var(--p)}.st.void,.st.open{background:var(--r)}.bet ul{margin:6px 0;padding-left:18px;font-size:13px}
+.bet form{display:inline}.bet button{font-size:12px;padding:3px 8px;margin-right:4px}.pos{color:var(--up)}.neg{color:var(--dn)}
+.add{background:var(--acc);color:#fff;border:0;border-radius:6px;padding:3px 9px;cursor:pointer;font-size:13px}.add.on{background:#6b7280}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;align-items:end}.form label{font-size:12px;color:var(--mut);display:block}.form input,.form select{width:100%}
+.warn{color:var(--warn)}.small{font-size:12px;color:var(--mut);margin-top:16px}.tabs a{margin-right:10px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px}
+.ok{color:var(--up)}.bad{color:var(--dn)}details summary{cursor:pointer;font-weight:600}
+</style>
+<script>
+var TN_R='{{ R }}',FB_KEY='tn_coupon';
+function fbLoad(){try{return JSON.parse(localStorage.getItem(FB_KEY))||[];}catch(e){return [];}}
+function fbSave(c){try{localStorage.setItem(FB_KEY,JSON.stringify(c));}catch(e){}fbBadge();}
+function fbHas(id){return fbLoad().some(function(l){return l.id===id;});}
+function fbAdd(id){var c=fbLoad();if(!c.some(function(l){return l.id===id;})){c.push({id:id,odds:''});fbSave(c);return true;}return false;}
+function fbRemove(id){var c=fbLoad().filter(function(l){return l.id!==id;});fbSave(c);}
+function fbBadge(){var n=fbLoad().length,b=document.getElementById('fb-badge');if(b)b.textContent=n?' ('+n+')':'';}
+function fbSync(){document.querySelectorAll('.add[data-id]').forEach(function(t){
+  if(!t.hasAttribute('data-label'))t.setAttribute('data-label',t.textContent);
+  var on=fbHas(t.getAttribute('data-id'));t.classList.toggle('on',on);t.textContent=on?'✓':t.getAttribute('data-label');
+  t.title=on?'Kliknij, aby usunąć z zestawienia':'Kliknij, aby dodać ten typ do zestawienia';});}
+document.addEventListener('click',function(e){var t=e.target.closest&&e.target.closest('.add[data-id]');if(!t)return;
+  var id=t.getAttribute('data-id');if(fbHas(id))fbRemove(id);else fbAdd(id);fbSync();});
+document.addEventListener('DOMContentLoaded',function(){fbBadge();fbSync();});
+window.addEventListener('pageshow',function(){fbBadge();fbSync();});
+</script>
+</head>
+<body>
+<h1><span class="ball"></span>{{ title }}</h1>
+<nav>{% for href, lab in nav %}<a href="{{ R }}{{ href }}" class="{{ 'on' if request.path == href.split('?')[0] else '' }}">{{ lab }}{% if href == '/coupon' %}<span id="fb-badge"></span>{% endif %}</a>{% endfor %}{% if football %}<a href="{{ football }}">⚽ Piłka</a>{% endif %}</nav>
+{% block body %}{% endblock %}
+<p class="small">tnpred {{ version }} · model ≈ rynek: to narzędzie do selekcji i oceny, nie „pewniaki”. Graj odpowiedzialnie.</p>
+</body></html>

@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="card"><div id="coupon" class="m">Ładowanie…</div></div>
+<script>
+(function(){
+var box=document.getElementById('coupon');
+function el(tag,txt,cls){var e=document.createElement(tag);if(txt!==undefined)e.textContent=txt;if(cls)e.className=cls;return e;}
+function query(c){var q=new URLSearchParams();c.forEach(function(l){q.append('leg',l.id);q.append('odds',l.odds||'');});return q;}
+function num(x){var v=parseFloat(String(x).replace(',','.'));return isFinite(v)?v:null;}
+function ako(d,inps,panel){
+  panel.textContent='';
+  var n=0,pAll=1,oAll=1,miss=0,fromDb=0,seen={},same=false;
+  d.legs.forEach(function(l,i){
+    if(l.blad)return;n++;pAll*=l.p;var k=(l.data||'')+(l.mecz||'');if(seen[k])same=true;seen[k]=1;
+    var v=inps[i]?num(inps[i].value):null;
+    if(v&&v>1){oAll*=v;}else if(l.kurs_uzyty&&l.kurs_uzyty>1){oAll*=l.kurs_uzyty;fromDb++;}else{miss++;}
+  });
+  if(!n){return;}
+  panel.appendChild(el('div','AKO z '+n+' typ'+(n===1?'u':n<5?'ów':'ów')+' (kursy się mnożą)','t'));
+  var rows=[];
+  if(!same){rows.push(['Szansa wszystkich typów wg modelu',(100*pAll).toFixed(1)+'%']);rows.push(['Uczciwy kurs AKO (z prognoz modelu)',(1/pAll).toFixed(2)]);}
+  else rows.push(['Uwaga','są typy z tego samego meczu - nie są niezależne, szansy łącznej nie liczę']);
+  if(miss===0){
+    rows.push(['Kurs AKO (iloczyn kursów)'+(fromDb?' - w tym '+fromDb+' z bazy':''),oAll.toFixed(2)]);
+    if(!same){var ev=pAll*oAll-1;rows.push(['Wartość oczekiwana (model)',(ev>=0?'+':'')+(100*ev).toFixed(0)+'% stawki']);}
+  }else{
+    if(miss<n)rows.push(['Iloczyn znanych kursów (bez '+miss+' brakujących)',oAll.toFixed(2)]);
+    rows.push(['Brak kursu','wpisz kurs przy '+miss+' typ'+(miss===1?'ie':'ach')+', a policzę pełne AKO']);
+  }
+  var tb=el('table');rows.forEach(function(r){var tr=el('tr');tr.appendChild(el('td',r[0]));tr.appendChild(el('td',r[1]));tb.appendChild(tr);});panel.appendChild(tb);
+  if(miss===0&&!same){var nt=el('div','Wartość oczekiwana zakłada, że model ma rację - to wersja optymistyczna. Im więcej typów, tym bardziej marża bukmachera i błąd modelu się kumulują.','small');nt.style.marginTop='6px';panel.appendChild(nt);}
+  var line=el('div',undefined,'m');line.style.marginTop='8px';line.appendChild(document.createTextNode('Stawka: '));
+  var st=el('input');st.type='number';st.step='1';st.style.width='80px';
+  try{st.value=localStorage.getItem('tn_stake')||'10';}catch(e){st.value='10';}
+  var res=el('span');line.appendChild(st);line.appendChild(document.createTextNode(' zł  '));line.appendChild(res);panel.appendChild(line);
+  function upd(){var x=num(st.value)||0;try{localStorage.setItem('tn_stake',st.value);}catch(e){}
+    res.textContent=miss===0?('→ wygrana '+(x*oAll).toFixed(2)+' zł (zysk '+(x*oAll-x).toFixed(2)+' zł)'+(same?'':', średnio wg modelu '+(x*(pAll*oAll-1)>=0?'+':'')+(x*(pAll*oAll-1)).toFixed(2)+' zł')):'';}
+  st.addEventListener('input',upd);upd();
+  if(miss===0){
+    var sv=el('button','Zapisz w dzienniku zakładów');sv.style.marginLeft='10px';var msg=el('span','','m');
+    sv.addEventListener('click',function(){
+      var ids=[],od=[];d.legs.forEach(function(l,i){if(l.blad)return;ids.push(l.id);var v=inps[i]?num(inps[i].value):null;od.push(v&&v>1?String(v):'');});
+      fetch(TN_R+'/api/bets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({legs:ids,odds:od,stake:st.value})})
+        .then(function(r){return r.json();}).then(function(x){
+          if(x.ok){msg.textContent=' ✓ zapisano (kurs '+x.kurs.toFixed(2)+') - zobacz zakładkę Moje zakłady';sv.disabled=true;}else{msg.textContent=' '+(x.blad||'błąd zapisu');}
+        }).catch(function(){msg.textContent=' błąd połączenia';});});
+    line.appendChild(sv);line.appendChild(msg);
+  }
+}
+function draw(){
+  var c=fbLoad();
+  if(!c.length){box.textContent='Zestawienie jest puste. Dodaj typy ze stron Mecze, Mecz albo Podpowiedzi (przycisk ＋).';return;}
+  fetch(TN_R+'/api/coupon?'+query(c).toString()).then(function(r){return r.json().then(function(d){return [r.status,d];});}).then(function(x){
+    if(x[0]===202){box.textContent=x[1].komunikat;setTimeout(draw,6000);return;}
+    render(x[1],c);
+  }).catch(function(){box.textContent='Nie udało się pobrać danych zestawienia.';});
+}
+function render(d,c){
+  box.textContent='';
+  var t=el('table');var h=el('tr');['mecz','rynek','szansa','fair','Twój kurs',''].forEach(function(x){h.appendChild(el('th',x));});t.appendChild(h);
+  var inps=[];
+  d.legs.forEach(function(l,i){
+    var r=el('tr');
+    r.appendChild(el('td',(l.data||'').slice(5)+' '+(l.mecz||l.id)));
+    if(l.blad){var td=el('td',l.blad,'warn');td.colSpan=3;r.appendChild(td);}
+    else{r.appendChild(el('td',l.rynek));r.appendChild(el('td',(100*l.p).toFixed(0)+'%'));r.appendChild(el('td',l.kurs_fair.toFixed(2)));}
+    var tdo=el('td');
+    if(!l.blad){var inp=el('input');inp.type='number';inp.step='0.01';inp.style.width='70px';inp.placeholder=l.kurs_uzyty&&l.kurs_zrodlo!=='Twój'?String(l.kurs_uzyty):'kurs';
+      inp.value=c[i].odds||'';inps[i]=inp;
+      inp.addEventListener('input',function(){var cc=fbLoad();cc[i].odds=inp.value;fbSave(cc);ako(d,inps,panel);});
+      inp.addEventListener('change',function(){draw();});tdo.appendChild(inp);}
+    r.appendChild(tdo);
+    var tdx=el('td');var b=el('button','✕');b.className='add';b.addEventListener('click',function(){var cc=fbLoad();cc.splice(i,1);fbSave(cc);draw();});tdx.appendChild(b);r.appendChild(tdx);
+    t.appendChild(r);
+    (l.ostrzezenia||[]).forEach(function(w){var rw=el('tr');var tw=el('td','⚠ '+w,'warn');tw.colSpan=6;tw.style.fontSize='11px';tw.style.textAlign='left';rw.appendChild(tw);t.appendChild(rw);});
+  });
+  box.appendChild(t);
+  var panel=el('div',undefined,'card');panel.style.marginTop='10px';box.appendChild(panel);ako(d,inps,panel);
+  var s=el('div',d.podsumowanie,'m');s.style.whiteSpace='pre-wrap';s.style.marginTop='10px';box.appendChild(s);
+  var clr=el('button','Wyczyść zestawienie');clr.addEventListener('click',function(){fbSave([]);draw();});clr.style.marginTop='10px';box.appendChild(clr);
+}
+draw();
+})();
+</script>
+{% endblock %}

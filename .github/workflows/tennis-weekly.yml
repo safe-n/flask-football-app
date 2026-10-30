@@ -1,0 +1,44 @@
+# Co tydzień ZA DARMO: świeża historia z tennis-data.co.uk -> strojenie modelu -> zapis w repo.
+# Dzięki temu Render startuje szybko (historia w repo) i nie musi stroić modelu sam.
+name: tennis-weekly
+on:
+  schedule:
+    - cron: "41 5 * * 1"      # poniedziałek 05:41 UTC
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: repo-write
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Historia + strojenie
+        run: |
+          python -m tnpred fetch-history --years 5
+          python -m tnpred fetch-history --years 1 --force
+          python -m tnpred tune
+          python -m tnpred backtest --days 365 | tee tennis_params/BACKTEST.txt
+      - name: Zapisz zmiany w repo
+        run: |
+          git config user.name "tnpred-bot"
+          git config user.email "tnpred-bot@users.noreply.github.com"
+          git add tennis_history tennis_params
+          if git diff --cached --quiet; then
+            echo "Brak zmian do zapisania."
+          else
+            git commit -m "tennis: historia i parametry $(date -u +%F)"
+            for n in 1 2 3; do
+              git pull --rebase --autostash && git push && exit 0
+              echo "push nieudany, próba $n"; sleep 5
+            done
+            exit 1
+          fi
