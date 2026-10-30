@@ -44,8 +44,9 @@ def cmd_fetch_history(a):
     total = len(years) * len(a.tours.split(","))
     print(f"\nPodsumowanie: pobrano {total - bad} z {total} plików.")
     if bad:
-        print("Część plików niedostępna. tennis-data.co.uk blokuje serwery (HTTP 403) - pobierz je ręcznie w przeglądarce "
-              "i wrzuć do tennis_history/ATP/ oraz tennis_history/WTA/ (README, sekcja „Dane ręcznie”).")
+        print("Część plików niedostępna. HTTP 403 = strona blokuje ten komputer/serwer (GitHub, Render) - uruchom komendę u siebie w domu. "
+              "HTTP 404 = zmienił się adres plików - skopiuj link z https://tennis-data.co.uk/alldata.php i wpisz wzór do .env "
+              "(TN_TDATA_ATP_URL / TN_TDATA_WTA_URL). Pliki można też wrzucić ręcznie do tennis_history/ATP/ i tennis_history/WTA/.")
     if tdata.load_history_dir().empty:
         print("Brak jakiejkolwiek historii - przerywam.")
         raise SystemExit(1)

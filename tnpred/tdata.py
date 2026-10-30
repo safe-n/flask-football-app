@@ -58,13 +58,13 @@ UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.3
       "Accept": "*/*"}
 
 
-def download(tour: str, year: int, timeout: int = 60) -> pd.DataFrame:
+def download(tour: str, year: int, timeout: int = 60, url: str | None = None) -> pd.DataFrame:
     """Pobiera rok; najpierw .xlsx, potem .xls (starsze lata)."""
     try:
         import openpyxl  # noqa: F401
     except ImportError:
         raise RuntimeError("brak biblioteki openpyxl - dopisz linię 'openpyxl>=3.1' do requirements.txt") from None
-    url = url_for(tour, year)
+    url = url or url_for(tour, year)
     errors = []
     for u in (url, url[:-1] if url.endswith(".xlsx") else url):
         try:
@@ -143,76 +143,41 @@ def load_history_dir(d: Path | None = None, report: list | None = None) -> pd.Da
     return df.drop_duplicates(subset=["tour", "date", "winner", "loser", "tournament"], keep="last").reset_index(drop=True)
 
 
-# ---------------------------------------------------------------- zapasowe źródło: Jeff Sackmann (GitHub, bez kursów)
-SACK_URL = {"ATP": "https://raw.githubusercontent.com/JeffSackmann/tennis_atp/master/atp_matches_{year}.csv",
-            "WTA": "https://raw.githubusercontent.com/JeffSackmann/tennis_wta/master/wta_matches_{year}.csv"}
-_ROUND = {"R128": ("1st Round", 0), "R64": ("2nd Round", 2), "R32": ("3rd Round", 4), "R16": ("4th Round", 5),
-          "QF": ("Quarterfinals", 6), "SF": ("Semifinals", 7), "F": ("The Final", 8), "RR": ("Round Robin", 3),
-          "BR": ("Bronze", 7), "ER": ("1st Round", 0)}
-_LEVEL = {"G": "Grand Slam", "M": "Masters 1000", "A": "ATP", "F": "Masters Cup", "P": "Premier", "PM": "Premier Mandatory",
-          "I": "International", "O": "Olympics"}
+# ---------------------------------------------------------------- odczyt aktualnych linków ze strony
+_LINKS: dict = {}
 
 
-def from_sackmann(raw: pd.DataFrame, tour: str) -> pd.DataFrame:
-    from .names import to_td
-    raw = raw[~raw.get("tourney_level", pd.Series("", index=raw.index)).astype(str).isin(["D", "C"])]
-    rows = []
-    for r in raw.to_dict("records"):
-        score = str(r.get("score") or "")
-        comment = "Completed"
-        up = score.upper()
-        if "W/O" in up or "WALK" in up:
-            comment = "Walkover"
-        elif "RET" in up or "ABD" in up or "DEF" in up:
-            comment = "Retired"
-        sets = []
-        for tok in score.split():
-            tok = tok.split("(")[0]
-            if "-" in tok:
-                a, _, b = tok.partition("-")
-                if a.isdigit() and b.isdigit():
-                    sets.append((int(a), int(b)))
-        rname, off = _ROUND.get(str(r.get("round")), ("2nd Round", 2))
-        try:
-            d = pd.Timestamp(str(int(r["tourney_date"]))) + pd.Timedelta(days=off)
-        except (TypeError, ValueError, KeyError):
-            continue
-        row = {"date": d, "tournament": r.get("tourney_name"), "location": r.get("tourney_name"),
-               "series": _LEVEL.get(str(r.get("tourney_level")), str(r.get("tourney_level"))), "court": "",
-               "surface": r.get("surface"), "round": rname, "best_of": r.get("best_of") or 3,
-               "winner": to_td(r.get("winner_name")), "loser": to_td(r.get("loser_name")),
-               "wrank": r.get("winner_rank"), "lrank": r.get("loser_rank"), "comment": comment,
-               "wsets": sum(a > b for a, b in sets), "lsets": sum(b > a for a, b in sets)}
-        for i, (a, b) in enumerate(sets[:5], 1):
-            row[f"w{i}"], row[f"l{i}"] = a, b
-        rows.append(row)
-    df = pd.DataFrame(rows)
-    if df.empty:
-        return pd.DataFrame(columns=COLS)
-    df["tour"] = tour
-    return _from_norm(df)
-
-
-def download_sackmann(tour: str, year: int, timeout: int = 60) -> pd.DataFrame:
-    u = SACK_URL[tour].format(year=year)
-    r = requests.get(u, timeout=timeout, headers=UA)
-    if r.status_code != 200:
-        raise RuntimeError(f"{u}: HTTP {r.status_code}")
-    return from_sackmann(pd.read_csv(io.StringIO(r.text)), tour)
+def discover_links(timeout: int = 30) -> dict:
+    """Czyta stronę z plikami tennis-data i zwraca {(tour, rok): pełny adres}. Pusty słownik, gdy się nie da."""
+    import re
+    from urllib.parse import urljoin
+    if _LINKS:
+        return dict(_LINKS)
+    try:
+        r = requests.get(config.TDATA_INDEX_URL, timeout=timeout, headers=UA)
+        if r.status_code != 200:
+            return {}
+        for href in re.findall(r'href=["\']([^"\']+\.xlsx?)["\']', r.text, flags=re.I):
+            m = re.search(r"/(\d{4})(w?)/\1\.xlsx?$", href, flags=re.I)
+            if m:
+                key = ("WTA" if m.group(2) else "ATP", int(m.group(1)))
+                url = urljoin(config.TDATA_INDEX_URL, href)
+                if key not in _LINKS or url.endswith(".xlsx"):
+                    _LINKS[key] = url
+    except Exception:  # noqa: BLE001
+        return {}
+    return dict(_LINKS)
 
 
 def download_any(tour: str, year: int) -> tuple[pd.DataFrame, str]:
-    """Najpierw tennis-data.co.uk (z kursami), gdy blokuje - Sackmann (GitHub, bez kursów)."""
+    """tennis-data.co.uk: najpierw znany wzór adresu, a gdy nie działa - link odczytany ze strony z plikami."""
     try:
         return download(tour, year), "tennis-data.co.uk"
     except Exception as e1:  # noqa: BLE001
-        try:
-            df = download_sackmann(tour, year)
-            if df.empty:
-                raise RuntimeError("pusty plik")
-            return df, "GitHub JeffSackmann (bez kursów)"
-        except Exception as e2:  # noqa: BLE001
-            raise RuntimeError(f"tennis-data: {str(e1)[:160]} | Sackmann: {str(e2)[:160]}") from None
+        url = discover_links().get((tour, year))
+        if not url or url == url_for(tour, year):
+            raise RuntimeError(f"{str(e1)[:200]} (na stronie {config.TDATA_INDEX_URL} nie znalazłem innego linku do tego roku)") from None
+        return download(tour, year, url=url), f"tennis-data.co.uk (link ze strony: {url})"
 
 
 def add_derived(df: pd.DataFrame) -> pd.DataFrame:

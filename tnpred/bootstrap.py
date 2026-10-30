@@ -97,10 +97,7 @@ def fetch_results(st: State, years: int | None = None, force: bool = False) -> i
             if y == now.year and now.month == 1 and now.day < 3:
                 continue
             try:
-                if len(have_y) and not force:
-                    df, src = tdata.download(tour, y), "tennis-data.co.uk"     # są już dane z kursami - nie mieszaj źródeł
-                else:
-                    df, src = tdata.download_any(tour, y)
+                df, src = tdata.download_any(tour, y)
                 n = db.upsert_matches(st.conn, df)
                 total += n
                 st.step(f"wyniki {tour} {y}", True, f"{len(df)} meczów (nowe/zmienione: {n}) - źródło: {src}")

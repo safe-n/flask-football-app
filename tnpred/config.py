@@ -47,8 +47,11 @@ REFRESH_HOURS = float(os.getenv("TN_REFRESH_HOURS", "12"))    # co ile godzin od
 DEMO = _flag("TN_DEMO")                                        # dane syntetyczne (tylko do podglądu / testów)
 
 # tennis-data.co.uk (darmowe XLSX z wynikami po setach i kursami). {year} zostanie podstawione.
-TDATA_ATP_URL = os.getenv("TN_TDATA_ATP_URL", "http://www.tennis-data.co.uk/{year}/{year}.xlsx")
-TDATA_WTA_URL = os.getenv("TN_TDATA_WTA_URL", "http://www.tennis-data.co.uk/{year}w/{year}.xlsx")
+# Strona dodała do ścieżki losowy człon (stan na 30.10.2026). Gdy znów go zmieni, aplikacja sama odczyta nowe linki
+# ze strony TDATA_INDEX_URL; można też podać wzór ręcznie w TN_TDATA_ATP_URL / TN_TDATA_WTA_URL.
+TDATA_ATP_URL = os.getenv("TN_TDATA_ATP_URL", "https://tennis-data.co.uk/hrjk-85HytOjkhth76j_ygh4jf7/{year}/{year}.xlsx")
+TDATA_WTA_URL = os.getenv("TN_TDATA_WTA_URL", "https://tennis-data.co.uk/hrjk-85HytOjkhth76j_ygh4jf7/{year}w/{year}.xlsx")
+TDATA_INDEX_URL = os.getenv("TN_TDATA_INDEX_URL", "https://tennis-data.co.uk/alldata.php")
 
 # The Odds API (opcjonalnie; darmowy plan ~500 kredytów/mies.). Koszt jednego zapytania = liczba rynków × liczba regionów.
 ODDS_API_KEY = os.getenv("ODDS_API_KEY", "")

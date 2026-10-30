@@ -1,3 +1,9 @@
+## 0.1.3 - nowe adresy plików tennis-data.co.uk
+- Strona zmieniła adresy plików (https, bez www, dodatkowy człon w ścieżce) - stąd „HTTP 404”. Nowy wzór domyślny,
+  a gdy strona znów go zmieni, aplikacja sama odczyta aktualne linki ze strony alldata.php.
+- Usunięte zapasowe źródło Sackmann (autor skasował repozytoria we wrześniu 2026).
+- `fetch-history` wyjaśnia różnicę: 403 = blokada serwera (uruchom w domu), 404 = zmieniony adres.
+
 ## 0.1.2 - historia ręcznie + zapasowe źródło
 - tennis-data.co.uk odpowiada serwerom GitHuba „403” (blokada, nie błąd kodu). Aplikacja czyta teraz pliki XLSX pobrane ręcznie
   w przeglądarce: `tennis_history/ATP/*.xlsx` i `tennis_history/WTA/*.xlsx` (nazwy plików dowolne).
