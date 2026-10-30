@@ -1,3 +1,10 @@
+## 0.1.2 - historia ręcznie + zapasowe źródło
+- tennis-data.co.uk odpowiada serwerom GitHuba „403” (blokada, nie błąd kodu). Aplikacja czyta teraz pliki XLSX pobrane ręcznie
+  w przeglądarce: `tennis_history/ATP/*.xlsx` i `tennis_history/WTA/*.xlsx` (nazwy plików dowolne).
+- Zapasowe źródło wyników: GitHub JeffSackmann (bez kursów), używane tylko dla lat bez danych.
+- Workflow tennis-weekly nie kończy się błędem, gdy historia jest w repo; stroi model na tym, co ma.
+- Zakładka Dane: które pliki wczytano i skąd pochodzi każdy rok; brak nowszych danych przy istniejącej historii = ostrzeżenie, nie błąd.
+
 ## 0.1.1 - workflow tennis-weekly odporniejszy
 - Workflow instaluje openpyxl jawnie (bez niego pobieranie XLSX z tennis-data.co.uk kończyło się błędem) i ma nowsze akcje (bez ostrzeżenia o Node 20).
 - `fetch-history`: czytelne podsumowanie i podpowiedź przyczyny; brak openpyxl zgłaszany wprost (też w zakładce Dane).

@@ -30,18 +30,24 @@ def cmd_fetch_history(a):
             if f.exists() and y < now.year and not a.force:
                 print(f"{tour} {y}: jest już {f.name} - pomijam (--force, by pobrać ponownie)")
                 continue
+            manual = config.HISTORY_DIR / tour / f"{y}.xlsx"
+            if manual.exists() and not a.force:
+                print(f"{tour} {y}: jest plik pobrany ręcznie ({tour}/{manual.name}) - pomijam")
+                continue
             try:
-                df = tdata.download(tour, y)
+                df, src = tdata.download_any(tour, y)
                 tdata.save_history(df, tour, y)
-                print(f"{tour} {y}: {len(df)} meczów -> {f}")
+                print(f"{tour} {y}: {len(df)} meczów ({src}) -> {f}")
             except Exception as e:  # noqa: BLE001
                 bad += 1
                 print(f"{tour} {y}: BŁĄD {e}")
     total = len(years) * len(a.tours.split(","))
     print(f"\nPodsumowanie: pobrano {total - bad} z {total} plików.")
-    if bad and bad == total:
-        print("NIC nie udało się pobrać. Najczęstsze przyczyny: brak 'openpyxl' w requirements.txt albo strona tennis-data.co.uk "
-              "nie odpowiada / blokuje serwer. Aplikacja na Renderze i tak spróbuje pobrać dane sama (zakładka Dane).")
+    if bad:
+        print("Część plików niedostępna. tennis-data.co.uk blokuje serwery (HTTP 403) - pobierz je ręcznie w przeglądarce "
+              "i wrzuć do tennis_history/ATP/ oraz tennis_history/WTA/ (README, sekcja „Dane ręcznie”).")
+    if tdata.load_history_dir().empty:
+        print("Brak jakiejkolwiek historii - przerywam.")
         raise SystemExit(1)
 
 

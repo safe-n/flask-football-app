@@ -94,6 +94,37 @@ class TennisData(unittest.TestCase):
         self.assertEqual(len(back), int((df.tour == "ATP").sum()))
 
 
+class ManualAndFallback(unittest.TestCase):
+    def test_xlsx_in_tour_folders(self):
+        from pathlib import Path
+        d = Path(_TMP) / "manual"
+        (d / "WTA").mkdir(parents=True, exist_ok=True)
+        raw = pd.DataFrame([{"WTA": 1, "Location": "Riyadh", "Tournament": "WTA Finals", "Date": "2025-11-05", "Tier": "Tour Championships",
+                             "Court": "Indoor", "Surface": "Hard", "Round": "Round Robin", "Best of": 3, "Winner": "Sabalenka A.",
+                             "Loser": "Gauff C.", "WRank": 1, "LRank": 3, "W1": 6, "L1": 4, "W2": 6, "L2": 2, "Wsets": 2, "Lsets": 0,
+                             "Comment": "Completed", "PSW": 1.5, "PSL": 2.6}])
+        raw.to_excel(d / "WTA" / "2025.xlsx", index=False)
+        rep = []
+        df = tdata.load_history_dir(d, report=rep)
+        self.assertEqual(len(df), 1)
+        self.assertEqual(df.loc[0, "tour"], "WTA")
+        self.assertIn("WTA/2025.xlsx: 1", rep[0])
+
+    def test_sackmann_parse(self):
+        raw = pd.DataFrame([{"tourney_name": "Wimbledon", "surface": "Grass", "tourney_level": "G", "tourney_date": 20250630,
+                             "round": "F", "best_of": 5, "winner_name": "Jannik Sinner", "loser_name": "Carlos Alcaraz",
+                             "winner_rank": 1, "loser_rank": 2, "score": "4-6 6-4 6-4 6-4"},
+                            {"tourney_name": "Wimbledon", "surface": "Grass", "tourney_level": "G", "tourney_date": 20250630,
+                             "round": "R128", "best_of": 5, "winner_name": "Alex de Minaur", "loser_name": "X Y",
+                             "winner_rank": 10, "loser_rank": 200, "score": "7-6(5) 2-0 RET"}])
+        df = tdata.from_sackmann(raw, "ATP")
+        f = df[df["round"] == "The Final"].iloc[0]
+        self.assertEqual((f.winner, f.loser, int(f.wsets), int(f.lsets), f.series), ("Sinner J.", "Alcaraz C.", 3, 1, "Grand Slam"))
+        r = df[df["round"] == "1st Round"].iloc[0]
+        self.assertEqual(r.comment, "Retired")
+        self.assertEqual(int(r.w1), 7)
+
+
 class EloTests(unittest.TestCase):
     def test_update_moves_ratings(self):
         e = Elo()

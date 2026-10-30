@@ -114,11 +114,105 @@ def _from_norm(df: pd.DataFrame) -> pd.DataFrame:
     return df.dropna(subset=["date", "winner", "loser"]).reset_index(drop=True)
 
 
-def load_history_dir(d: Path | None = None) -> pd.DataFrame:
-    d = d or config.HISTORY_DIR
-    files = sorted(Path(d).glob("*.csv")) if Path(d).exists() else []
-    parts = [read_csv(f) for f in files if not f.name.startswith("DEMO")]
-    return pd.concat(parts, ignore_index=True) if parts else pd.DataFrame(columns=COLS)
+def read_xlsx(path, tour: str) -> pd.DataFrame:
+    """Plik pobrany ręcznie z tennis-data.co.uk (bez zmiany nazwy), np. tennis_history/WTA/2025.xlsx."""
+    return normalize(pd.read_excel(path), tour)
+
+
+def load_history_dir(d: Path | None = None, report: list | None = None) -> pd.DataFrame:
+    """CSV w tennis_history/ + ręcznie pobrane XLSX w tennis_history/ATP/ i tennis_history/WTA/ (nazwy plików bez zmian)."""
+    d = Path(d or config.HISTORY_DIR)
+    parts = []
+    if d.exists():
+        for f in sorted(d.glob("*.csv")):
+            if not f.name.startswith("DEMO"):
+                parts.append(read_csv(f))
+        for tour in ("ATP", "WTA"):
+            for f in sorted((d / tour).glob("*.xls*")) if (d / tour).exists() else []:
+                try:
+                    x = read_xlsx(f, tour)
+                    parts.append(x)
+                    if report is not None:
+                        report.append(f"{tour}/{f.name}: {len(x)} meczów")
+                except Exception as e:  # noqa: BLE001
+                    if report is not None:
+                        report.append(f"{tour}/{f.name}: BŁĄD {e}")
+    if not parts:
+        return pd.DataFrame(columns=COLS)
+    df = pd.concat(parts, ignore_index=True)
+    return df.drop_duplicates(subset=["tour", "date", "winner", "loser", "tournament"], keep="last").reset_index(drop=True)
+
+
+# ---------------------------------------------------------------- zapasowe źródło: Jeff Sackmann (GitHub, bez kursów)
+SACK_URL = {"ATP": "https://raw.githubusercontent.com/JeffSackmann/tennis_atp/master/atp_matches_{year}.csv",
+            "WTA": "https://raw.githubusercontent.com/JeffSackmann/tennis_wta/master/wta_matches_{year}.csv"}
+_ROUND = {"R128": ("1st Round", 0), "R64": ("2nd Round", 2), "R32": ("3rd Round", 4), "R16": ("4th Round", 5),
+          "QF": ("Quarterfinals", 6), "SF": ("Semifinals", 7), "F": ("The Final", 8), "RR": ("Round Robin", 3),
+          "BR": ("Bronze", 7), "ER": ("1st Round", 0)}
+_LEVEL = {"G": "Grand Slam", "M": "Masters 1000", "A": "ATP", "F": "Masters Cup", "P": "Premier", "PM": "Premier Mandatory",
+          "I": "International", "O": "Olympics"}
+
+
+def from_sackmann(raw: pd.DataFrame, tour: str) -> pd.DataFrame:
+    from .names import to_td
+    raw = raw[~raw.get("tourney_level", pd.Series("", index=raw.index)).astype(str).isin(["D", "C"])]
+    rows = []
+    for r in raw.to_dict("records"):
+        score = str(r.get("score") or "")
+        comment = "Completed"
+        up = score.upper()
+        if "W/O" in up or "WALK" in up:
+            comment = "Walkover"
+        elif "RET" in up or "ABD" in up or "DEF" in up:
+            comment = "Retired"
+        sets = []
+        for tok in score.split():
+            tok = tok.split("(")[0]
+            if "-" in tok:
+                a, _, b = tok.partition("-")
+                if a.isdigit() and b.isdigit():
+                    sets.append((int(a), int(b)))
+        rname, off = _ROUND.get(str(r.get("round")), ("2nd Round", 2))
+        try:
+            d = pd.Timestamp(str(int(r["tourney_date"]))) + pd.Timedelta(days=off)
+        except (TypeError, ValueError, KeyError):
+            continue
+        row = {"date": d, "tournament": r.get("tourney_name"), "location": r.get("tourney_name"),
+               "series": _LEVEL.get(str(r.get("tourney_level")), str(r.get("tourney_level"))), "court": "",
+               "surface": r.get("surface"), "round": rname, "best_of": r.get("best_of") or 3,
+               "winner": to_td(r.get("winner_name")), "loser": to_td(r.get("loser_name")),
+               "wrank": r.get("winner_rank"), "lrank": r.get("loser_rank"), "comment": comment,
+               "wsets": sum(a > b for a, b in sets), "lsets": sum(b > a for a, b in sets)}
+        for i, (a, b) in enumerate(sets[:5], 1):
+            row[f"w{i}"], row[f"l{i}"] = a, b
+        rows.append(row)
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return pd.DataFrame(columns=COLS)
+    df["tour"] = tour
+    return _from_norm(df)
+
+
+def download_sackmann(tour: str, year: int, timeout: int = 60) -> pd.DataFrame:
+    u = SACK_URL[tour].format(year=year)
+    r = requests.get(u, timeout=timeout, headers=UA)
+    if r.status_code != 200:
+        raise RuntimeError(f"{u}: HTTP {r.status_code}")
+    return from_sackmann(pd.read_csv(io.StringIO(r.text)), tour)
+
+
+def download_any(tour: str, year: int) -> tuple[pd.DataFrame, str]:
+    """Najpierw tennis-data.co.uk (z kursami), gdy blokuje - Sackmann (GitHub, bez kursów)."""
+    try:
+        return download(tour, year), "tennis-data.co.uk"
+    except Exception as e1:  # noqa: BLE001
+        try:
+            df = download_sackmann(tour, year)
+            if df.empty:
+                raise RuntimeError("pusty plik")
+            return df, "GitHub JeffSackmann (bez kursów)"
+        except Exception as e2:  # noqa: BLE001
+            raise RuntimeError(f"tennis-data: {str(e1)[:160]} | Sackmann: {str(e2)[:160]}") from None
 
 
 def add_derived(df: pd.DataFrame) -> pd.DataFrame:

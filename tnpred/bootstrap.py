@@ -67,8 +67,11 @@ class State:
 
 # ---------------------------------------------------------------------- ładowanie
 def load_local(st: State) -> int:
-    df = tdata.load_history_dir()
+    rep: list = []
+    df = tdata.load_history_dir(report=rep)
     n = db.upsert_matches(st.conn, df) if len(df) else 0
+    if rep:
+        st.step("pliki XLSX z repo", not any("BŁĄD" in x for x in rep), "; ".join(rep))
     if n == 0 and config.DEMO and db.load_matches(st.conn).empty:
         demo = synthetic.generate()
         db.upsert_matches(st.conn, demo)
@@ -94,12 +97,17 @@ def fetch_results(st: State, years: int | None = None, force: bool = False) -> i
             if y == now.year and now.month == 1 and now.day < 3:
                 continue
             try:
-                df = tdata.download(tour, y)
+                if len(have_y) and not force:
+                    df, src = tdata.download(tour, y), "tennis-data.co.uk"     # są już dane z kursami - nie mieszaj źródeł
+                else:
+                    df, src = tdata.download_any(tour, y)
                 n = db.upsert_matches(st.conn, df)
                 total += n
-                st.step(f"wyniki {tour} {y}", True, f"{len(df)} meczów (nowe/zmienione: {n}) z {tdata.url_for(tour, y)}")
+                st.step(f"wyniki {tour} {y}", True, f"{len(df)} meczów (nowe/zmienione: {n}) - źródło: {src}")
             except Exception as e:  # noqa: BLE001
-                st.step(f"wyniki {tour} {y}", False, f"{e}")
+                ok = len(have_y) > 0
+                st.step(f"wyniki {tour} {y}", ok, (f"nie pobrano nowszych danych ({str(e)[:200]}); używam {len(have_y)} meczów z repo. "
+                                                    f"Aktualizacja: pobierz plik ręcznie (README)") if ok else str(e))
     db.meta_set(st.conn, "results_at", _now())
     if total:
         st.mark_changed()
