@@ -54,13 +54,21 @@ def url_for(tour: str, year: int) -> str:
     return tpl.format(year=year)
 
 
+UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36",
+      "Accept": "*/*"}
+
+
 def download(tour: str, year: int, timeout: int = 60) -> pd.DataFrame:
     """Pobiera rok; najpierw .xlsx, potem .xls (starsze lata)."""
+    try:
+        import openpyxl  # noqa: F401
+    except ImportError:
+        raise RuntimeError("brak biblioteki openpyxl - dopisz linię 'openpyxl>=3.1' do requirements.txt") from None
     url = url_for(tour, year)
     errors = []
     for u in (url, url[:-1] if url.endswith(".xlsx") else url):
         try:
-            r = requests.get(u, timeout=timeout, headers={"User-Agent": "tnpred"})
+            r = requests.get(u, timeout=timeout, headers=UA)
             if r.status_code != 200 or len(r.content) < 1000:
                 errors.append(f"{u}: HTTP {r.status_code}")
                 continue

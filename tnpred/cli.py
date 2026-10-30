@@ -37,7 +37,11 @@ def cmd_fetch_history(a):
             except Exception as e:  # noqa: BLE001
                 bad += 1
                 print(f"{tour} {y}: BŁĄD {e}")
-    if bad and bad == len(years) * len(a.tours.split(",")):
+    total = len(years) * len(a.tours.split(","))
+    print(f"\nPodsumowanie: pobrano {total - bad} z {total} plików.")
+    if bad and bad == total:
+        print("NIC nie udało się pobrać. Najczęstsze przyczyny: brak 'openpyxl' w requirements.txt albo strona tennis-data.co.uk "
+              "nie odpowiada / blokuje serwer. Aplikacja na Renderze i tak spróbuje pobrać dane sama (zakładka Dane).")
         raise SystemExit(1)
 
 

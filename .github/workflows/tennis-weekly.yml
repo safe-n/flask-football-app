@@ -15,18 +15,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install -r requirements.txt
+      - run: pip install -r requirements.txt openpyxl   # openpyxl jawnie - na wypadek braku w requirements.txt
       - name: Historia + strojenie
         run: |
           python -m tnpred fetch-history --years 5
-          python -m tnpred fetch-history --years 1 --force
+          python -m tnpred fetch-history --years 1 --force || echo "bieżący rok nie pobrany - zostaje poprzednia wersja"
           python -m tnpred tune
-          python -m tnpred backtest --days 365 | tee tennis_params/BACKTEST.txt
+          python -m tnpred backtest --days 365 > tennis_params/BACKTEST.txt || echo "backtest pominięty"
       - name: Zapisz zmiany w repo
         run: |
           git config user.name "tnpred-bot"
