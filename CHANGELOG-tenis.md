@@ -1,3 +1,20 @@
+## 0.2.1 - godziny rozpoczęcia i status meczu
+- Mecze: godzina startu w czasie polskim (TN_TZ), sortowanie po godzinie, dni po polsku („sob 31.10.2026”).
+- Status: „za X min” / „▶ rozpoczęty” / „zakończony?” (wg planu; TN_MATCH_HOURS = 4 h) + ostrzeżenie, że kursy są sprzed meczu.
+- Ręczne dodawanie meczu: pole „Godzina” (czas polski, opcjonalne).
+- The Odds API: po starcie meczu nie nadpisujemy kursów przedmeczowych kursami na żywo (te psułyby przewagę i dziennik).
+- Eksport PDF: godzina i status przy każdym meczu.
+- Lista meczów odświeża się od razu po nowych kursach/meczach (wcześniej do 10 min opóźnienia).
+
+## 0.2.0 - eksport PDF + mniej pamięci
+- Mecze -> „📄 Eksport PDF”: zwięzła wersja do druku (A4) - zwycięzca z uczciwym kursem, kursem i przewagą, gemy (over, średnia),
+  tie-break, najczęstszy wynik w setach, H2H i forma W/P, ostrzeżenia. PDF zapisuje przeglądarka („Zapisz jako PDF”) - zero
+  obciążenia serwera. Filtr touru i dnia (`?day=RRRR-MM-DD`).
+- Pamięć (mail z Rendera „exceeded its memory limit”): dane modelu jako kategorie/float32, indeks wyników bez kopii wierszy,
+  historia Elo ograniczona do 120 ostatnich ocen, mniejsze bufory modelu punktowego, czyszczenie bufora stron po zmianie danych,
+  oddawanie pamięci systemowi po przebudowie. Dodatek tenisa w szczycie: ok. 130 MB -> ok. 55 MB (pomiar na 18 tys. meczów).
+- Krótkie nazwiska wielowyrazowe („De Vries”, nie „De”).
+
 ## 0.1.4 - stabilność na darmowym Renderze (HTTP 503)
 - Przyczyna 503: przy pierwszym starcie aplikacja stroiła model na serwerze (minuty CPU przy 0,1 CPU) i trzymała w pamięci
   ogromny cache rozkładów meczów - razem z piłką przekraczało to limity Rendera (512 MB), proces był restartowany.

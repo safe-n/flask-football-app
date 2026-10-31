@@ -26,6 +26,18 @@ def _f(x):
         return None
 
 
+def _manual_date(day, hhmm) -> str:
+    """Data z formularza; z godziną -> zapis w UTC (jak z The Odds API), bez godziny -> sam dzień."""
+    day = day or f"{pd.Timestamp.today():%Y-%m-%d}"
+    if hhmm and ":" in hhmm:
+        try:
+            t = pd.Timestamp(f"{day} {hhmm}").tz_localize(config.TZ).tz_convert("UTC")
+            return f"{t:%Y-%m-%d %H:%M}"
+        except (ValueError, TypeError):
+            pass
+    return day
+
+
 def _opts(values, current) -> str:
     return "".join(f'<option {"selected" if v == current else ""}>{v}</option>' for v in values)
 
@@ -45,6 +57,8 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
 
     def cached(key, build, ttl=1800):
         k = (key, st.model_version, st.data_version)
+        if cache and next(iter(cache))[1:] != k[1:]:
+            cache.clear()          # nowe dane -> stare wyniki (i ich pamięć) do kosza
         hit = cache.get(k)
         if hit and time.time() - hit[0] < ttl:
             return hit[1]
@@ -77,7 +91,8 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
                 p = m.predict(r["tour"], r["surface"], r["best_of"], r["p1"], r["p2"], r.get("o1"), r.get("o2"))
                 out.append((r, p))
             return out
-        return cached(("up", tour), build, ttl=600)
+        stamp = st.conn.execute("SELECT COUNT(*), MAX(updated_at) FROM upcoming").fetchone()   # nowe mecze/kursy -> przelicz
+        return cached(("up", tour, stamp), build, ttl=600)
 
     @app.errorhandler(404)
     def nf(e):
@@ -92,11 +107,15 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
         cards = []
         h = hl()
         last_day = None
+        now = pd.Timestamp.now(tz="UTC")
+        items = sorted(items, key=lambda rp: (V.when(rp[0]["date"], now)["day"], V.start_time(rp[0]["date"]) or now + pd.Timedelta(days=9999)))
         for r, p in items:
-            day = str(r["date"])[:10]
-            if day != last_day:
-                cards.append(f"<h2>{escape(day)}</h2>")
-                last_day = day
+            day = str(r["date"])[:10]          # dzień w identyfikatorze typu (UTC, jak w bazie)
+            w = V.when(r["date"], now)
+            if w["day"] != last_day:
+                d0 = pd.Timestamp(w["day"])
+                cards.append(f"<h2>{V.DNI[d0.weekday()]} {d0:%d.%m.%Y}</h2>")
+                last_day = w["day"]
             line = _f(r.get("total_line"))
             q = {"tour": p["tour"], "surface": p["surface"], "bo": p["best_of"], "p1": p["p1"], "p2": p["p2"], "date": day,
                  "o1": r.get("o1") or "", "o2": r.get("o2") or ""}
@@ -111,8 +130,13 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
                                       f"＋ {V.short(who)} {V.fair(pp)}{e}"))
             src = "ręczny" if r.get("source") == "manual" else ("demo" if r.get("source") == "demo" else "")
             warn = "".join(f'<div class="warn m">⚠ {escape(w)}</div>' for w in p["warn"])
+            started = w["status"] in ("live", "done", "past")
+            if started:
+                warn += ('<div class="warn m">⚠ Mecz już się zaczął (wg planu) - prognoza i kursy są sprzed meczu; '
+                         'kursy na żywo u bukmachera są inne.</div>')
             cards.append(
-                f'<div class="match"><div class="hd"><span class="pl">{escape(p["p1"])} <small>vs</small> {escape(p["p2"])}</span>'
+                f'<div class="match{" started" if started else ""}"><div class="hd"><span class="pl"><span class="tm">{escape(w["time"] or "--:--")}</span>'
+                f'{escape(p["p1"])} <small>vs</small> {escape(p["p2"])}{V.status_chip(w)}</span>'
                 f'<span class="m">{escape(p["tour"])} · {escape(r.get("tournament") or "")} · {escape(p["surface"])} · do {p["best_of"] // 2 + 1} setów{o_txt}'
                 f'{" · " + src if src else ""}</span></div>'
                 f'<div class="bar2" title="{escape(p["p1"])} {V.pct(p["m"]["p1"])}"><i style="width:{100 * p["m"]["p1"]:.0f}%"></i></div>'
@@ -121,7 +145,8 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
                 f'<div class="pgrow"><span class="lb">forma {escape(V.short(p["p2"]))}</span>{ft.form(m.df, p["tour"], p["p2"], 5)["html"]}</div>'
                 f'{warn}<div class="row" style="align-items:center">{"".join(legs)} <a href="{href}">szczegóły →</a>'
                 f'{_del_form(r) if r.get("source") == "manual" else ""}</div></div>')
-        tabs = [("Wszystkie", "/"), ("ATP", "/?tour=ATP"), ("WTA", "/?tour=WTA")]
+        tabs = [("Wszystkie", "/"), ("ATP", "/?tour=ATP"), ("WTA", "/?tour=WTA"),
+                ("📄 Eksport PDF", f"/print?auto=1{'&tour=' + tour if tour else ''}")]
         empty = "" if items else (
             '<div class="card"><p class="m">Brak nadchodzących meczów. ' +
             ("Kursy z The Odds API pobierają się co kilka godzin. " if config.ODDS_API_KEY else
@@ -142,6 +167,7 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
         return (f'<details class="card"><summary>＋ Dodaj mecz ręcznie (np. z oferty bukmachera)</summary>'
                 f'<form method="post" action="{request.script_root}/upcoming/add" class="form" style="margin-top:8px">'
                 f'<div><label>Data</label><input type="date" name="date" required value="{pd.Timestamp.today():%Y-%m-%d}"></div>'
+                f'<div><label>Godzina (czas polski, opcjonalnie)</label><input type="time" name="time"></div>'
                 f'<div><label>Tour</label><select name="tour"><option>ATP</option><option>WTA</option></select></div>'
                 f'<div><label>Turniej</label><input name="tournament" placeholder="np. Paris Masters"></div>'
                 f'<div><label>Nawierzchnia</label><select name="surface">{"".join(f"<option>{s}</option>" for s in SURFACES)}</select></div>'
@@ -155,6 +181,44 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
                 f'<p class="small">Wpisz nazwisko jak w bazie (podpowiedzi) albo pełne imię i nazwisko - aplikacja spróbuje dopasować. '
                 f'Ręczne mecze zapisują się w GitHubie (jeśli ustawiono token), więc przetrwają restart.</p></details>')
 
+    @app.get("/print")
+    def print_view():
+        """Wersja do druku / PDF: przeglądarka zapisuje PDF (Drukuj -> Zapisz jako PDF). Zero obciążenia serwera."""
+        tour = (request.args.get("tour") or "").upper() or None
+        day = request.args.get("day")
+        m = model()
+        rows = []
+        for r, p in sorted(upcoming_preds(tour), key=lambda rp: str(rp[0]["date"])):
+            d = V.when(r["date"])["day"]
+            if day and d != day:
+                continue
+            mm, base = p["m"], p["base"] or {}
+            line = _f(r.get("total_line")) or (22.5 if p["best_of"] == 3 else 38.5)
+            p_over = sum(v for k, v in mm["games_pmf"].items() if k > line)
+            h = ft.h2h(m.df, p["tour"], p["p1"], p["p2"])
+            fav = max(mm["p1"], mm["p2"])
+            flag = ft.underdog_flag(h, fav, mm["p1"] >= 0.5)
+            f1 = " ".join(x["res"] for x in ft.form(m.df, p["tour"], p["p1"], 5)["rows"]) or "–"
+            f2 = " ".join(x["res"] for x in ft.form(m.df, p["tour"], p["p2"], 5)["rows"]) or "–"
+            top_set = max(mm["sets"].items(), key=lambda kv: kv[1])
+            odds = []
+            for k, who, pp in (("w1", p["p1"], mm["p1"]), ("w2", p["p2"], mm["p2"])):
+                o = bm.book_odds(r, k)
+                odds.append(f"{float(o):.2f} ({100 * edge(pp, o):+.0f}%)" if o else "–")
+            i1, i2 = p["info"]
+            rk = lambda i: f"#{int(i['rank'])}" if i.get("rank") == i.get("rank") and i.get("rank") else ""  # noqa: E731
+            wv = V.when(r["date"])
+            rows.append({"date": wv["label"] + (f" · {wv['badge']}" if wv["badge"] else ""), "tour": p["tour"], "tournament": r.get("tournament") or "", "surface": p["surface"],
+                         "bo": p["best_of"], "p1": p["p1"], "p2": p["p2"], "s1": V.short(p["p1"]), "s2": V.short(p["p2"]), "r1": rk(i1), "r2": rk(i2),
+                         "pp1": V.pct(mm["p1"]), "pp2": V.pct(mm["p2"]), "fair1": V.fair(mm["p1"]), "fair2": V.fair(mm["p2"]),
+                         "mk": V.pct(p["p_market"]) if p["p_market"] is not None else "–", "o1": odds[0], "o2": odds[1],
+                         "line": f"{line:g}", "over": V.pct(p_over), "over_b": V.pct((base.get("over") or {}).get(f"{float(line)}")),
+                         "tb": V.pct(mm["p_tb"]), "tb_b": V.pct(base.get("p_tb")), "games": f"{mm['games_mean']:.1f}",
+                         "sets": f"{top_set[0]} ({V.pct(top_set[1])})", "h2h": f"{h['w1']}–{h['w2']}" if h["n"] else "brak",
+                         "flag": flag, "f1": f1, "f2": f2, "warn": p["warn"]})
+        return render_template("print.html", rows=rows, tour=tour, version=__version__, auto=request.args.get("auto") == "1",
+                               now=pd.Timestamp.now(tz="Europe/Warsaw").strftime("%Y-%m-%d %H:%M"), R=request.script_root)
+
     @app.post("/upcoming/add")
     def upcoming_add():
         f = request.form
@@ -165,7 +229,7 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
         if not p1 or not p2 or p1 == p2:
             return page("Błąd", ("p", "Podaj dwóch różnych zawodników.")), 400
         row = {"source": "manual", "tour": tour, "tournament": f.get("tournament") or "", "surface": f.get("surface") or "Hard",
-               "best_of": 5 if f.get("bo") == "5" else 3, "date": f.get("date") or f"{pd.Timestamp.today():%Y-%m-%d}",
+               "best_of": 5 if f.get("bo") == "5" else 3, "date": _manual_date(f.get("date"), f.get("time")),
                "p1": p1, "p2": p2, "o1": _f(f.get("o1")), "o2": _f(f.get("o2")), "total_line": _f(f.get("total_line")),
                "o_over": _f(f.get("o_over")), "o_under": _f(f.get("o_under"))}
         db.upsert_upcoming(st.conn, [row])
@@ -409,8 +473,8 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
         k = f"{tour}|{name}"
         if k not in m.elo.r:
             return page("Zawodnik", ("p", f"Nie znaleziono {name} w bazie {tour}.")), 404
-        hist = m.elo.hist.get(k, [])[-120:]
-        spark = bets_mod.sparkline([v for _, v in hist], h=80) if len(hist) > 2 else ""
+        hist = list(m.elo.hist.get(k, []))
+        spark = bets_mod.sparkline(hist, h=80) if len(hist) > 2 else ""
         blocks = []
         for s in SURFACES:
             w, l = ft.surface_record(m.df, tour, name, s)

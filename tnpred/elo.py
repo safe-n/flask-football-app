@@ -6,6 +6,7 @@ Walk-forward: dla każdego meczu zapamiętujemy prognozę SPRZED meczu (do backt
 from __future__ import annotations
 
 import math
+from collections import deque
 
 import numpy as np
 import pandas as pd
@@ -46,7 +47,7 @@ class Elo:
         self.ns: dict[tuple[str, str], int] = {}
         self.last: dict[str, pd.Timestamp] = {}
         self.rank: dict[str, float] = {}
-        self.hist: dict[str, list[tuple]] = {}
+        self.hist: dict[str, deque] = {}     # ostatnie 120 ocen (wykres na stronie zawodnika)
 
     def _ensure(self, key: str, rank) -> None:
         if key not in self.r:
@@ -88,7 +89,7 @@ class Elo:
         self.ns[sl] += 1
         self.last[w] = self.last[l] = date
         for k in (w, l):
-            self.hist.setdefault(k, []).append((date, round(self.r[k], 1)))
+            self.hist.setdefault(k, deque(maxlen=120)).append(round(self.r[k], 1))
         return p
 
 

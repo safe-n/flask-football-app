@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
 
-from . import ai, avail, bets as bets_mod, bootstrap, h2h as h2h_mod, config, db, draws, gh_store, history, ledger, leagues as lg_cat, params as prm, profile as prof, recent as recent_mod, recent_vis, stats, suggest as sg
+from . import ai, avail, bets as bets_mod, pdfexport, bootstrap, h2h as h2h_mod, config, db, draws, gh_store, history, ledger, leagues as lg_cat, params as prm, profile as prof, recent as recent_mod, recent_vis, stats, suggest as sg
 from .betmarkets import GROUPS as BET_GROUPS, book_odds, catalogue, parse_leg
 from .odds import apply_blend, value_picks
 from .simulate import simulate_table
@@ -287,19 +287,23 @@ def create_app() -> Flask:
                     ("p", f"Tylko drużyny z bieżącego sezonu. Przewaga domowa: {np.exp(P.goals.ha):.2f}x goli. "
                           f"ridge={p['ridge']}, xi={p['xi']}, shot_weight={p.get('shot_weight', 0)}."), ("t", s))
 
-    @app.get("/recent")
-    def recent_page():
-        league = league_arg()
-        days = max(3, min(int(request.args.get("days", 10)), 30))
+    def recent_res(league: str, days: int) -> pd.DataFrame:
         P, p, df = model(league)
 
         def build():
             return recent_mod.recent_predictions(df, days, ridge=p["ridge"], xi=p["xi"], shot_weight=p.get("shot_weight", 0.0),
                                                  calib=p.get("draw_shift") or None)
-        res = cached(("recent", league, days), build)
+        return cached(("recent", league, days), build)
+
+    @app.get("/recent")
+    def recent_page():
+        league = league_arg()
+        days = max(3, min(int(request.args.get("days", 10)), 30))
+        res = recent_res(league, days)
         if res.empty:
             return page("Ostatnie mecze", league, ("p", f"Brak rozegranych meczów z ostatnich {days} dni w bazie."))
-        tabs = ("tabs", [(f"{d} dni", f"/recent?league={league}&days={d}") for d in (7, 14, 30)])
+        tabs = ("tabs", [(f"{d} dni", f"/recent?league={league}&days={d}") for d in (7, 14, 30)]
+                + [("📄 PDF (wszystkie ligi)", f"/export/recent.pdf?days={days}")])
         last = str(pd.to_datetime(res["date"]).max())[:10]
         fast = bootstrap.get_diag().get(league, {}).get("wyniki_szybkie", "brak informacji (odświeżanie jeszcze się nie wykonało)")
         return page(f"Ostatnie mecze · {lg_cat.name(league)}", league, tabs,
@@ -328,7 +332,8 @@ def create_app() -> Flask:
                    ("" if gh_store.enabled() else "UWAGA: trwałość dziennika jest wyłączona (brak GITHUB_TOKEN/GITHUB_REPO), "
                                                   "więc dziennik znika przy każdym restarcie serwisu."))
             return page("Dziennik prognoz", league, diag, ("p", why),
-                        ("tabs", [("Zobacz ostatnie mecze (retrospektywa)", f"/recent?league={league}")]))
+                        ("tabs", [("Zobacz ostatnie mecze (retrospektywa)", f"/recent?league={league}"),
+                                  ("📄 PDF dziennika (wszystkie ligi)", "/export/journal.pdf")]))
         hist = db.load_matches(conn, league)
         hist = hist[~hist["fixture_id"].isin(s["fixture_id"])]
         tab, sim = ledger.track_summary(s, base=ledger.league_base_rates(hist))
@@ -487,6 +492,60 @@ def create_app() -> Flask:
             abort(404)
         persist_bets()
         return redirect(url_for("bets_page", league=league_arg()))
+
+    def _pdf(data: bytes, name: str):
+        from flask import Response
+        return Response(data, mimetype="application/pdf", headers={"Content-Disposition": f'inline; filename="{name}"'})
+
+    @app.get("/export/recent.pdf")
+    def export_recent():
+        days = max(3, min(int(request.args.get("days", 14)), 30))
+        budget = float(request.args.get("budget", 85))
+        t0, sections, skipped = time.time(), [], []
+        for lg, _label in league_options():
+            if lg.startswith("DEMO"):
+                continue
+            if time.time() - t0 > budget:
+                skipped.append(lg_cat.name(lg) + " (limit czasu - spróbuj ponownie, modele są już w pamięci)")
+                continue
+            try:
+                res = recent_res(lg, days)
+            except Exception:  # noqa: BLE001 - brak danych ligi itp.
+                skipped.append(lg_cat.name(lg))
+                continue
+            if res.empty:
+                continue
+            sections.append((lg_cat.name(lg), recent_mod.summary(res), res))
+        return _pdf(pdfexport.recent_pdf(sections, days, skipped), f"ostatnie-{days}dni.pdf")
+
+    @app.get("/export/journal.pdf")
+    def export_journal():
+        conn = db.connect(config.DB_PATH)
+        sections = []
+        for lg, _label in league_options():
+            st = ledger.stats(conn, lg)
+            if not st["w_bazie"]:
+                continue
+            s = ledger.settled(conn, lg)
+            summ = pd.DataFrame()
+            if not s.empty:
+                hist = db.load_matches(conn, lg)
+                hist = hist[~hist["fixture_id"].isin(s["fixture_id"])]
+                summ, _ = ledger.track_summary(s, base=ledger.league_base_rates(hist) if len(hist) else None)
+            sections.append((lg_cat.name(lg), st, summ, s))
+        return _pdf(pdfexport.journal_pdf(sections), "dziennik.pdf")
+
+    @app.get("/export/coupon.pdf")
+    def export_coupon():
+        data, loading = compute_coupon(request.args.getlist("leg"), request.args.getlist("odds"))
+        if data is None:
+            return page("Zestawienie PDF", league_arg(), ("p", "Model tych lig jeszcze się liczy (to kilka sekund do minuty) - "
+                                                               "odśwież tę stronę za chwilę."), refresh=True), 202
+        try:
+            stake = float(request.args.get("stake", "").replace(",", ".")) or None
+        except ValueError:
+            stake = None
+        return _pdf(pdfexport.coupon_pdf(data, stake), "zestawienie.pdf")
 
     @app.get("/coupon")
     def coupon_page():

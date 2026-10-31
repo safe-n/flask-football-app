@@ -125,7 +125,7 @@ def upcoming(df: pd.DataFrame, n: int = 8, seed: int = 3) -> list[dict]:
             o1 = round(float(rng.uniform(1.3, 3.2)), 2)
             o2 = round(1 / max(1.05 - 1 / o1, 0.08), 2)
             out.append({"source": "demo", "tour": tour, "tournament": "Demo Indoor", "surface": "Hard",
-                        "best_of": 3, "date": (today + pd.Timedelta(days=1 + i // 4)).strftime("%Y-%m-%d"),
+                        "best_of": 3, "date": (pd.Timestamp.now(tz="UTC").floor("h") + pd.Timedelta(hours=-1 + 5 * i)).strftime("%Y-%m-%d %H:%M"),
                         "p1": names[i], "p2": names[i + 1], "o1": o1, "o2": o2,
                         "total_line": 22.5, "o_over": 1.87, "o_under": 1.93})
     return out

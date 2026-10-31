@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tenis – mecze {{ now[:10] }}{% if tour %} {{ tour }}{% endif %}</title>
+<style>
+@page{size:A4;margin:12mm 10mm}
+*{box-sizing:border-box}body{font:11px/1.35 system-ui,Arial,sans-serif;color:#111;background:#fff;margin:0 auto;padding:12px;max-width:820px}
+h1{font-size:17px;margin:0 0 2px}.sub{color:#555;font-size:10.5px;margin-bottom:10px}
+.bar{display:flex;gap:8px;margin:0 0 12px}.bar button,.bar a{font-size:14px;padding:6px 12px;border-radius:6px;border:1px solid #0b6e9e;background:#0b6e9e;color:#fff;text-decoration:none;cursor:pointer}
+.bar a{background:#fff;color:#0b6e9e}
+.m{border:1px solid #ccd3da;border-radius:6px;padding:7px 9px;margin:0 0 7px;break-inside:avoid;page-break-inside:avoid}
+.hd{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}.pl{font-weight:700;font-size:12.5px}.pl small{font-weight:400;color:#555}
+.meta{color:#555}
+table{width:100%;border-collapse:collapse;margin-top:5px}td,th{border-top:1px solid #e3e7eb;padding:2px 4px;text-align:left;vertical-align:top}
+th{font-weight:600;color:#444;width:22%}
+.W{color:#13803f;font-weight:700}.P{color:#c0392b;font-weight:700}.flag{color:#9a6700;font-weight:700}.warn{color:#9a6700}
+.foot{color:#666;font-size:9.5px;margin-top:10px}
+@media print{.bar{display:none}body{padding:0}}
+</style>
+</head>
+<body>
+<div class="bar"><button onclick="window.print()">📄 Zapisz jako PDF / drukuj</button><a href="{{ R }}/">← wróć</a></div>
+<h1>Tenis – nadchodzące mecze{% if tour %} ({{ tour }}){% endif %}</h1>
+<div class="sub">Wygenerowano {{ now }} · tnpred {{ version }} · szansa = model (Elo zmieszane z rynkiem, gdy są kursy) · „śr.” = średnia touru i nawierzchni (3 lata)</div>
+{% if not rows %}<p>Brak nadchodzących meczów.</p>{% endif %}
+{% for r in rows %}
+<div class="m">
+  <div class="hd"><span class="pl">{{ r.p1 }} <small>{{ r.r1 }}</small> – {{ r.p2 }} <small>{{ r.r2 }}</small>{% if r.flag %} <span class="flag">⚑</span>{% endif %}</span>
+    <span class="meta">{{ r.date }} · {{ r.tour }} · {{ r.tournament }} · {{ r.surface }} · Bo{{ r.bo }}</span></div>
+  <table>
+    <tr><th>Zwycięzca</th><td>{{ r.s1 }} <b>{{ r.pp1 }}</b> (uczciwy {{ r.fair1 }}, kurs {{ r.o1 }}) · {{ r.s2 }} <b>{{ r.pp2 }}</b> (uczciwy {{ r.fair2 }}, kurs {{ r.o2 }}) · rynek {{ r.mk }}</td></tr>
+    <tr><th>Gemy / tie-break</th><td>średnio {{ r.games }} · over {{ r.line }}: <b>{{ r.over }}</b> (śr. {{ r.over_b }}) · tie-break: <b>{{ r.tb }}</b> (śr. {{ r.tb_b }}) · najczęstszy wynik w setach {{ r.sets }}</td></tr>
+    <tr><th>H2H / forma</th><td>H2H {{ r.h2h }} · forma {{ r.s1 }}: {% for x in r.f1.split(' ') %}<span class="{{ x }}">{{ x }}</span> {% endfor %}· {{ r.s2 }}: {% for x in r.f2.split(' ') %}<span class="{{ x }}">{{ x }}</span> {% endfor %}</td></tr>
+    {% if r.warn %}<tr><th>Uwaga</th><td class="warn">{{ r.warn|join('; ') }}</td></tr>{% endif %}
+  </table>
+</div>
+{% endfor %}
+<div class="foot">Forma: W = wygrana, P = porażka, najnowsze z lewej. ⚑ = faworyt rzadko wygrywa z tym rywalem (mała próba). W nawiasie przy kursie: przewaga modelu nad kursem.
+Model ≈ rynek – to narzędzie do selekcji i oceny, nie „pewniaki”. Graj odpowiedzialnie.</div>
+{% if auto %}<script>window.addEventListener('load',function(){setTimeout(function(){window.print();},400);});</script>{% endif %}
+</body></html>

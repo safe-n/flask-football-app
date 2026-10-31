@@ -60,6 +60,9 @@ ODDS_MARKETS = os.getenv("TN_ODDS_MARKETS", "h2h")             # np. "h2h,totals
 ODDS_REFRESH_HOURS = float(os.getenv("TN_ODDS_REFRESH_HOURS", "12"))
 ODDS_MONTHLY_BUDGET = int(os.getenv("TN_ODDS_BUDGET", "450"))  # zostaw zapas z 500
 
+TZ = os.getenv("TN_TZ", "Europe/Warsaw")                       # strefa czasu do wyświetlania godzin meczów
+MATCH_HOURS = float(os.getenv("TN_MATCH_HOURS", "4"))          # po ilu godzinach od startu uznajemy mecz za „pewnie zakończony”
+
 # Model
 ELO_SURFACE_WEIGHT = float(os.getenv("TN_ELO_SURFACE_WEIGHT", "0.5"))  # 0 = tylko ogólne Elo, 1 = tylko nawierzchnia
 ELO_USE_RETIRED = _flag("TN_ELO_USE_RETIRED")                          # mecze skreczowane w Elo (domyślnie nie)

@@ -74,7 +74,7 @@ window.addEventListener('pageshow',function(){fbBadge();fbSync();});
 <h1>{{ title }}</h1>
 <nav><a href="/?league={{ league }}">Mecze</a><a href="/match?league={{ league }}">Mecz</a><a href="/suggest?league={{ league }}">Podpowiedzi</a><a href="/coupon?league={{ league }}">Zestawienie<span id="fb-badge"></span></a><a href="/draws?league={{ league }}">Remisy</a><a href="/stats?league={{ league }}">Statystyki</a>
 <a href="/table?league={{ league }}">Tabela</a><a href="/strengths?league={{ league }}">Siła drużyn</a>
-<a href="/recent?league={{ league }}">Ostatnie</a><a href="/track?league={{ league }}">Dziennik</a><a href="/bets?league={{ league }}">Moje zakłady</a><a href="/data?league={{ league }}">Dane</a></nav>
+<a href="/recent?league={{ league }}">Ostatnie</a><a href="/track?league={{ league }}">Dziennik</a><a href="/bets?league={{ league }}">Moje zakłady</a><a href="/data?league={{ league }}">Dane</a><a href="/tennis/" title="Tenis">🎾 Tenis</a></nav>
 <form method="get" action="{{ request.path }}"><select name="league" onchange="this.form.submit()">
 {% for code, lab in leagues %}<option value="{{ code }}" {{ 'selected' if code == league }}>{{ lab }}</option>{% endfor %}
 </select></form>

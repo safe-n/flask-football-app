@@ -221,6 +221,23 @@ class OddsApiParse(unittest.TestCase):
         self.assertEqual(r["total_line"], 33.5)
 
 
+class StartTimes(unittest.TestCase):
+    def test_when_statuses(self):
+        from tnpred import views as V
+        now = pd.Timestamp("2026-10-31 12:00", tz="UTC")
+        self.assertEqual(V.when("2026-10-31 13:00", now)["status"], "soon")
+        self.assertEqual(V.when("2026-10-31 13:00", now)["time"], "14:00")      # czas polski (UTC+1)
+        self.assertEqual(V.when("2026-10-31 11:00", now)["status"], "live")
+        self.assertEqual(V.when("2026-10-31 06:00", now)["status"], "done")
+        self.assertEqual(V.when("2026-11-02", now)["status"], "future")
+        self.assertIn("godz. nieznana", V.when("2026-11-02", now)["label"])
+
+    def test_manual_time_to_utc(self):
+        from tnpred.web import _manual_date
+        self.assertEqual(_manual_date("2026-11-02", "14:30"), "2026-11-02 13:30")
+        self.assertEqual(_manual_date("2026-11-02", ""), "2026-11-02")
+
+
 class AppTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -263,6 +280,23 @@ class AppTests(unittest.TestCase):
         self.assertTrue(((ledger.load(self.st.conn).p1 == a)).any())
         txt, n = bootstrap.manual_export(self.st)
         self.assertGreaterEqual(n, 1)
+
+    def test_started_match_keeps_prematch_odds(self):
+        past = (pd.Timestamp.now(tz="UTC") - pd.Timedelta(hours=1)).strftime("%Y-%m-%d %H:%M")
+        a, b = self.st.get_model().players("ATP")[5:7]
+        db.upsert_upcoming(self.st.conn, [{"source": "oddsapi", "tour": "ATP", "tournament": "T", "surface": "Hard", "best_of": 3,
+                                           "date": past, "p1": a, "p2": b, "o1": 1.8, "o2": 2.0}])
+        rows = bootstrap.keep_prematch_odds(self.st, [{"tour": "ATP", "date": past, "p1": a, "p2": b, "o1": 1.1, "o2": 7.0}])
+        self.assertEqual(rows, [])
+        html = self.c.get("/").data.decode()
+        self.assertIn("rozpoczęty", html)
+
+    def test_print_view(self):
+        r = self.c.get("/print")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"Zapisz jako PDF", r.data)
+        self.assertIn(b'class="m"', r.data)
+        self.assertIn(b"/print?auto=1", self.c.get("/").data)
 
     def test_mounted_under_prefix(self):
         from werkzeug.middleware.dispatcher import DispatcherMiddleware

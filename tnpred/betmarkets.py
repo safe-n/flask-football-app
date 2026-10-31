@@ -7,6 +7,13 @@ Krecz / walkower: typ = zwrot (zasady bukmacherów się różnią - sprawdź u s
 """
 from __future__ import annotations
 
+def _short(name: str) -> str:
+    toks = str(name or "").split()
+    while len(toks) > 1 and toks[-1].endswith("."):
+        toks.pop()
+    return " ".join(toks)
+
+
 GROUPS = ["Zwycięzca", "Gemy", "Handicap", "Sety", "Tie-break", "1. set"]
 SEP = "~"
 
@@ -30,7 +37,7 @@ def catalogue(pred: dict) -> dict[str, dict]:
         inv = ("+" if h.startswith("-") else "-") + h[1:]
         add(f"h2{inv}", f"{b} {inv} gemów", "Handicap", 1 - p)
     for sc, p in m["sets"].items():
-        add(f"s{sc}", f"Wynik w setach {sc} ({a.split()[0]}–{b.split()[0]})", "Sety", p)
+        add(f"s{sc}", f"Wynik w setach {sc} ({_short(a)}–{_short(b)})", "Sety", p)
     add("ws1", f"{a} wygra co najmniej seta", "Sety", m["win_a_set"]["1"])
     add("ws2", f"{b} wygra co najmniej seta", "Sety", m["win_a_set"]["2"])
     add("tb", "Tie-break w meczu – tak", "Tie-break", m["p_tb"])

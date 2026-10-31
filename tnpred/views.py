@@ -9,6 +9,53 @@ from . import betmarkets as bm, features as ft
 from .odds import edge, kelly, valid
 
 
+DNI = ["pon", "wt", "śr", "czw", "pt", "sob", "nd"]
+
+
+def start_time(date_str):
+    """Czas startu (UTC, z The Odds API albo z formularza). None, gdy znamy tylko dzień."""
+    import pandas as pd
+    s = str(date_str or "").strip()
+    if len(s) < 16 or ":" not in s:
+        return None
+    try:
+        return pd.Timestamp(s[:16].replace("T", " "), tz="UTC")
+    except (ValueError, TypeError):
+        return None
+
+
+def when(date_str, now=None) -> dict:
+    """Godzina startu w czasie lokalnym i status: przed / wkrótce / trwa / zakończony?"""
+    import pandas as pd
+    from . import config
+    now = now if now is not None else pd.Timestamp.now(tz="UTC")
+    t = start_time(date_str)
+    if t is None:
+        d = pd.Timestamp(str(date_str)[:10])
+        today = now.tz_convert(config.TZ).normalize().tz_localize(None)
+        st = "today" if d == today else ("past" if d < today else "future")
+        return {"day": str(date_str)[:10], "label": f"{DNI[d.weekday()]} {d:%d.%m}, godz. nieznana", "time": "",
+                "status": st, "badge": "dziś" if st == "today" else ("minął" if st == "past" else "")}
+    loc = t.tz_convert(config.TZ)
+    mins = (t - now).total_seconds() / 60
+    if mins > 0:
+        status = "soon" if mins <= 90 else "future"
+        badge = (f"za {int(mins)} min" if mins < 60 else f"za {int(mins // 60)} h {int(mins % 60)} min") if mins <= 12 * 60 else ""
+    elif -mins <= config.MATCH_HOURS * 60:
+        status, badge = "live", "▶ rozpoczęty"
+    else:
+        status, badge = "done", "zakończony?"
+    return {"day": f"{loc:%Y-%m-%d}", "label": f"{DNI[loc.weekday()]} {loc:%d.%m} {loc:%H:%M}", "time": f"{loc:%H:%M}",
+            "status": status, "badge": badge}
+
+
+def status_chip(w: dict) -> str:
+    if not w["badge"]:
+        return ""
+    cls = {"live": "live", "soon": "soon", "done": "done", "today": "soon", "past": "done"}.get(w["status"], "")
+    return f'<span class="chip {cls}">{escape(w["badge"])}</span>'
+
+
 def pct(x, d=0) -> str:
     if x is None or (isinstance(x, float) and math.isnan(x)):
         return "–"
@@ -44,7 +91,11 @@ def fair(p) -> str:
 
 
 def short(name: str) -> str:
-    return str(name).split(" ")[0] if name else ""
+    """„De Vries L.” -> „De Vries”, „Kwon S.W.” -> „Kwon” (nazwisko bez inicjałów)."""
+    toks = str(name or "").split()
+    while len(toks) > 1 and toks[-1].endswith("."):
+        toks.pop()
+    return " ".join(toks)
 
 
 def tiles_for(pred: dict, line: float | None, hl_pp: float) -> str:

@@ -45,6 +45,24 @@ def final_tb(best_of: int, series: str | None = None) -> int:
     return 10 if best_of == 5 or (series or "").lower().startswith("grand") else 7
 
 
+KEEP = ["date", "tour", "tournament", "series", "surface", "round", "best_of", "winner", "loser", "wrank", "lrank",
+        "w1", "l1", "w2", "l2", "w3", "l3", "w4", "l4", "w5", "l5", "lsets", "comment", "psw", "psl",
+        "games_w", "games_l", "total_games", "n_tb", "completed", "retired", "p_elo_w", "p_mkt_w"]
+CATS = ["tour", "tournament", "series", "surface", "round", "winner", "loser", "comment"]
+
+
+def slim(df: pd.DataFrame) -> pd.DataFrame:
+    """Tylko potrzebne kolumny; teksty jako kategorie, liczby jako float32 - kilka razy mniej pamięci (Render: 512 MB)."""
+    df = df[[c for c in KEEP if c in df.columns]].copy()
+    for c in CATS:
+        if c in df.columns:
+            df[c] = df[c].astype(str).astype("category")
+    for c in df.columns:
+        if c not in CATS and c not in ("date", "completed", "retired", "p_elo_w", "p_mkt_w") and df[c].dtype.kind == "f":
+            df[c] = df[c].astype("float32")
+    return df.reset_index(drop=True)
+
+
 class TennisModel:
     def __init__(self, matches: pd.DataFrame, params: dict | None = None):
         self.params = params if params is not None else load_params()
@@ -55,7 +73,7 @@ class TennisModel:
         mk = [market_pair(a, b) for a, b in zip(df.get("psw", []), df.get("psl", []))]
         mk2 = [market_pair(a, b) for a, b in zip(df.get("avgw", []), df.get("avgl", []))]
         df["p_mkt_w"] = [m[0] if m else (m2[0] if m2 else np.nan) for m, m2 in zip(mk, mk2)]
-        self.df = df
+        self.df = slim(df)
         self.s0 = {**S0_DEFAULT, **self.params.get("s0", {})}
         self.w = {**W_DEFAULT, **self.params.get("blend_w", {})}
         self.names = {t: NameIndex(pd.concat([df[df.tour == t].winner, df[df.tour == t].loser]).astype(str).tolist())

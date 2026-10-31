@@ -13,6 +13,17 @@ from .model import TennisModel, load_params, save_params
 from .names import norm
 
 
+def free_memory() -> None:
+    """Oddaje zwolnioną pamięć systemowi (glibc trzyma ją „na zapas”, a Render liczy ją jako zajętą)."""
+    import ctypes
+    import gc
+    gc.collect()
+    try:
+        ctypes.CDLL("libc.so.6").malloc_trim(0)
+    except (OSError, AttributeError):
+        pass
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -43,9 +54,12 @@ class State:
             with self.model_lock:
                 if self.model is None or self.model_version != self.data_version:
                     v = self.data_version
-                    self.model = TennisModel(db.load_matches(self.conn))
+                    self.model = None
                     self._lookup = None
+                    free_memory()
+                    self.model = TennisModel(db.load_matches(self.conn))
                     self.model_version = v
+                    free_memory()
         return self.model
 
     def lookup(self, tour, date, p1, p2):
@@ -53,13 +67,20 @@ class State:
         m = self.get_model()
         if self._lookup is None:
             idx: dict = {}
-            for r in m.df.to_dict("records"):
-                idx.setdefault((r["tour"], frozenset((r["winner"], r["loser"]))), []).append(r)
+            for i, (t, w, l) in enumerate(zip(m.df.tour.astype(str), m.df.winner.astype(str), m.df.loser.astype(str))):
+                idx.setdefault((t, frozenset((w, l))), []).append(i)
             self._lookup = idx
         rows = self._lookup.get((tour, frozenset((p1, p2))), [])
         d = pd.Timestamp(str(date)[:10])
-        best = [r for r in rows if d - pd.Timedelta(days=3) <= r["date"] <= d + pd.Timedelta(days=4)]
-        return best[0] if best else None
+        dates = m.df["date"]
+        for i in rows:
+            if d - pd.Timedelta(days=3) <= dates.iat[i] <= d + pd.Timedelta(days=4):
+                r = m.df.iloc[i].to_dict()
+                for c in ("tour", "winner", "loser", "comment", "tournament", "surface", "round", "series"):
+                    if c in r:
+                        r[c] = str(r[c])
+                return r
+        return None
 
     def mark_changed(self) -> None:
         self.data_version += 1
@@ -79,6 +100,8 @@ def load_local(st: State) -> int:
         st.step("demo", True, f"TN_DEMO=1: {len(demo)} meczów syntetycznych (NIE są prawdziwe)")
         n = len(demo)
     st.step("historia z repo", True, f"{len(df)} meczów z folderu {config.HISTORY_DIR.name}/")
+    del df
+    free_memory()
     st.mark_changed()
     return n
 
@@ -145,6 +168,7 @@ def fetch_odds(st: State, force: bool = False) -> int:
     except Exception as e:  # noqa: BLE001
         st.step("kursy (The Odds API)", False, str(e))
         return 0
+    rows = keep_prematch_odds(st, rows)
     n = db.upsert_upcoming(st.conn, rows)
     db.meta_set(st.conn, "odds_at", _now())
     q = info.get("quota") or {}
@@ -152,6 +176,24 @@ def fetch_odds(st: State, force: bool = False) -> int:
             f"{n} meczów; kredyty: zostało {q.get('remaining')}, zużyto {q.get('used')}" +
             (f"; problemy: {'; '.join(info['errors'][:3])}" if info["errors"] else ""))
     return n
+
+
+def keep_prematch_odds(st: State, rows: list[dict]) -> list[dict]:
+    """Mecz już trwa -> The Odds API zwraca kursy NA ŻYWO. Zostawiamy zapisane kursy sprzed meczu (albo żadnych)."""
+    from .views import start_time
+    now = pd.Timestamp.now(tz="UTC")
+    have = db.load_upcoming(st.conn, include_past_days=2)
+    known = set(have.id) if len(have) else set()
+    out = []
+    for r in rows:
+        t = start_time(r.get("date"))
+        if t is not None and t <= now:
+            if db.up_id(r["tour"], r["date"], r["p1"], r["p2"]) in known:
+                continue
+            r = {**r, "o1": None, "o2": None, "total_line": None, "o_over": None, "o_under": None,
+                 "hcp_line": None, "o_h1": None, "o_h2": None}
+        out.append(r)
+    return out
 
 
 def prune_played(st: State) -> int:
@@ -277,6 +319,7 @@ def refresh(st: State, force: bool = False, network: bool = True) -> None:
         if network:
             sync_up(st)
         st.diag["refreshed_at"] = _now()
+        free_memory()
     except Exception as e:  # noqa: BLE001
         st.step("odświeżanie", False, f"{e}\n{traceback.format_exc()[-800:]}")
     finally:

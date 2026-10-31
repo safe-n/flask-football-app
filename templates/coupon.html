@@ -83,6 +83,8 @@ function render(d,c){
   box.appendChild(t);
   var panel=el('div',undefined,'card');panel.style.marginTop='10px';box.appendChild(panel);ako(d,inps,panel);
   var s=el('div',d.podsumowanie,'m');s.style.whiteSpace='pre-wrap';s.style.marginTop='10px';box.appendChild(s);
+  var pdf=el('a','📄 Pobierz PDF');pdf.className='add';pdf.style.display='inline-block';pdf.style.marginTop='10px';pdf.style.marginRight='8px';pdf.style.textDecoration='none';
+  var qp=query(c);try{qp.append('stake',localStorage.getItem('fb_stake')||'');}catch(e){}pdf.href='/export/coupon.pdf?'+qp.toString();pdf.target='_blank';box.appendChild(pdf);
   var clr=el('button','Wyczyść zestawienie');clr.addEventListener('click',function(){fbSave([]);draw();});clr.style.marginTop='10px';box.appendChild(clr);
 }
 var ai=document.getElementById('aibtn');
