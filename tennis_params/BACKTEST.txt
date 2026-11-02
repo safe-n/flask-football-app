@@ -1,0 +1,35 @@
+{
+ "n": 5045,
+ "acc_elo": 0.6517,
+ "ll_elo": 0.6277,
+ "n_mkt": 5044,
+ "ll_elo_mkt": 0.6276,
+ "ll_market": 0.5865,
+ "ll_blend": 0.5865,
+ "acc_market": 0.6838,
+ "acc_blend": 0.6838,
+ "brier_elo": 0.2185,
+ "brier_market": 0.2013,
+ "brier_blend": 0.2013,
+ "n_games": 4900,
+ "games_mean_pred": 25.6002,
+ "games_mean_real": 24.2684,
+ "games_mae": 5.5294,
+ "over_pred": 0.5241,
+ "over_real": 0.4322,
+ "over_brier": 0.2495,
+ "over_brier_base": 0.2454,
+ "tb_pred": 0.3655,
+ "tb_real": 0.3333,
+ "tb_brier": 0.2106,
+ "tb_brier_base": 0.2222,
+ "straight_pred": 0.534,
+ "straight_real": 0.6188
+}
+ROI mieszanka: {'n': 0} | samo Elo: {'n': 242, 'zysk': -34.070000529289246, 'roi': -0.14078512615408778, 'se': 0.0688319747847034, 'trafnosc': 0.44214876033057854}
+     0–20%  n=  467  model 12%  faktycznie 12%
+    20–35%  n=  878  model 28%  faktycznie 29%
+    35–50%  n= 1116  model 42%  faktycznie 43%
+    50–65%  n= 1109  model 58%  faktycznie 58%
+    65–80%  n=  956  model 72%  faktycznie 71%
+   80–100%  n=  519  model 87%  faktycznie 87%
