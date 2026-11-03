@@ -615,6 +615,15 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
                      "tennis-data.co.uk nie wpuszcza serwerów Rendera ani GitHuba, a sama strona nie zawsze aktualizuje pliki codziennie."
                      + (' <span class="warn">Dane mają ponad 3 dni - sprawdź, czy zadanie na komputerze działa (plik tennis_update.log).</span>' if age > 3 else "") + "</p></div>")
         busy = ""
+        last_step = max((x["czas"] for x in st.diag["kroki"]), default=None)
+        idle = (pd.Timestamp.now(tz="UTC") - pd.Timestamp(last_step)).total_seconds() / 60 if last_step else 0
+        alive = any(t.ident == st.bg_thread for t in threading.enumerate()) if st.bg_thread else None
+        if config.AUTO_BOOTSTRAP and st.bg_thread is None and idle > 2:
+            busy += '<div class="warn m">Wątek tła nie wystartował - wyślij zrzut tej strony.</div>'
+        elif alive is False:
+            busy += '<div class="warn m">Wątek tła zakończył się - błąd powinien być w tabeli niżej („wątek tła”).</div>'
+        elif not st.refreshing and idle > 5 and len(st.diag["kroki"]) < 4:
+            busy += f'<div class="warn m" style="white-space:normal">Brak postępu od {idle:.0f} min. Wątek stoi w: {escape(bootstrap.stuck_where(st))}</div>'
         if st.refreshing and st.refresh_started:
             mins = (time.time() - st.refresh_started) / 60
             busy = f"trwa odświeżanie ({mins:.0f} min)…"

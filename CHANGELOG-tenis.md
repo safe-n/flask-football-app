@@ -1,3 +1,8 @@
+## 0.3.3 - mecze z kursami nie czekają na GitHuba; wątek tła widoczny w Dane
+- Na Renderze wątek w tle nie zapisywał żadnego kroku (od początku): stał albo kończył się błędem bez śladu - a kursy
+  The Odds API pobierały się dopiero na końcu, więc znikały mecze. Teraz kursy idą PIERWSZE, każdy błąd wątku trafia
+  do tabeli w Dane („wątek tła: …”), a gdy brak postępu - Dane pokazują, w którym miejscu kodu wątek stoi.
+
 ## 0.3.2 - wersja na górze strony + sprawdzanie tokenu GitHub
 - Na górze każdej strony: „tenis vX.Y.Z · commit abc1234 · start dd.mm hh:mm” - widać, która wersja jest wgrana i kiedy serwer wystartował.
 - Zakładka Dane: krok „GitHub: token” mówi wprost, czy token widzi repo i może do niego pisać (bez tego dziennik, zakłady

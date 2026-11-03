@@ -17,7 +17,7 @@ def stuck_where(st: State) -> str:
     """Gdzie stoi wątek odświeżania (diagnostyka zawieszeń - widoczne w zakładce Dane)."""
     import sys
     import traceback
-    fr = sys._current_frames().get(st.refresh_thread or -1)
+    fr = sys._current_frames().get(st.refresh_thread or -1) or sys._current_frames().get(st.bg_thread or -1)
     if fr is None:
         return ""
     lines = [f"{f.filename.rsplit('/', 2)[-1]}:{f.lineno} {f.name}" for f in traceback.extract_stack(fr)[-6:]]
@@ -53,6 +53,7 @@ class State:
         self.refreshing = False
         self.refresh_started: float | None = None
         self.refresh_thread: int | None = None
+        self.bg_thread: int | None = None
         self._lookup = None
 
     # ------------------------------------------------------------------ diagnostyka
@@ -380,14 +381,13 @@ def refresh(st: State, force: bool = False, network: bool = True) -> None:
     st.step("odświeżanie", True, "start")
     try:
         if network:
+            fetch_odds(st, force=force)       # najpierw mecze z kursami - nie mogą czekać na GitHuba ani tennis-data
             sync_history(st)
             fetch_results(st, force=force)
         m = st.get_model()
         st.step("model", True, f"{len(m.df)} meczów, {sum(1 for _ in m.elo.r)} zawodników; ostatni mecz {m.df.date.max():%Y-%m-%d}"
                 if len(m.df) else "brak meczów w bazie")
         autotune(st)
-        if network:
-            fetch_odds(st, force=force)
         pr = prune_played(st)
         lg = log_predictions(st)
         sb = bets_mod.settle_open(st.conn, st.lookup)
@@ -405,11 +405,21 @@ def refresh(st: State, force: bool = False, network: bool = True) -> None:
 
 
 def start_background(st: State) -> None:
-    """Start: GitHub -> pełne odświeżenie; potem pętla co TN_REFRESH_HOURS."""
+    """Wątek w tle: najpierw kursy i model (nie zależą od GitHuba), potem GitHub; dalej pętla co TN_REFRESH_HOURS.
+    Każdy błąd - także taki, który wcześniej po cichu kończył wątek - trafia do zakładki Dane."""
+    def guarded(name, fn):
+        try:
+            fn()
+        except BaseException as e:  # noqa: BLE001 - wątek tła nie może zginąć bez śladu
+            st.step(f"wątek tła: {name}", False, f"{type(e).__name__}: {e}\n{traceback.format_exc()[-700:]}")
+
     def loop():
-        sync_down(st)
-        refresh(st)
+        st.bg_thread = threading.get_ident()
+        st.step("wątek tła", True, "start")
+        guarded("odświeżanie", lambda: refresh(st))
+        guarded("GitHub", lambda: sync_down(st))
         while config.REFRESH_HOURS > 0:
             time.sleep(max(600, config.REFRESH_HOURS * 3600))
-            refresh(st)
+            guarded("odświeżanie", lambda: refresh(st))
+
     threading.Thread(target=loop, daemon=True, name="tnpred-refresh").start()
