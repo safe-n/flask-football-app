@@ -167,8 +167,11 @@ def history_surface_lookup(st: State):
     df = m.df
     if df.empty:
         return lambda title: None
-    last = df.sort_values("date").groupby("location").surface.last().to_dict()
-    last.update(df.sort_values("date").groupby("tournament").surface.last().to_dict())
+    last: dict = {}
+    for col in ("location", "tournament"):          # „location” nie ma w odchudzonych danych modelu - bierzemy, co jest
+        if col in df.columns:
+            g = df[[col, "surface", "date"]].sort_values("date").groupby(col, observed=True).surface.last()
+            last.update({str(k): str(v) for k, v in g.items()})
     keys = {norm(k): v for k, v in last.items() if k}
 
     def look(title: str):

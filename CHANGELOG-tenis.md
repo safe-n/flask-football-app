@@ -1,3 +1,7 @@
+## 0.3.6 - BŁĄD: od 0.2.0 nie pobierały się mecze z kursami
+- Przy odchudzaniu danych (0.2.0) zniknęła kolumna „location”, z której korzystało dopasowanie nawierzchni turnieju
+  z The Odds API -> krok „kursy” kończył się błędem 'location' i lista meczów zostawała pusta. Naprawione + test regresji.
+
 ## 0.3.5 - szybkie ładowanie strony Mecze
 - „Forma dnia” (0.3.0) spowolniła liczenie meczu ok. 10×: przy kilkudziesięciu meczach z kursami strona Mecze na Renderze
   liczyła się ponad minutę i nie ładowała się. Teraz: tablica szansa→serwis liczona raz na tour+nawierzchnię (interpolacja

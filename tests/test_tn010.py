@@ -363,6 +363,23 @@ class AppTests(unittest.TestCase):
         for v in s0.values():
             self.assertTrue(0.5 <= v < 0.72, s0)
 
+    def test_fetch_odds_with_slim_model_data(self):
+        """Regresja: od 0.2.0 dane modelu nie mają kolumny location - pobieranie kursów wywracało się (KeyError)."""
+        from unittest import mock
+        from tnpred import oddsapi
+        seen = {}
+
+        def fake_fetch(resolve=None, history_lookup=None, tours=None):
+            seen["surface"] = history_lookup("ATP Doha Open")
+            a, b = self.st.get_model().players("ATP")[:2]
+            return [{"source": "oddsapi", "tour": "ATP", "tournament": "ATP Doha", "surface": "Hard", "best_of": 3,
+                     "date": "2099-01-01 12:00", "p1": a, "p2": b, "o1": 1.9, "o2": 1.9}], {"quota": {"remaining": "400"}, "errors": []}
+        db.meta_set(self.st.conn, "odds_at", "2000-01-01T00:00:00+00:00")
+        with mock.patch.object(oddsapi, "enabled", return_value=True), mock.patch.object(oddsapi, "fetch_all", side_effect=fake_fetch):
+            n = bootstrap.fetch_odds(self.st, force=True)
+        self.assertEqual(n, 1)
+        self.assertEqual(seen["surface"], "Hard")
+
     def test_print_view(self):
         r = self.c.get("/print")
         self.assertEqual(r.status_code, 200)
