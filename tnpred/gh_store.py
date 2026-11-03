@@ -62,6 +62,9 @@ def check() -> tuple[bool, str]:
     if r.status_code == 404:
         return False, (f"token nie widzi repo „{config.GITHUB_REPO}” - sprawdź GITHUB_REPO (ma być safe-n/flask-football-app) "
                        f"i czy token ma dostęp do tego repo")
+    if config.GITHUB_REPO_RAW != config.GITHUB_REPO:
+        return True, (f"token OK, repo {config.GITHUB_REPO} - UWAGA: zmienna GITHUB_REPO zawiera dodatkowe znaki "
+                      f"({config.GITHUB_REPO_RAW!r}); popraw ją w Render → Environment (dla piłki też)")
     if r.status_code != 200:
         return False, f"GitHub odpowiedział HTTP {r.status_code}"
     perm = (r.json().get("permissions") or {})

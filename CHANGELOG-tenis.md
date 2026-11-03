@@ -1,3 +1,8 @@
+## 0.3.4 - odporność na błędną wartość GITHUB_REPO
+- Render: GITHUB_REPO zawierał enter i dopisek („safe-n/flask-football-app⏎2”) - GitHub odpowiadał 404, przez co dziennik,
+  zakłady i wyniki z GitHuba nigdy się nie zapisywały/wczytywały. Tenis bierze teraz tylko pierwsze słowo zmiennej
+  i ostrzega w Dane, że wartość warto poprawić (piłka korzysta z tej samej zmiennej).
+
 ## 0.3.3 - mecze z kursami nie czekają na GitHuba; wątek tła widoczny w Dane
 - Na Renderze wątek w tle nie zapisywał żadnego kroku (od początku): stał albo kończył się błędem bez śladu - a kursy
   The Odds API pobierały się dopiero na końcu, więc znikały mecze. Teraz kursy idą PIERWSZE, każdy błąd wątku trafia

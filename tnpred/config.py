@@ -73,7 +73,9 @@ LOG_HORIZON_DAYS = int(os.getenv("TN_LOG_HORIZON_DAYS", "4"))
 
 # Trwałość (jak w football): CSV w osobnej gałęzi repo przez GitHub REST API
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
-GITHUB_REPO = os.getenv("GITHUB_REPO", "")
+GITHUB_REPO_RAW = os.getenv("GITHUB_REPO", "")
+# tylko pierwsze „słowo” - wklejona wartość potrafi mieć spację, enter albo dopisek (Render: "safe-n/flask-football-app\n2")
+GITHUB_REPO = (GITHUB_REPO_RAW.split() or [""])[0].strip().strip('"\'')
 LEDGER_BRANCH = os.getenv("TN_LEDGER_BRANCH", os.getenv("LEDGER_BRANCH", "ledger-data"))
 LEDGER_PREFIX = os.getenv("TN_LEDGER_PREFIX", "tennis/")      # folder w gałęzi - nie miesza się z plikami football
 
