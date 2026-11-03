@@ -1,3 +1,17 @@
+## 0.3.2 - wersja na górze strony + sprawdzanie tokenu GitHub
+- Na górze każdej strony: „tenis vX.Y.Z · commit abc1234 · start dd.mm hh:mm” - widać, która wersja jest wgrana i kiedy serwer wystartował.
+- Zakładka Dane: krok „GitHub: token” mówi wprost, czy token widzi repo i może do niego pisać (bez tego dziennik, zakłady
+  i codzienne wyniki nie działają).
+
+## 0.3.1 - codzienna aktualizacja wyników bez Commit/Push
+- `python -m tnpred push-history` (albo dwuklik `aktualizuj_tenis.bat`): pobiera bieżący rok z tennis-data.co.uk na Twoim
+  komputerze i wysyła go prosto do GitHuba (gałąź ledger-data, folder tennis/history) razem z parametrami modelu.
+  Nie zmienia plików w folderze repo i nie przebudowuje Rendera. Wysyła tylko to, co się zmieniło.
+- `python -m tnpred install-task`: zadanie w Harmonogramie zadań Windows - aktualizacja co 4 h, gdy komputer jest włączony
+  (`--every 6` zmienia odstęp, `--remove` usuwa). Dziennik: tennis_update.log.
+- Aplikacja sprawdza nowe wyniki w GitHubie co 3 h (TN_REFRESH_HOURS) i od razu po „Odśwież teraz”; pobiera tylko zmienione pliki.
+- Zakładka Dane: ostrzeżenie, gdy dane mają ponad 3 dni.
+
 ## 0.3.0 - model gemów skalibrowany na prawdziwych danych („forma dnia”)
 - BŁĄD wykryty backtestem na historii 2022-26: model przewidywał 25,6 gema na mecz (realnie 24,3), over 22.5 w 52% meczów
   (realnie 43%) i 53% meczów bez straty seta (realnie 62%). Kafelki „Over” i „Tie-break” były więc prawie zawsze zielone,

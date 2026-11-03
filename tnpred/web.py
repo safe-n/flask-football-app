@@ -26,6 +26,17 @@ def _f(x):
         return None
 
 
+def _build_info() -> str:
+    """Commit i czas startu serwera (Render podaje RENDER_GIT_COMMIT) - widać, czy wgrała się nowa wersja."""
+    import os
+    c = (os.getenv("RENDER_GIT_COMMIT") or "")[:7]
+    started = pd.Timestamp.now(tz=config.TZ).strftime("%d.%m %H:%M")
+    return (f"commit {c} · " if c else "") + f"start {started}"
+
+
+BUILD = _build_info()
+
+
 def _manual_date(day, hhmm) -> str:
     """Data z formularza; z godziną -> zapis w UTC (jak z The Odds API), bez godziny -> sam dzień."""
     day = day or f"{pd.Timestamp.today():%Y-%m-%d}"
@@ -68,7 +79,7 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
         return val
 
     def render(tpl, title, **kw):
-        return render_template(tpl, title=title, nav=NAV, R=request.script_root, version=__version__,
+        return render_template(tpl, title=title, nav=NAV, R=request.script_root, version=__version__, build=BUILD,
                                football=config.FOOTBALL_LINK, **kw)
 
     def page(title, *blocks, refresh=False):
@@ -599,9 +610,10 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
         if last is not None:
             age = (pd.Timestamp.today().normalize() - last).days
             fresh = (f'<div class="card"><p class="m">Ostatni mecz w bazie: <b>{last:%Y-%m-%d}</b> ({age} dni temu). '
-                     "Nowe wyniki dodajesz u siebie: <code>python -m tnpred fetch-history</code>, potem Commit + Push w GitHub Desktop "
-                     "(tennis-data.co.uk nie wpuszcza serwerów Rendera ani GitHuba; sama strona aktualizuje pliki zwykle raz w tygodniu)."
-                     + (' <span class="warn">Dane mają ponad tydzień - czas na aktualizację.</span>' if age > 8 else "") + "</p></div>")
+                     "Nowe wyniki wysyła Twój komputer: zaplanowane zadanie (<code>python -m tnpred install-task</code>) albo dwuklik "
+                     "<code>aktualizuj_tenis.bat</code>; aplikacja sprawdza je co ok. 3 h (lub kliknij „Odśwież teraz”). "
+                     "tennis-data.co.uk nie wpuszcza serwerów Rendera ani GitHuba, a sama strona nie zawsze aktualizuje pliki codziennie."
+                     + (' <span class="warn">Dane mają ponad 3 dni - sprawdź, czy zadanie na komputerze działa (plik tennis_update.log).</span>' if age > 3 else "") + "</p></div>")
         busy = ""
         if st.refreshing and st.refresh_started:
             mins = (time.time() - st.refresh_started) / 60

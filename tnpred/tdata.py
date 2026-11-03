@@ -83,6 +83,17 @@ def history_file(tour: str, year: int) -> Path:
     return config.HISTORY_DIR / f"{tour}_{year}.csv"
 
 
+def history_text(df: pd.DataFrame) -> str:
+    out = df.copy()
+    out["date"] = pd.to_datetime(out["date"]).dt.strftime("%Y-%m-%d")
+    return out.to_csv(index=False)
+
+
+def read_csv_text(text: str) -> pd.DataFrame:
+    import io as _io
+    return _from_norm(pd.read_csv(_io.StringIO(text)))
+
+
 def save_history(df: pd.DataFrame, tour: str, year: int) -> Path:
     p = history_file(tour, year)
     p.parent.mkdir(parents=True, exist_ok=True)

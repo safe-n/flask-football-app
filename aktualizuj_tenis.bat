@@ -1,8 +1,6 @@
 @echo off
-REM Aktualizacja historii tenisa: pobiera biezacy rok z tennis-data.co.uk i stroi model.
-REM Potem otworz GitHub Desktop: Commit to master, Push origin.
+REM Recznie (dwuklik): pobiera biezacy rok z tennis-data.co.uk i wysyla do GitHuba - bez Commit/Push.
 cd /d "%~dp0"
-python -m tnpred fetch-history
+python -m tnpred push-history
 echo.
-echo Teraz w GitHub Desktop: Commit to master, potem Push origin.
 pause

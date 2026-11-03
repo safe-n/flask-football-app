@@ -127,8 +127,8 @@ def fetch_results(st: State, years: int | None = None, force: bool = False) -> i
         age = (datetime.now(timezone.utc) - datetime.fromisoformat(blocked)).total_seconds() / 3600
         if age < 24:
             st.step("wyniki (tennis-data.co.uk)", True,
-                    f"pominięte: {age:.0f} h temu strona zablokowała ten serwer (HTTP 403). Nowe wyniki: u siebie "
-                    f"python -m tnpred fetch-history, potem Commit + Push")
+                    f"pominięte: {age:.0f} h temu strona zablokowała ten serwer (HTTP 403) - to normalne. Nowe wyniki przychodzą "
+                    f"z Twojego komputera przez GitHuba (krok „wyniki z GitHuba”)")
             return 0
     have = db.load_matches(st.conn)
     now = pd.Timestamp.today()
@@ -151,7 +151,7 @@ def fetch_results(st: State, years: int | None = None, force: bool = False) -> i
                 if "403" in str(e):
                     db.meta_set(st.conn, "tdata_blocked_at", _now())
                     st.step(f"wyniki {tour} {y}", ok, f"tennis-data.co.uk blokuje serwer Rendera (HTTP 403) - to normalne. "
-                            f"W bazie {len(have_y)} meczów z repo. Nowe wyniki: u siebie python -m tnpred fetch-history, potem Commit + Push")
+                            f"Nowe wyniki przychodzą z Twojego komputera przez GitHuba (python -m tnpred push-history / zaplanowane zadanie)")
                     return total
                 st.step(f"wyniki {tour} {y}", ok, (f"nie pobrano nowszych danych ({str(e)[:200]}); używam {len(have_y)} meczów z repo. "
                                                     f"Aktualizacja: pobierz plik ręcznie (README)") if ok else str(e))
@@ -272,9 +272,52 @@ def manual_import(st: State, text: str) -> int:
     return db.upsert_upcoming(st.conn, rows)
 
 
+def sync_history(st: State) -> int:
+    """Świeże wyniki wysłane z Twojego komputera (python -m tnpred push-history) leżą w gałęzi ledger-data,
+    folder tennis/history/. Pobieramy tylko pliki, które się zmieniły (porównanie sha) + nowe parametry modelu."""
+    if not gh_store.enabled():
+        return 0
+    try:
+        files = gh_store.list_dir(gh_store.history_path())
+    except Exception as e:  # noqa: BLE001
+        st.step("wyniki z GitHuba", False, str(e))
+        return 0
+    if not files:
+        st.step("wyniki z GitHuba", True, "brak plików w gałęzi - uruchom u siebie python -m tnpred push-history "
+                                         "(albo zaplanuj: python -m tnpred install-task)")
+        return 0
+    n, names = 0, []
+    for name, sha in sorted(files.items()):
+        key = f"hist_sha:{name}"
+        if db.meta_get(st.conn, key) == sha:
+            continue
+        try:
+            if name.endswith(".csv"):
+                df = tdata.read_csv_text(gh_store.pull_raw(gh_store.history_path(name)) or "")
+                n += db.upsert_matches(st.conn, df)
+                names.append(f"{name} ({len(df)})")
+            elif name == "model.json":
+                import json
+                from .model import save_params
+                save_params(json.loads(gh_store.pull_raw(gh_store.history_path(name)) or "{}"))
+                names.append("parametry modelu")
+                n += 1
+            db.meta_set(st.conn, key, sha)
+        except Exception as e:  # noqa: BLE001
+            st.step(f"wyniki z GitHuba: {name}", False, str(e))
+    if names:
+        st.mark_changed()
+    st.step("wyniki z GitHuba", True, ("wczytano: " + ", ".join(names)) if names else "bez zmian od ostatniego sprawdzenia")
+    return n
+
+
 def sync_down(st: State) -> None:
     if not gh_store.enabled():
         st.step("GitHub (zapis trwały)", True, "wyłączone - brak GITHUB_TOKEN/GITHUB_REPO: dziennik i zakłady znikną przy restarcie")
+        return
+    ok, msg = gh_store.check()
+    st.step("GitHub: token", ok, msg)
+    if not ok:
         return
     try:
         a = gh_store.sync_down("predictions", lambda t: ledger.import_text(st.conn, t))
@@ -337,6 +380,7 @@ def refresh(st: State, force: bool = False, network: bool = True) -> None:
     st.step("odświeżanie", True, "start")
     try:
         if network:
+            sync_history(st)
             fetch_results(st, force=force)
         m = st.get_model()
         st.step("model", True, f"{len(m.df)} meczów, {sum(1 for _ in m.elo.r)} zawodników; ostatni mecz {m.df.date.max():%Y-%m-%d}"

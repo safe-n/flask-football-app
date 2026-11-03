@@ -221,6 +221,61 @@ class OddsApiParse(unittest.TestCase):
         self.assertEqual(r["total_line"], 33.5)
 
 
+class DailyHistorySync(unittest.TestCase):
+    def test_sync_history_pulls_changed_files_once(self):
+        from unittest import mock
+        from tnpred import gh_store
+        st = bootstrap.State(os.path.join(_TMP, "sync.db"))
+        df = demo_df()
+        text = tdata.history_text(df[df.tour == "ATP"].tail(50))
+        with mock.patch.object(gh_store, "enabled", return_value=True), \
+             mock.patch.object(gh_store, "list_dir", return_value={"ATP_2026.csv": "abc"}), \
+             mock.patch.object(gh_store, "pull_raw", return_value=text) as pr:
+            n1 = bootstrap.sync_history(st)
+            n2 = bootstrap.sync_history(st)
+        self.assertEqual(n1, 50)
+        self.assertEqual(n2, 0)
+        self.assertEqual(pr.call_count, 1)          # drugi raz ten sam sha -> nie pobiera
+
+    def test_push_history_skips_unchanged(self):
+        from unittest import mock
+        from tnpred import cli, gh_store
+        df = demo_df()
+        atp = df[df.tour == "ATP"].tail(30)
+        same_sha = gh_store.git_sha(tdata.history_text(atp))
+        with mock.patch.object(gh_store, "enabled", return_value=True), \
+             mock.patch.object(gh_store, "list_dir", return_value={f"ATP_{pd.Timestamp.today().year}.csv": same_sha}), \
+             mock.patch.object(cli.tdata, "download_any", side_effect=lambda t, y: (atp if t == "ATP" else df[df.tour == "WTA"].tail(30), "test")), \
+             mock.patch.object(gh_store, "push") as push:
+            cli.main(["push-history", "--no-tune"])
+        names = [c.args[1] for c in push.call_args_list]
+        self.assertEqual(len(names), 1)               # ATP bez zmian, wysłane tylko WTA
+        self.assertIn("WTA_", names[0])
+
+
+class GhCheck(unittest.TestCase):
+    def test_check_messages(self):
+        from unittest import mock
+        from tnpred import gh_store
+        with mock.patch.object(gh_store, "_call", return_value=mock.Mock(status_code=404)):
+            ok, msg = gh_store.check()
+        self.assertFalse(ok)
+        self.assertIn("GITHUB_REPO", msg)
+        resp = mock.Mock(status_code=200)
+        resp.json.return_value = {"permissions": {"push": False}}
+        with mock.patch.object(gh_store, "_call", return_value=resp):
+            ok, msg = gh_store.check()
+        self.assertFalse(ok)
+        self.assertIn("Read and write", msg)
+
+    def test_version_on_page(self):
+        from tnpred import __version__
+        from tnpred.web import create_app
+        st = bootstrap.State(os.path.join(_TMP, "ver.db"))
+        c = create_app(st, background=False).test_client()
+        self.assertIn(f"tenis v{__version__}".encode(), c.get("/data").data)
+
+
 class StartTimes(unittest.TestCase):
     def test_when_statuses(self):
         from tnpred import views as V
@@ -301,7 +356,7 @@ class AppTests(unittest.TestCase):
             bootstrap.fetch_results(st, years=1)
             self.assertEqual(m.call_count, 1)             # przez 24 h w ogóle nie próbuje
         self.assertTrue(db.meta_get(st.conn, "tdata_blocked_at"))
-        self.assertIn("python -m tnpred fetch-history", " ".join(x["opis"] for x in st.diag["kroki"]))
+        self.assertIn("python -m tnpred push-history", " ".join(x["opis"] for x in st.diag["kroki"]))
 
     def test_fit_s0_in_realistic_range(self):
         s0 = self.st.get_model().fit_s0()
