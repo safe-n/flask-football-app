@@ -599,9 +599,10 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
         if last is not None:
             age = (pd.Timestamp.today().normalize() - last).days
             fresh = (f'<div class="card"><p class="m">Ostatni mecz w bazie: <b>{last:%Y-%m-%d}</b> ({age} dni temu). '
-                     "Nowe wyniki dodajesz u siebie: <code>python -m tnpred fetch-history</code>, potem Commit + Push w GitHub Desktop "
-                     "(tennis-data.co.uk nie wpuszcza serwerów Rendera ani GitHuba; sama strona aktualizuje pliki zwykle raz w tygodniu)."
-                     + (' <span class="warn">Dane mają ponad tydzień - czas na aktualizację.</span>' if age > 8 else "") + "</p></div>")
+                     "Nowe wyniki wysyła Twój komputer: zaplanowane zadanie (<code>python -m tnpred install-task</code>) albo dwuklik "
+                     "<code>aktualizuj_tenis.bat</code>; aplikacja sprawdza je co ok. 3 h (lub kliknij „Odśwież teraz”). "
+                     "tennis-data.co.uk nie wpuszcza serwerów Rendera ani GitHuba, a sama strona nie zawsze aktualizuje pliki codziennie."
+                     + (' <span class="warn">Dane mają ponad 3 dni - sprawdź, czy zadanie na komputerze działa (plik tennis_update.log).</span>' if age > 3 else "") + "</p></div>")
         busy = ""
         if st.refreshing and st.refresh_started:
             mins = (time.time() - st.refresh_started) / 60

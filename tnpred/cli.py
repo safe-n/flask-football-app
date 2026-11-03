@@ -56,6 +56,77 @@ def cmd_fetch_history(a):
         print("Gotowe. Teraz Commit + Push (GitHub Desktop), żeby Render dostał nową historię i parametry.")
 
 
+def cmd_push_history(a):
+    """Pobiera bieżący rok z tennis-data.co.uk NA TWOIM KOMPUTERZE i wysyła go do gałęzi ledger-data (folder tennis/history).
+    Nie zmienia plików w folderze repo (GitHub Desktop nic nie pokaże) i nie wywołuje przebudowy Rendera -
+    aplikacja sama sprawdza tę gałąź co kilka godzin."""
+    import json
+    from datetime import datetime
+    from . import gh_store
+    from .model import TennisModel
+    stamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+    print(f"=== {stamp} tnpred {__version__}: aktualizacja wyników ===")
+    if not gh_store.enabled():
+        raise SystemExit("Brak GITHUB_TOKEN / GITHUB_REPO w pliku .env w folderze repo (README: „Codzienna aktualizacja”).")
+    now = pd.Timestamp.today()
+    years = [now.year] + ([now.year - 1] if now.month == 1 else [])
+    remote = gh_store.list_dir(gh_store.history_path())
+    fresh, sent = [], 0
+    for tour in a.tours.split(","):
+        for y in years:
+            name = f"{tour}_{y}.csv"
+            try:
+                df, src = tdata.download_any(tour, y)
+            except Exception as e:  # noqa: BLE001
+                print(f"{tour} {y}: BŁĄD {e}")
+                continue
+            fresh.append(df)
+            text = tdata.history_text(df)
+            last = pd.to_datetime(df["date"]).max()
+            if remote.get(name) == gh_store.git_sha(text):
+                print(f"{tour} {y}: bez zmian ({len(df)} meczów, ostatni {last:%Y-%m-%d})")
+                continue
+            gh_store.push(text, gh_store.history_path(name), message=f"tennis history: {name} ({len(df)} meczów, do {last:%Y-%m-%d})")
+            sent += 1
+            print(f"{tour} {y}: wysłano {len(df)} meczów (ostatni {last:%Y-%m-%d})")
+    if not fresh:
+        raise SystemExit("Nic nie pobrano - sprawdź internet albo adresy plików (README).")
+    if sent and not a.no_tune:
+        base = tdata.load_history_dir()
+        allm = pd.concat([base] + fresh, ignore_index=True).drop_duplicates(
+            subset=["tour", "date", "winner", "loser", "tournament"], keep="last")
+        m = TennisModel(allm)
+        s0 = m.fit_s0()
+        params = {"s0": s0, "sigma": m.fitted_sigma, "blend_w": m.fit_blend(), "fitted_at": pd.Timestamp.utcnow().isoformat(),
+                  "matches": int(len(m.df))}
+        text = json.dumps(params, indent=2, ensure_ascii=False)
+        gh_store.push(text, gh_store.history_path("model.json"), message="tennis: parametry modelu")
+        print("wysłano parametry modelu:", ", ".join(f"{k} {v}" for k, v in sorted(s0.items())))
+    print(f"Gotowe: {sent} plik(ów) wysłanych. Aplikacja wczyta je przy najbliższym sprawdzeniu (co ok. 3 h) "
+          f"albo od razu po kliknięciu „Odśwież teraz” w zakładce Dane.")
+
+
+def cmd_install_task(a):
+    """Windows: zadanie w Harmonogramie zadań uruchamiające aktualizuj_tenis_auto.bat co N godzin (gdy komputer jest włączony)."""
+    import os
+    import subprocess
+    bat = config.ROOT / "aktualizuj_tenis_auto.bat"
+    name = "Tenis - aktualizacja wynikow"
+    if os.name != "nt":
+        raise SystemExit("To polecenie działa na Windows.")
+    if a.remove:
+        r = subprocess.run(["schtasks", "/Delete", "/TN", name, "/F"], capture_output=True, text=True)
+        print(r.stdout or r.stderr)
+        return
+    if not bat.exists():
+        raise SystemExit(f"Brak pliku {bat}")
+    r = subprocess.run(["schtasks", "/Create", "/SC", "HOURLY", "/MO", str(a.every), "/TN", name, "/TR", f'"{bat}"', "/F"],
+                       capture_output=True, text=True)
+    print(r.stdout or r.stderr)
+    if r.returncode == 0:
+        print(f"Zadanie „{name}” uruchamia się co {a.every} h, gdy komputer jest włączony. Dziennik: {config.ROOT / 'tennis_update.log'}")
+
+
 def cmd_tune(a):
     from .model import save_params
     m = _model()
@@ -104,6 +175,14 @@ def main(argv=None):
     f.add_argument("--force", action="store_true")
     f.add_argument("--no-tune", action="store_true", help="nie stroj modelu po pobraniu")
     f.set_defaults(fn=cmd_fetch_history)
+    ph = sub.add_parser("push-history", help="pobierz bieżący rok i wyślij do GitHuba (gałąź ledger-data) - codzienna aktualizacja")
+    ph.add_argument("--tours", default=",".join(config.TOURS))
+    ph.add_argument("--no-tune", action="store_true")
+    ph.set_defaults(fn=cmd_push_history)
+    it = sub.add_parser("install-task", help="Windows: zaplanuj push-history co kilka godzin")
+    it.add_argument("--every", type=int, default=4, help="co ile godzin (domyślnie 4)")
+    it.add_argument("--remove", action="store_true", help="usuń zaplanowane zadanie")
+    it.set_defaults(fn=cmd_install_task)
     t = sub.add_parser("tune", help="dobierz s0 (serwis) i wagę rynku -> tennis_params/model.json")
     t.set_defaults(fn=cmd_tune)
     b = sub.add_parser("backtest", help="walk-forward: model vs rynek, gemy, tie-breaki, kalibracja")

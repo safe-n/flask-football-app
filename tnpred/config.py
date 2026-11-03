@@ -43,7 +43,7 @@ PARAMS_DIR = _path("TN_PARAMS_DIR", "tennis_params")         # parametry modelu 
 AUTO_BOOTSTRAP = auto_bootstrap_default()
 TOURS = [t.strip().upper() for t in os.getenv("TN_TOURS", "ATP,WTA").split(",") if t.strip()]
 YEARS = int(os.getenv("TN_YEARS", "5"))                       # ile ostatnich sezonów pobrać
-REFRESH_HOURS = float(os.getenv("TN_REFRESH_HOURS", "12"))    # co ile godzin odświeżać wyniki (0 = wyłączone)
+REFRESH_HOURS = float(os.getenv("TN_REFRESH_HOURS", "3"))     # co ile godzin sprawdzać nowe wyniki (0 = wyłączone)
 DEMO = _flag("TN_DEMO")                                        # dane syntetyczne (tylko do podglądu / testów)
 
 # tennis-data.co.uk (darmowe XLSX z wynikami po setach i kursami). {year} zostanie podstawione.
