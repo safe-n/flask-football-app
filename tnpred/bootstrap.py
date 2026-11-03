@@ -13,6 +13,19 @@ from .model import TennisModel, load_params, save_params
 from .names import norm
 
 
+def all_stacks() -> str:
+    """Gdzie są teraz wątki tenisa (diagnostyka zawieszeń, pokazywana w Dane podczas startu)."""
+    import sys
+    frames = sys._current_frames()
+    out = []
+    for t in threading.enumerate():
+        if not t.name.startswith("tnpred") or t.ident not in frames:
+            continue
+        lines = [f"{f.filename.rsplit('/', 2)[-1]}:{f.lineno} {f.name}" for f in traceback.extract_stack(frames[t.ident])[-5:]]
+        out.append(f"{t.name}: " + " → ".join(lines))
+    return "\n".join(out)
+
+
 def stuck_where(st: State) -> str:
     """Gdzie stoi wątek odświeżania (diagnostyka zawieszeń - widoczne w zakładce Dane)."""
     import sys
@@ -68,7 +81,13 @@ class State:
             with self.model_lock:
                 if self.model is None or self.model_version != self.data_version:
                     v = self.data_version
-                    new = TennisModel(db.load_matches(self.conn))     # stary model obsługuje strony, dopóki nowy się liczy
+                    t0 = time.time()
+                    self.step("model: liczę", True, "start (wczytanie meczów z bazy, Elo, kursy historyczne)")
+                    df_m = db.load_matches(self.conn)
+                    self.step("model: liczę", True, f"wczytano {len(df_m)} meczów z bazy w {time.time() - t0:.0f} s, liczę Elo…")
+                    new = TennisModel(df_m)     # stary model obsługuje strony, dopóki nowy się liczy
+                    del df_m
+                    self.step("model: liczę", True, f"gotowy w {time.time() - t0:.0f} s")
                     self.model, self._lookup, self.model_version = new, None, v
                     del new
                     free_memory()
@@ -199,7 +218,9 @@ def fetch_odds(st: State, force: bool = False) -> int:
         if age < config.ODDS_REFRESH_HOURS:
             st.step("kursy (The Odds API)", True, f"pominięte - ostatnio {age:.1f} h temu (limit kredytów)")
             return 0
+    st.step("kursy (The Odds API)", True, "czekam na model…")
     m = st.get_model()
+    st.step("kursy (The Odds API)", True, "pobieram z the-odds-api.com…")
     try:
         rows, info = oddsapi.fetch_all(resolve=m.resolve, history_lookup=history_surface_lookup(st))
     except Exception as e:  # noqa: BLE001

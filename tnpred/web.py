@@ -615,7 +615,9 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
             steps = "".join(f'<tr><td class="l">{escape(x["krok"])}</td><td class="{"ok" if x["ok"] else "bad"}">{"OK" if x["ok"] else "BŁĄD"}</td>'
                             f'<td class="l" style="white-space:normal">{escape(x["opis"])}</td><td>{escape(x["czas"][11:19])}</td></tr>'
                             for x in st.diag["kroki"])
+            stacks = escape(bootstrap.all_stacks())
             return page("Dane", ("p", "Model jeszcze się liczy (pierwszy start) - strona odświeży się sama."),
+                        ("html", f'<div class="card m" style="white-space:pre-wrap;font-size:11px">Wątki teraz:\n{stacks}</div>'),
                         ("html", f'<div class="card"><table><tr><th class="l">krok</th><th>stan</th><th class="l">opis</th><th>UTC</th></tr>{steps}</table></div>'),
                         refresh=True)
         df = m.df

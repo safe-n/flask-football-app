@@ -1,3 +1,6 @@
+## 0.3.8 - diagnostyka startu
+- Dane: kroki „model: liczę” (z czasem) i „kursy: czekam na model / pobieram”, a podczas startu - gdzie są teraz wątki.
+
 ## 0.3.7 - strony nie czekają na przeliczanie modelu (502 na Renderze)
 - Podczas liczenia modelu (start, nowe wyniki) każde wejście na tenisa czekało - na darmowym Renderze kilka minut, więc
   Render zwracał 502. Teraz: w trakcie przeliczania strony działają na poprzednim modelu; przy pierwszym starcie od razu
