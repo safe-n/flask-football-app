@@ -539,7 +539,7 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
         tour = (request.args.get("tour") or "").upper() or None
         days = int(_f(request.args.get("days")) or 365)
         m = model()
-        bt = cached(("bt", tour, days), lambda: backtest.rows(m, days=days, tour=tour, limit=600), ttl=6 * 3600)
+        bt = cached(("bt", tour, days), lambda: backtest.rows(m, days=days, tour=tour, limit=400), ttl=6 * 3600)
         s = backtest.summary(bt)
         if not s:
             return page("Backtest", ("p", "Za mało danych."))
@@ -594,9 +594,23 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
         steps = "".join(f'<tr><td class="l">{escape(s["krok"])}</td><td class="{"ok" if s["ok"] else "bad"}">{"OK" if s["ok"] else "BŁĄD"}</td>'
                         f'<td class="l" style="white-space:normal">{escape(s["opis"])}</td><td>{escape(s["czas"][11:19])}</td></tr>' for s in st.diag["kroki"])
         params = pd.DataFrame([{"tour|nawierzchnia": k, "serwis bazowy s0": v} for k, v in sorted(m.s0.items())])
+        last = m.df.date.max() if len(m.df) else None
+        fresh = ""
+        if last is not None:
+            age = (pd.Timestamp.today().normalize() - last).days
+            fresh = (f'<div class="card"><p class="m">Ostatni mecz w bazie: <b>{last:%Y-%m-%d}</b> ({age} dni temu). '
+                     "Nowe wyniki dodajesz u siebie: <code>python -m tnpred fetch-history</code>, potem Commit + Push w GitHub Desktop "
+                     "(tennis-data.co.uk nie wpuszcza serwerów Rendera ani GitHuba; sama strona aktualizuje pliki zwykle raz w tygodniu)."
+                     + (' <span class="warn">Dane mają ponad tydzień - czas na aktualizację.</span>' if age > 8 else "") + "</p></div>")
+        busy = ""
+        if st.refreshing and st.refresh_started:
+            mins = (time.time() - st.refresh_started) / 60
+            busy = f"trwa odświeżanie ({mins:.0f} min)…"
+            if mins > 3:
+                busy += f'<div class="warn m" style="white-space:normal">Długo trwa. Wątek stoi w: {escape(bootstrap.stuck_where(st))}</div>'
         refresh_btn = (f'<form method="post" action="{request.script_root}/refresh"><button>Odśwież teraz</button> '
-                       f'<span class="m">{"trwa odświeżanie…" if st.refreshing else ""}</span></form>')
-        return page("Dane", ("html", refresh_btn), ("t", info) if len(info) else ("p", "Baza pusta."),
+                       f'<span class="m">{busy}</span></form>')
+        return page("Dane", ("html", refresh_btn + fresh), ("t", info) if len(info) else ("p", "Baza pusta."),
                     ("html", f'<div class="card"><table><tr><th class="l">krok</th><th>stan</th><th class="l">opis</th><th>UTC</th></tr>{steps}</table></div>'),
                     ("h", "Parametry modelu"), ("t", params), ("p", f"Waga modelu w mieszance z rynkiem: {m.w}. Źródło: "
                                                                    f"{'tennis_params/model.json' if m.params.get('s0') else 'domyślne (python -m tnpred tune, by dobrać)'}."),

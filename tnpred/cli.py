@@ -59,7 +59,8 @@ def cmd_fetch_history(a):
 def cmd_tune(a):
     from .model import save_params
     m = _model()
-    p = {"s0": m.fit_s0(verbose=True), "blend_w": m.fit_blend(verbose=True), "fitted_at": pd.Timestamp.utcnow().isoformat(),
+    s0 = m.fit_s0(verbose=True)
+    p = {"s0": s0, "sigma": m.fitted_sigma, "blend_w": m.fit_blend(verbose=True), "fitted_at": pd.Timestamp.utcnow().isoformat(),
          "matches": int(len(m.df))}
     save_params(p)
     print(f"zapisano {config.PARAMS_DIR / 'model.json'}")

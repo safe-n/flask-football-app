@@ -1,3 +1,28 @@
+## 0.3.0 - model gemów skalibrowany na prawdziwych danych („forma dnia”)
+- BŁĄD wykryty backtestem na historii 2022-26: model przewidywał 25,6 gema na mecz (realnie 24,3), over 22.5 w 52% meczów
+  (realnie 43%) i 53% meczów bez straty seta (realnie 62%). Kafelki „Over” i „Tie-break” były więc prawie zawsze zielone,
+  a „2:0” czerwone - to był błąd modelu, nie sygnał.
+- Przyczyna: założenie, że każdy punkt jest „taki sam”. Dodana forma dnia (losowa przewaga zawodnika w danym meczu,
+  sigma dobierana na historii) - mecze stają się bardziej jednostronne tak jak w rzeczywistości.
+- Strojenie dobiera teraz razem serwis bazowy i formę dnia (tour + nawierzchnia) pod 4 wskaźniki: tie-break i gemy w 1. secie,
+  mecze bez straty seta, średnia gemów. Parametry znowu realistyczne (ATP 0,64-0,66, WTA 0,56-0,60; wcześniej WTA 0,45-0,51).
+- Backtest (ostatni rok, 4900 meczów): średnia gemów 24,2 vs 24,3; over 22.5: 42,5% vs 43,2%; tie-break 34% vs 33%;
+  bez straty seta 63% vs 62%. Over i tie-break lepsze od samej średniej (Brier 0,241 vs 0,245 oraz 0,210 vs 0,222).
+  Uwaga: parametry strojone na ostatnich 3 latach, które obejmują ten rok - wynik lekko optymistyczny.
+- Zwycięzca: samo Elo jest wyraźnie słabsze od kursów Pinnacle (log-loss 0,628 vs 0,587), więc waga modelu = 0 i przy zwycięzcy
+  aplikacja w praktyce pokazuje rynek. Uczciwy wynik, nie błąd.
+- Strojenie trwa ok. 1 min (u Ciebie w aktualizuj_tenis.bat). Backtest w aplikacji: ostatnie 400 meczów.
+
+## 0.2.2 - poprawne parametry WTA + odświeżanie, które nie wisi
+- BŁĄD: dobieranie serwisu bazowego (s0) potrafiło zjechać poniżej 0,5 (WTA mączka 0,45, hard 0,51) - zawyżało to przełamania
+  i psuło gemy/tie-breaki WTA. Teraz siatka 0,50-0,72 dopasowuje jednocześnie częstość tie-breaka i średnią liczbę gemów
+  w 1. secie; wynik na brzegu siatki = wartość domyślna. Na danych testowych odtwarza prawdziwe wartości (±0,02), 2× szybciej.
+- Odświeżanie na Renderze: krótsze limity czasu połączeń, po „403” od tennis-data.co.uk przerywa i nie próbuje przez 24 h
+  (strona blokuje serwery - nowe wyniki tylko z Twojego komputera). Postęp każdego kroku widać w zakładce Dane.
+- Dane: data ostatniego meczu w bazie + przypomnienie o aktualizacji, gdy dane mają ponad tydzień; przy długim odświeżaniu
+  pokazuje, w którym miejscu stoi (diagnostyka).
+- `aktualizuj_tenis.bat`: dwuklik = pobranie bieżącego roku + strojenie modelu (potem Commit + Push).
+
 ## 0.2.1 - godziny rozpoczęcia i status meczu
 - Mecze: godzina startu w czasie polskim (TN_TZ), sortowanie po godzinie, dni po polsku („sob 31.10.2026”).
 - Status: „za X min” / „▶ rozpoczęty” / „zakończony?” (wg planu; TN_MATCH_HOURS = 4 h) + ostrzeżenie, że kursy są sprzed meczu.

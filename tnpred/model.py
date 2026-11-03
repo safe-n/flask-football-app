@@ -12,12 +12,13 @@ from . import config
 from .elo import Elo, surface_of, walk
 from .names import NameIndex
 from .odds import blend, market_pair
-from .pointmodel import match_dist, serve_probs, summarize
+from .pointmodel import mixture_dist, serve_probs, summarize
 from .tdata import add_derived
 
 S0_DEFAULT = {"ATP|Hard": 0.645, "ATP|Clay": 0.625, "ATP|Grass": 0.670,
               "WTA|Hard": 0.565, "WTA|Clay": 0.555, "WTA|Grass": 0.575}
 W_DEFAULT = {"ATP": 0.35, "WTA": 0.35}
+SIGMA_DEFAULT: dict = {}           # forma dnia (tour|nawierzchnia); brak = 0 do czasu strojenia
 
 
 def params_path():
@@ -76,6 +77,7 @@ class TennisModel:
         self.df = slim(df)
         self.s0 = {**S0_DEFAULT, **self.params.get("s0", {})}
         self.w = {**W_DEFAULT, **self.params.get("blend_w", {})}
+        self.sigma = {**SIGMA_DEFAULT, **self.params.get("sigma", {})}
         self.names = {t: NameIndex(pd.concat([df[df.tour == t].winner, df[df.tour == t].loser]).astype(str).tolist())
                       for t in (df.tour.unique() if len(df) else [])}
         self.base = self._base_rates()
@@ -139,8 +141,9 @@ class TennisModel:
         w_used = self.w.get(tour, 0.35) if w is None else w
         p = blend(p_elo, mk[0], w_used) if mk else p_elo
         s0 = self.s0.get(f"{tour}|{surface}", 0.62)
-        pa, pb = serve_probs(p, s0)
-        dist = match_dist(pa, pb, best_of, final_tb(best_of, series))
+        sg = self.sigma.get(f"{tour}|{surface}", 0.0)
+        pa, pb = serve_probs(p, s0, sg)
+        dist = mixture_dist(pa, pb, sg, best_of, final_tb(best_of, series))
         m = summarize(dist, best_of)
         warn = []
         for i in (i1, i2):
@@ -150,44 +153,58 @@ class TennisModel:
                 warn.append(f"{i['name']}: tylko {i['n']} meczów w bazie")
         return {"tour": tour, "surface": surface, "best_of": best_of, "p1": n1, "p2": n2, "info": [i1, i2],
                 "p_elo": p_elo, "p_market": mk[0] if mk else None, "p": p, "w": w_used if mk else None,
-                "s0": s0, "serve": (pa, pb), "m": m, "base": self.base_for(tour, surface, best_of),
+                "s0": s0, "sigma": sg, "serve": (pa, pb), "m": m, "base": self.base_for(tour, surface, best_of),
                 "o1": o1, "o2": o2, "warn": warn}
 
     # ---------------------------------------------------------------- strojenie
-    def fit_s0(self, years: float = 3, sample: int = 1500, verbose=False) -> dict:
-        """Dobiera s0 (tour+nawierzchnia), by częstość tie-breaka w 1. secie zgadzała się z historią (mecze do 2 setów)."""
-        out = {}
+    def fit_s0(self, years: float = 3, sample: int = 1500, verbose=False, with_sigma: bool = True) -> dict:
+        """Dobiera s0 (serwis bazowy) i sigma (forma dnia) dla touru+nawierzchni tak, by na historii meczów do 2 setów zgadzały się:
+        tie-break w 1. secie, gemy w 1. secie, odsetek meczów bez straty seta i średnia gemów w meczu.
+        Zwraca {"tour|naw": s0}; sigma zapisuje w self.fitted_sigma (fit_all zapisuje oba)."""
+        out, self.fitted_sigma = {}, {}
         df = self.df
         cut = df.date.max() - pd.Timedelta(days=int(365 * years))
-        d = df[(df.date >= cut) & df.completed & (df.best_of == 3) & df.p_elo_w.notna()].copy()
-        # szansa z kursów (ostrzejsza niż samo Elo) - inaczej spłaszczone Elo zawyża liczbę gemów i zaniża s0
-        d["p_fit"] = d.p_mkt_w.fillna(d.p_elo_w)
-        for (t, s), g in d.groupby(["tour", "surface"]):
+        d = df[(df.date >= cut) & df.completed & (df.best_of == 3) & df.p_elo_w.notna() & df.w1.notna()].copy()
+        d["p_fit"] = d.p_mkt_w.fillna(d.p_elo_w)      # szansa z kursów (ostrzejsza niż samo Elo)
+        s0_grid = [round(x, 2) for x in np.arange(0.50, 0.7201, 0.02)]
+        sg_grid = [0.0, 0.02, 0.04, 0.06, 0.08, 0.10] if with_sigma else [0.0]
+        for (t, s), g in d.groupby(["tour", "surface"], observed=True):
             if len(g) < 60:
                 continue
             g = g.tail(sample)
-            # cel: częstość tie-breaka w 1. secie (bardzo czuła na s0, niezależna od długości meczu)
-            obs = float((((g.w1 == 7) & (g.l1 == 6)) | ((g.w1 == 6) & (g.l1 == 7))).mean())
-            ps = np.round(np.abs(g.p_fit.to_numpy() - 0.5) + 0.5, 2)
-            vals, cnt = np.unique(ps, return_counts=True)
-
-            def mean_games(s0):
-                tot = 0.0
-                for v, c in zip(vals, cnt):
-                    pa, pb = serve_probs(float(v), s0)
-                    tot += c * summarize(match_dist(pa, pb, 3, 7), 3)["set1_tb"]
-                return tot / cnt.sum()
-
-            lo, hi = 0.45, 0.78
-            for _ in range(9):
-                mid = round((lo + hi) / 2, 4)
-                if mean_games(mid) < obs:
-                    lo = mid
-                else:
-                    hi = mid
-            out[f"{t}|{s}"] = round((lo + hi) / 2, 3)
+            obs = {"tb1": float((((g.w1 == 7) & (g.l1 == 6)) | ((g.w1 == 6) & (g.l1 == 7))).mean()),
+                   "g1": float((g.w1 + g.l1).mean()), "st": float((g.lsets == 0).mean()), "gm": float(g.total_games.mean())}
+            ps = np.round((np.abs(g.p_fit.to_numpy() - 0.5) + 0.5) / 0.05) * 0.05
+            vals, cnt = np.unique(np.clip(ps, 0.5, 0.95), return_counts=True)
+            best = None
+            for s0 in s0_grid:
+                for sg in sg_grid:
+                    acc = {"tb1": 0.0, "g1": 0.0, "st": 0.0, "gm": 0.0}
+                    for v, c in zip(vals, cnt):
+                        pa, pb = serve_probs(float(v), s0, sg)
+                        sm = summarize(mixture_dist(pa, pb, sg, 3, 7), 3)
+                        g1 = 0.0
+                        dist1 = mixture_dist(pa, pb, sg, 3, 7)["set1"]
+                        g1 = sum((a_ + b_) * pr for (a_, b_), pr in dist1.items())
+                        acc["tb1"] += c * sm["set1_tb"]
+                        acc["g1"] += c * g1
+                        acc["st"] += c * sm["straight"]
+                        acc["gm"] += c * sm["games_mean"]
+                    n = cnt.sum()
+                    pred = {k: v / n for k, v in acc.items()}
+                    loss = (((pred["tb1"] - obs["tb1"]) / 0.02) ** 2 + ((pred["g1"] - obs["g1"]) / 0.25) ** 2
+                            + ((pred["st"] - obs["st"]) / 0.03) ** 2 + ((pred["gm"] - obs["gm"]) / 0.4) ** 2)
+                    if best is None or loss < best[0]:
+                        best = (loss, s0, sg, pred)
+            key = f"{t}|{s}"
+            ok = best[1] < s0_grid[-1]
+            out[key] = best[1] if ok else S0_DEFAULT.get(key, 0.62)
+            self.fitted_sigma[key] = best[2] if ok else 0.0
             if verbose:
-                print(f"s0 {t} {s}: {out[f'{t}|{s}']} (tie-break w 1. secie {100 * obs:.1f}%, n={len(g)})")
+                pr = best[3]
+                print(f"{t} {s}: s0={out[key]} forma dnia={self.fitted_sigma[key]}{'' if ok else ' (górny brzeg - domyślne)'} | "
+                      f"TB 1. set {100 * obs['tb1']:.1f}% (model {100 * pr['tb1']:.1f}%), gemy 1. set {obs['g1']:.2f} ({pr['g1']:.2f}), "
+                      f"bez straty seta {100 * obs['st']:.0f}% ({100 * pr['st']:.0f}%), gemy w meczu {obs['gm']:.1f} ({pr['gm']:.1f}), n={len(g)}")
         return out
 
     def fit_blend(self, verbose=False) -> dict:

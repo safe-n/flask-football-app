@@ -1,16 +1,24 @@
 {
   "s0": {
-    "ATP|Clay": 0.612,
-    "ATP|Grass": 0.656,
-    "ATP|Hard": 0.649,
-    "WTA|Clay": 0.45,
-    "WTA|Grass": 0.548,
-    "WTA|Hard": 0.511
+    "ATP|Clay": 0.64,
+    "ATP|Grass": 0.66,
+    "ATP|Hard": 0.66,
+    "WTA|Clay": 0.56,
+    "WTA|Grass": 0.6,
+    "WTA|Hard": 0.58
+  },
+  "sigma": {
+    "ATP|Clay": 0.04,
+    "ATP|Grass": 0.02,
+    "ATP|Hard": 0.04,
+    "WTA|Clay": 0.04,
+    "WTA|Grass": 0.04,
+    "WTA|Hard": 0.04
   },
   "blend_w": {
     "ATP": 0.0,
     "WTA": 0.0
   },
-  "fitted_at": "2026-11-02T13:49:06.944599+00:00",
+  "fitted_at": "2026-11-03T08:55:19.739378+00:00",
   "matches": 25378
 }

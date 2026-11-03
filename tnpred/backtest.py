@@ -8,7 +8,7 @@ import pandas as pd
 
 from .model import TennisModel, final_tb
 from .odds import blend
-from .pointmodel import match_dist, serve_probs, summarize
+from .pointmodel import mixture_dist, serve_probs, summarize
 
 
 def _ll(p, y):
@@ -52,8 +52,9 @@ def rows(m: TennisModel, days: int | None = None, tour: str | None = None, limit
                "o1": r["psw"] if w_first else r["psl"], "o2": r["psl"] if w_first else r["psw"]}
         if with_markets and rec["completed"]:
             s0 = m.s0.get(f"{r['tour']}|{r['surface']}", 0.62)
-            pa, pb = serve_probs(round(p, 3), s0)
-            sm = summarize(match_dist(pa, pb, rec["best_of"], final_tb(rec["best_of"], r.get("series"))), rec["best_of"])
+            sg = m.sigma.get(f"{r['tour']}|{r['surface']}", 0.0)
+            pa, pb = serve_probs(round(p, 3), s0, sg)
+            sm = summarize(mixture_dist(pa, pb, sg, rec["best_of"], final_tb(rec["best_of"], r.get("series"))), rec["best_of"])
             line = 22.5 if rec["best_of"] == 3 else 38.5
             rec.update(games_mean=sm["games_mean"], line=line, p_over=sum(v for k, v in sm["games_pmf"].items() if k > line),
                        p_tb=sm["p_tb"], p_straight=sm["straight"], p_set1_tb=sm["set1_tb"])

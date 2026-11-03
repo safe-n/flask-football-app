@@ -13,6 +13,17 @@ from .model import TennisModel, load_params, save_params
 from .names import norm
 
 
+def stuck_where(st: State) -> str:
+    """Gdzie stoi wątek odświeżania (diagnostyka zawieszeń - widoczne w zakładce Dane)."""
+    import sys
+    import traceback
+    fr = sys._current_frames().get(st.refresh_thread or -1)
+    if fr is None:
+        return ""
+    lines = [f"{f.filename.rsplit('/', 2)[-1]}:{f.lineno} {f.name}" for f in traceback.extract_stack(fr)[-6:]]
+    return " → ".join(lines)
+
+
 def free_memory() -> None:
     """Oddaje zwolnioną pamięć systemowi (glibc trzyma ją „na zapas”, a Render liczy ją jako zajętą)."""
     import ctypes
@@ -40,6 +51,8 @@ class State:
         self.data_version = 0
         self.diag: dict = {"kroki": [], "start": _now()}
         self.refreshing = False
+        self.refresh_started: float | None = None
+        self.refresh_thread: int | None = None
         self._lookup = None
 
     # ------------------------------------------------------------------ diagnostyka
@@ -109,6 +122,14 @@ def load_local(st: State) -> int:
 def fetch_results(st: State, years: int | None = None, force: bool = False) -> int:
     """tennis-data.co.uk: bieżący rok zawsze, starsze tylko gdy brak ich w bazie/historii."""
     years = years or config.YEARS
+    blocked = db.meta_get(st.conn, "tdata_blocked_at")
+    if blocked and not force:
+        age = (datetime.now(timezone.utc) - datetime.fromisoformat(blocked)).total_seconds() / 3600
+        if age < 24:
+            st.step("wyniki (tennis-data.co.uk)", True,
+                    f"pominięte: {age:.0f} h temu strona zablokowała ten serwer (HTTP 403). Nowe wyniki: u siebie "
+                    f"python -m tnpred fetch-history, potem Commit + Push")
+            return 0
     have = db.load_matches(st.conn)
     now = pd.Timestamp.today()
     total = 0
@@ -119,6 +140,7 @@ def fetch_results(st: State, years: int | None = None, force: bool = False) -> i
                 continue
             if y == now.year and now.month == 1 and now.day < 3:
                 continue
+            st.step(f"wyniki {tour} {y}", True, "pobieram…")
             try:
                 df, src = tdata.download_any(tour, y)
                 n = db.upsert_matches(st.conn, df)
@@ -126,6 +148,11 @@ def fetch_results(st: State, years: int | None = None, force: bool = False) -> i
                 st.step(f"wyniki {tour} {y}", True, f"{len(df)} meczów (nowe/zmienione: {n}) - źródło: {src}")
             except Exception as e:  # noqa: BLE001
                 ok = len(have_y) > 0
+                if "403" in str(e):
+                    db.meta_set(st.conn, "tdata_blocked_at", _now())
+                    st.step(f"wyniki {tour} {y}", ok, f"tennis-data.co.uk blokuje serwer Rendera (HTTP 403) - to normalne. "
+                            f"W bazie {len(have_y)} meczów z repo. Nowe wyniki: u siebie python -m tnpred fetch-history, potem Commit + Push")
+                    return total
                 st.step(f"wyniki {tour} {y}", ok, (f"nie pobrano nowszych danych ({str(e)[:200]}); używam {len(have_y)} meczów z repo. "
                                                     f"Aktualizacja: pobierz plik ręcznie (README)") if ok else str(e))
     db.meta_set(st.conn, "results_at", _now())
@@ -286,10 +313,12 @@ def autotune(st: State) -> None:
     if len(m.df) < 500:
         return
     try:
-        p = {"s0": m.fit_s0(), "blend_w": m.fit_blend(), "fitted_at": _now(), "auto": True}
+        s0 = m.fit_s0()
+        p = {"s0": s0, "sigma": m.fitted_sigma, "blend_w": m.fit_blend(), "fitted_at": _now(), "auto": True}
         m.params = p
         m.s0.update(p["s0"])
         m.w.update(p["blend_w"])
+        m.sigma.update(p["sigma"])
         try:
             save_params(p)
         except OSError:
@@ -303,6 +332,9 @@ def refresh(st: State, force: bool = False, network: bool = True) -> None:
     if not st.lock.acquire(blocking=False):
         return
     st.refreshing = True
+    st.refresh_started = time.time()
+    st.refresh_thread = threading.get_ident()
+    st.step("odświeżanie", True, "start")
     try:
         if network:
             fetch_results(st, force=force)
@@ -319,6 +351,7 @@ def refresh(st: State, force: bool = False, network: bool = True) -> None:
         if network:
             sync_up(st)
         st.diag["refreshed_at"] = _now()
+        st.step("odświeżanie", True, f"zakończone w {time.time() - st.refresh_started:.0f} s")
         free_memory()
     except Exception as e:  # noqa: BLE001
         st.step("odświeżanie", False, f"{e}\n{traceback.format_exc()[-800:]}")

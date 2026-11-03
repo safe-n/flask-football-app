@@ -123,14 +123,28 @@ def _r(x: float) -> float:
     return round(min(max(x, 0.30), 0.92), 3)
 
 
-def p_match_bo3(pa: float, pb: float) -> float:
-    return match_dist(_r(pa), _r(pb), 3, 7)["p_match"]
+# Forma dnia: przewaga serwisowa w konkretnym meczu = d + sigma·x, x ~ N(0,1) (kwadratura Gaussa-Hermite'a, 5 punktów).
+# Bez niej model (wszystkie punkty „takie same”) daje za mało jednostronnych meczów: na historii 2022-26 przewidywał
+# 25,6 gema na mecz zamiast 24,3 i 53% meczów bez straty seta zamiast 62%.
+GH_X = (-2.856970, -1.355626, 0.0, 1.355626, 2.856970)
+GH_W = (0.011257, 0.222076, 0.533333, 0.222076, 0.011257)
+
+
+@lru_cache(maxsize=60_000)
+def _p_bo3(pa: float, pb: float) -> float:
+    return match_dist.__wrapped__(pa, pb, 3, 7)["p_match"]       # sama liczba - nie zapycha cache rozkładów
+
+
+def p_match_bo3(pa: float, pb: float, sigma: float = 0.0) -> float:
+    if sigma <= 0:
+        return _p_bo3(_r(pa), _r(pb))
+    return sum(w * _p_bo3(_r(pa + sigma * x), _r(pb - sigma * x)) for x, w in zip(GH_X, GH_W))
 
 
 @lru_cache(maxsize=20_000)
-def _solve(p_target: float, s0: float) -> float:
+def _solve(p_target: float, s0: float, sigma: float = 0.0) -> float:
     lo, hi = -min(0.25, s0 - 0.31), min(0.25, 0.91 - s0)
-    f = lambda d: p_match_bo3(s0 + d, s0 - d) - p_target  # noqa: E731
+    f = lambda d: p_match_bo3(s0 + d, s0 - d, sigma) - p_target  # noqa: E731
     if f(lo) > 0:
         return lo
     if f(hi) < 0:
@@ -138,14 +152,30 @@ def _solve(p_target: float, s0: float) -> float:
     return brentq(f, lo, hi, xtol=1e-4)
 
 
-def serve_probs(p_match: float, s0: float) -> tuple[float, float]:
-    """Dobiera pa = s0 + d, pb = s0 - d tak, by szansa wygrania meczu do 2 setów = p_match.
+def serve_probs(p_match: float, s0: float, sigma: float = 0.0) -> tuple[float, float]:
+    """Dobiera pa = s0 + d, pb = s0 - d tak, by szansa wygrania meczu do 2 setów = p_match (z uwzględnieniem formy dnia sigma).
 
-    s0 = średnia szansa punktu przy serwisie dla touru i nawierzchni (np. ATP trawa ~0,67, WTA mączka ~0,56).
+    s0 = średnia szansa punktu przy serwisie dla touru i nawierzchni.
     """
     p = round(min(max(p_match, 0.01), 0.99), 3)
-    d = _solve(p, round(s0, 3))
+    d = _solve(p, round(s0, 3), round(sigma, 3))
     return _r(s0 + d), _r(s0 - d)
+
+
+@lru_cache(maxsize=300)
+def mixture_dist(pa: float, pb: float, sigma: float, best_of: int = 3, final_tb: int = 7) -> dict:
+    """Rozkład meczu uśredniony po formie dnia (sigma = 0 -> zwykły match_dist)."""
+    if sigma <= 0:
+        return match_dist(pa, pb, best_of, final_tb)
+    out = {"p_match": 0.0, "sets": {}, "games": {}, "p_tb": 0.0, "set1": {}}
+    for x, w in zip(GH_X, GH_W):
+        d = match_dist.__wrapped__(_r(pa + sigma * x), _r(pb - sigma * x), best_of, final_tb)
+        out["p_match"] += w * d["p_match"]
+        out["p_tb"] += w * d["p_tb"]
+        for key in ("sets", "games", "set1"):
+            for k, v in d[key].items():
+                out[key][k] = out[key].get(k, 0.0) + w * v
+    return out
 
 
 def summarize(dist: dict, best_of: int) -> dict:

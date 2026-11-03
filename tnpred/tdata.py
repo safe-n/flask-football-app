@@ -58,7 +58,7 @@ UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.3
       "Accept": "*/*"}
 
 
-def download(tour: str, year: int, timeout: int = 60, url: str | None = None) -> pd.DataFrame:
+def download(tour: str, year: int, timeout=(10, 40), url: str | None = None) -> pd.DataFrame:
     """Pobiera rok; najpierw .xlsx, potem .xls (starsze lata)."""
     try:
         import openpyxl  # noqa: F401
@@ -147,7 +147,7 @@ def load_history_dir(d: Path | None = None, report: list | None = None) -> pd.Da
 _LINKS: dict = {}
 
 
-def discover_links(timeout: int = 30) -> dict:
+def discover_links(timeout=(10, 20)) -> dict:
     """Czyta stronę z plikami tennis-data i zwraca {(tour, rok): pełny adres}. Pusty słownik, gdy się nie da."""
     import re
     from urllib.parse import urljoin

@@ -291,6 +291,23 @@ class AppTests(unittest.TestCase):
         html = self.c.get("/").data.decode()
         self.assertIn("rozpoczęty", html)
 
+    def test_403_marks_blocked_and_skips(self):
+        from unittest import mock
+        st = bootstrap.State(os.path.join(_TMP, "blk.db"))
+        db.upsert_matches(st.conn, demo_df())
+        with mock.patch.object(bootstrap.tdata, "download_any", side_effect=RuntimeError("https://x: HTTP 403")) as m:
+            bootstrap.fetch_results(st, years=1)
+            self.assertEqual(m.call_count, 1)             # po 403 nie próbuje dalej
+            bootstrap.fetch_results(st, years=1)
+            self.assertEqual(m.call_count, 1)             # przez 24 h w ogóle nie próbuje
+        self.assertTrue(db.meta_get(st.conn, "tdata_blocked_at"))
+        self.assertIn("python -m tnpred fetch-history", " ".join(x["opis"] for x in st.diag["kroki"]))
+
+    def test_fit_s0_in_realistic_range(self):
+        s0 = self.st.get_model().fit_s0()
+        for v in s0.values():
+            self.assertTrue(0.5 <= v < 0.72, s0)
+
     def test_print_view(self):
         r = self.c.get("/print")
         self.assertEqual(r.status_code, 200)
