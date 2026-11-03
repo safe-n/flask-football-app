@@ -152,13 +152,29 @@ def _solve(p_target: float, s0: float, sigma: float = 0.0) -> float:
     return brentq(f, lo, hi, xtol=1e-4)
 
 
+@lru_cache(maxsize=64)
+def _table(s0: float, sigma: float) -> tuple:
+    """Tablica d -> szansa meczu (liczona raz na tour+nawierzchnię). Odwracanie przez interpolację zamiast szukania
+    dla każdego meczu osobno - na Renderze to różnica: ok. 1,5 s vs kilka ms na mecz."""
+    import numpy as np
+    hi = min(0.25, 0.91 - s0, s0 - 0.31)
+    ds = np.linspace(0.0, hi, 61)
+    ps = np.array([p_match_bo3(s0 + d, s0 - d, sigma) for d in ds])
+    ps = np.maximum.accumulate(ps)          # monotoniczność (zaokrąglenia potrafią dać mikroskopijne cofnięcia)
+    return tuple(ds), tuple(ps)
+
+
 def serve_probs(p_match: float, s0: float, sigma: float = 0.0) -> tuple[float, float]:
     """Dobiera pa = s0 + d, pb = s0 - d tak, by szansa wygrania meczu do 2 setów = p_match (z uwzględnieniem formy dnia sigma).
 
     s0 = średnia szansa punktu przy serwisie dla touru i nawierzchni.
     """
-    p = round(min(max(p_match, 0.01), 0.99), 3)
-    d = _solve(p, round(s0, 3), round(sigma, 3))
+    import numpy as np
+    p = min(max(float(p_match), 0.01), 0.99)
+    ds, ps = _table(round(s0, 3), round(sigma, 3))
+    q = p if p >= 0.5 else 1 - p             # symetria: p(-d) = 1 - p(d)
+    d = float(np.interp(q, ps, ds))
+    d = d if p >= 0.5 else -d
     return _r(s0 + d), _r(s0 - d)
 
 

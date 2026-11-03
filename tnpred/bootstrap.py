@@ -388,6 +388,8 @@ def refresh(st: State, force: bool = False, network: bool = True) -> None:
         st.step("model", True, f"{len(m.df)} meczów, {sum(1 for _ in m.elo.r)} zawodników; ostatni mecz {m.df.date.max():%Y-%m-%d}"
                 if len(m.df) else "brak meczów w bazie")
         autotune(st)
+        from . import features
+        features._index(m.df)                 # rozgrzewka: indeks zawodników przed pierwszym wejściem na stronę
         pr = prune_played(st)
         lg = log_predictions(st)
         sb = bets_mod.settle_open(st.conn, st.lookup)

@@ -1,3 +1,10 @@
+## 0.3.5 - szybkie ładowanie strony Mecze
+- „Forma dnia” (0.3.0) spowolniła liczenie meczu ok. 10×: przy kilkudziesięciu meczach z kursami strona Mecze na Renderze
+  liczyła się ponad minutę i nie ładowała się. Teraz: tablica szansa→serwis liczona raz na tour+nawierzchnię (interpolacja
+  zamiast szukania dla każdego meczu), H2H i forma z indeksu zawodników zamiast przeszukiwania 25 tys. meczów.
+- Pomiar (120 meczów, Twoje dane): strona Mecze 0,08 s (wcześniej kilka s lokalnie ≈ minuta na Renderze); pierwsze wejście
+  po restarcie przygotowywane w tle.
+
 ## 0.3.4 - odporność na błędną wartość GITHUB_REPO
 - Render: GITHUB_REPO zawierał enter i dopisek („safe-n/flask-football-app⏎2”) - GitHub odpowiadał 404, przez co dziennik,
   zakłady i wyniki z GitHuba nigdy się nie zapisywały/wczytywały. Tenis bierze teraz tylko pierwsze słowo zmiennej

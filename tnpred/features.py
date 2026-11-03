@@ -18,8 +18,45 @@ def _score(r, flip: bool) -> str:
     return s + ("" if c.lower().startswith("compl") else f" ({c})")
 
 
+_IDX: dict = {}
+_REC_COLS = ("date", "tournament", "surface", "round", "winner", "loser", "comment", "total_games",
+             "w1", "l1", "w2", "l2", "w3", "l3", "w4", "l4", "w5", "l5")
+
+
+def _index(df: pd.DataFrame) -> dict:
+    """Indeks zawodnik -> numery wierszy + kolumny jako zwykłe tablice; budowany raz na wersję danych
+    (zamiast przeszukiwać i konwertować 25 tys. meczów przy każdej karcie meczu)."""
+    key = (id(df), len(df))
+    idx = _IDX.get(key)
+    if idx is None:
+        _IDX.clear()
+        rows: dict = {}
+        for i, (t, w, l) in enumerate(zip(df.tour.astype(str), df.winner.astype(str), df.loser.astype(str))):
+            rows.setdefault((t, w), []).append(i)
+            rows.setdefault((t, l), []).append(i)
+        cols = {}
+        for c in _REC_COLS:
+            if c in df.columns:
+                v = df[c]
+                cols[c] = (v.astype(str) if str(v.dtype) == "category" else v).to_numpy()
+        idx = {"rows": rows, "cols": cols}
+        _IDX[key] = idx
+    return idx
+
+
+def _rows(df: pd.DataFrame, tour: str, name: str):
+    return _index(df)["rows"].get((str(tour), str(name)), [])
+
+
+def _rec(df: pd.DataFrame, i: int) -> dict:
+    cols = _index(df)["cols"]
+    r = {c: a[i] for c, a in cols.items()}
+    r["date"] = pd.Timestamp(r["date"])
+    return r
+
+
 def player_matches(df: pd.DataFrame, tour: str, name: str, before=None) -> pd.DataFrame:
-    d = df[(df.tour == tour) & ((df.winner == name) | (df.loser == name))]
+    d = df.iloc[_rows(df, tour, name)]
     if before is not None:
         d = d[d.date < pd.Timestamp(before)]
     return d
@@ -34,10 +71,9 @@ def chips(rows: list[dict]) -> str:
 
 
 def h2h(df: pd.DataFrame, tour: str, p1: str, p2: str, n: int = 6) -> dict:
-    d = df[(df.tour == tour) & (((df.winner == p1) & (df.loser == p2)) | ((df.winner == p2) & (df.loser == p1)))]
-    d = d.sort_values("date", ascending=False)
+    both = sorted(set(_rows(df, tour, p1)) & set(_rows(df, tour, p2)), reverse=True)   # wiersze są po dacie
     rows = []
-    for r in d.to_dict("records"):
+    for r in (_rec(df, i) for i in both):
         won = r["winner"] == p1
         rows.append({"res": "W" if won else "P",
                      "tip": f"{r['date']:%Y-%m-%d} {r['tournament']} ({r['surface']}, {r['round']}): {_score(r, not won)}"})
@@ -46,12 +82,15 @@ def h2h(df: pd.DataFrame, tour: str, p1: str, p2: str, n: int = 6) -> dict:
 
 
 def form(df: pd.DataFrame, tour: str, name: str, n: int = 10, surface: str | None = None) -> dict:
-    d = player_matches(df, tour, name)
-    if surface:
-        d = d[d.surface == surface]
-    d = d.sort_values("date", ascending=False).head(n)
+    picked = []
+    for i in reversed(_rows(df, tour, name)):        # od najnowszego
+        if surface and _index(df)["cols"]["surface"][i] != surface:
+            continue
+        picked.append(i)
+        if len(picked) >= n:
+            break
     rows = []
-    for r in d.to_dict("records"):
+    for r in (_rec(df, i) for i in picked):
         won = r["winner"] == name
         opp = r["loser"] if won else r["winner"]
         rows.append({"res": "W" if won else "P",
