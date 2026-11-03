@@ -51,6 +51,25 @@ def pull(p: str, branch: str | None = None) -> tuple[str | None, str | None]:
     return base64.b64decode(data["content"]).decode("utf-8"), data["sha"]
 
 
+def check() -> tuple[bool, str]:
+    """Czy token widzi repo i może do niego pisać - czytelny opis do zakładki Dane (bez ujawniania tokenu)."""
+    try:
+        r = _call("GET", f"/repos/{config.GITHUB_REPO}")
+    except GhStoreError as e:
+        return False, str(e)
+    except requests.RequestException as e:
+        return False, f"brak połączenia z GitHubem: {e}"
+    if r.status_code == 404:
+        return False, (f"token nie widzi repo „{config.GITHUB_REPO}” - sprawdź GITHUB_REPO (ma być safe-n/flask-football-app) "
+                       f"i czy token ma dostęp do tego repo")
+    if r.status_code != 200:
+        return False, f"GitHub odpowiedział HTTP {r.status_code}"
+    perm = (r.json().get("permissions") or {})
+    if perm and not perm.get("push"):
+        return False, f"token widzi {config.GITHUB_REPO}, ale nie może zapisywać - nadaj mu „Contents: Read and write”"
+    return True, f"token OK, repo {config.GITHUB_REPO}"
+
+
 def git_sha(text: str) -> str:
     """Sha pliku liczone jak w gicie - pozwala pominąć wysyłkę, gdy treść się nie zmieniła."""
     import hashlib

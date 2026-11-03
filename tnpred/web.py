@@ -26,6 +26,17 @@ def _f(x):
         return None
 
 
+def _build_info() -> str:
+    """Commit i czas startu serwera (Render podaje RENDER_GIT_COMMIT) - widać, czy wgrała się nowa wersja."""
+    import os
+    c = (os.getenv("RENDER_GIT_COMMIT") or "")[:7]
+    started = pd.Timestamp.now(tz=config.TZ).strftime("%d.%m %H:%M")
+    return (f"commit {c} · " if c else "") + f"start {started}"
+
+
+BUILD = _build_info()
+
+
 def _manual_date(day, hhmm) -> str:
     """Data z formularza; z godziną -> zapis w UTC (jak z The Odds API), bez godziny -> sam dzień."""
     day = day or f"{pd.Timestamp.today():%Y-%m-%d}"
@@ -68,7 +79,7 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
         return val
 
     def render(tpl, title, **kw):
-        return render_template(tpl, title=title, nav=NAV, R=request.script_root, version=__version__,
+        return render_template(tpl, title=title, nav=NAV, R=request.script_root, version=__version__, build=BUILD,
                                football=config.FOOTBALL_LINK, **kw)
 
     def page(title, *blocks, refresh=False):

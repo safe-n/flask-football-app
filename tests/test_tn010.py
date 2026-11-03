@@ -253,6 +253,29 @@ class DailyHistorySync(unittest.TestCase):
         self.assertIn("WTA_", names[0])
 
 
+class GhCheck(unittest.TestCase):
+    def test_check_messages(self):
+        from unittest import mock
+        from tnpred import gh_store
+        with mock.patch.object(gh_store, "_call", return_value=mock.Mock(status_code=404)):
+            ok, msg = gh_store.check()
+        self.assertFalse(ok)
+        self.assertIn("GITHUB_REPO", msg)
+        resp = mock.Mock(status_code=200)
+        resp.json.return_value = {"permissions": {"push": False}}
+        with mock.patch.object(gh_store, "_call", return_value=resp):
+            ok, msg = gh_store.check()
+        self.assertFalse(ok)
+        self.assertIn("Read and write", msg)
+
+    def test_version_on_page(self):
+        from tnpred import __version__
+        from tnpred.web import create_app
+        st = bootstrap.State(os.path.join(_TMP, "ver.db"))
+        c = create_app(st, background=False).test_client()
+        self.assertIn(f"tenis v{__version__}".encode(), c.get("/data").data)
+
+
 class StartTimes(unittest.TestCase):
     def test_when_statuses(self):
         from tnpred import views as V

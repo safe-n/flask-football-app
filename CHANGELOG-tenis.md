@@ -1,3 +1,8 @@
+## 0.3.2 - wersja na górze strony + sprawdzanie tokenu GitHub
+- Na górze każdej strony: „tenis vX.Y.Z · commit abc1234 · start dd.mm hh:mm” - widać, która wersja jest wgrana i kiedy serwer wystartował.
+- Zakładka Dane: krok „GitHub: token” mówi wprost, czy token widzi repo i może do niego pisać (bez tego dziennik, zakłady
+  i codzienne wyniki nie działają).
+
 ## 0.3.1 - codzienna aktualizacja wyników bez Commit/Push
 - `python -m tnpred push-history` (albo dwuklik `aktualizuj_tenis.bat`): pobiera bieżący rok z tennis-data.co.uk na Twoim
   komputerze i wysyła go prosto do GitHuba (gałąź ledger-data, folder tennis/history) razem z parametrami modelu.

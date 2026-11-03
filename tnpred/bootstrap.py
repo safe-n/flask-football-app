@@ -315,6 +315,10 @@ def sync_down(st: State) -> None:
     if not gh_store.enabled():
         st.step("GitHub (zapis trwały)", True, "wyłączone - brak GITHUB_TOKEN/GITHUB_REPO: dziennik i zakłady znikną przy restarcie")
         return
+    ok, msg = gh_store.check()
+    st.step("GitHub: token", ok, msg)
+    if not ok:
+        return
     try:
         a = gh_store.sync_down("predictions", lambda t: ledger.import_text(st.conn, t))
         b = gh_store.sync_down("bets", lambda t: bets_mod.import_text(st.conn, t))

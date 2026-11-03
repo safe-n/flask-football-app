@@ -54,6 +54,7 @@ th:first-child,td:first-child{text-align:left}td.l,th.l{text-align:left}.m{color
 .chip{display:inline-block;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700;background:var(--bar);color:var(--fg);margin-left:6px;vertical-align:1px}
 .chip.live{background:var(--dn);color:#fff}.chip.soon{background:var(--warn);color:#fff}.chip.done{background:var(--r);color:#fff}
 .tm{font-weight:800;margin-right:6px}.match.started{opacity:.75}
+.ver{font-size:11px;color:var(--mut);text-align:right;margin:-4px 0 -6px}
 .ok{color:var(--up)}.bad{color:var(--dn)}details summary{cursor:pointer;font-weight:600}
 </style>
 <script>
@@ -75,6 +76,7 @@ window.addEventListener('pageshow',function(){fbBadge();fbSync();});
 </script>
 </head>
 <body>
+<div class="ver">tenis v{{ version }}{% if build %} · {{ build }}{% endif %}</div>
 <h1><span class="ball"></span>{{ title }}</h1>
 <nav>{% for href, lab in nav %}<a href="{{ R }}{{ href }}" class="{{ 'on' if request.path == href.split('?')[0] else '' }}">{{ lab }}{% if href == '/coupon' %}<span id="fb-badge"></span>{% endif %}</a>{% endfor %}{% if football %}<a href="{{ football }}">⚽ Piłka</a>{% endif %}</nav>
 {% block body %}{% endblock %}
