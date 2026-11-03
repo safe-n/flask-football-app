@@ -1,3 +1,11 @@
+## 0.3.9 - wątek tła w procesie, który obsługuje strony + 5× szybsze liczenie modelu
+- Przyczyna „wiecznego” ładowania i pustej zakładki Dane: serwer wczytuje aplikację w jednym procesie, a strony obsługuje
+  w kopii tego procesu - wątki z oryginału w kopii nie istnieją, a blokady skopiowane w trakcie liczenia zostają zamknięte.
+  Logi pokazywały „odświeżanie zakończone” (proces główny), a strona nic nie widziała (kopia). Teraz wątek tła startuje
+  przy pierwszym zapytaniu w procesie obsługującym strony (też przy pingu UptimeRobota w /healthz piłki), ze świeżymi blokadami.
+- Usuwanie marży z 25 tys. historycznych kursów liczone naraz (numpy) zamiast w pętli: model 4,0 s -> 0,7 s u mnie
+  (na Renderze z minut do kilkunastu sekund). Wynik identyczny (różnica < 1e-13).
+
 ## 0.3.8 - diagnostyka startu
 - Dane: kroki „model: liczę” (z czasem) i „kursy: czekam na model / pobieram”, a podczas startu - gdzie są teraz wątki.
 

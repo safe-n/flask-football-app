@@ -67,6 +67,7 @@ class State:
         self.refresh_started: float | None = None
         self.refresh_thread: int | None = None
         self.bg_thread: int | None = None
+        self.bg_pid: int | None = None
         self._lookup = None
 
     # ------------------------------------------------------------------ diagnostyka
@@ -434,6 +435,30 @@ def refresh(st: State, force: bool = False, network: bool = True) -> None:
     finally:
         st.refreshing = False
         st.lock.release()
+
+
+def ensure_background(st: State) -> bool:
+    """Startuje wątek tła w procesie, który NAPRAWDĘ obsługuje strony. Serwer (gunicorn z --preload / Render)
+    może wczytać aplikację w procesie głównym i obsługiwać strony w procesie potomnym - wątki z procesu głównego
+    tam nie istnieją, a blokady skopiowane w trakcie liczenia zostają „zamknięte” na zawsze. Wołane przy każdym zapytaniu."""
+    import os
+    pid = os.getpid()
+    if st.bg_pid == pid:
+        return False
+    with _START_LOCK:
+        if st.bg_pid == pid:
+            return False
+        if st.bg_pid is not None:                 # jesteśmy kopią po fork - świeże blokady i flagi
+            st.lock = threading.Lock()
+            st.model_lock = threading.Lock()
+            st.refreshing = False
+            st.step("proces", True, f"nowy proces serwera (pid {pid}) - startuję wątek tła tutaj")
+        st.bg_pid = pid
+        start_background(st)
+        return True
+
+
+_START_LOCK = threading.Lock()
 
 
 def start_background(st: State) -> None:

@@ -11,7 +11,7 @@ import pandas as pd
 from . import config
 from .elo import Elo, surface_of, walk
 from .names import NameIndex
-from .odds import blend, market_pair
+from .odds import blend, market_pair, market_pair_vec
 from .pointmodel import mixture_dist, serve_probs, summarize
 from .tdata import add_derived
 
@@ -71,9 +71,12 @@ class TennisModel:
         self.elo, pre = walk(df, config.ELO_SURFACE_WEIGHT, config.ELO_USE_RETIRED) if len(df) else (Elo(), np.array([]))
         df = df.copy()
         df["p_elo_w"] = pre
-        mk = [market_pair(a, b) for a, b in zip(df.get("psw", []), df.get("psl", []))]
-        mk2 = [market_pair(a, b) for a, b in zip(df.get("avgw", []), df.get("avgl", []))]
-        df["p_mkt_w"] = [m[0] if m else (m2[0] if m2 else np.nan) for m, m2 in zip(mk, mk2)]
+        if len(df):
+            p_ps = market_pair_vec(df["psw"], df["psl"])
+            p_avg = market_pair_vec(df["avgw"], df["avgl"])
+            df["p_mkt_w"] = np.where(np.isnan(p_ps), p_avg, p_ps)
+        else:
+            df["p_mkt_w"] = []
         self.df = slim(df)
         self.s0 = {**S0_DEFAULT, **self.params.get("s0", {})}
         self.w = {**W_DEFAULT, **self.params.get("blend_w", {})}

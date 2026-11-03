@@ -304,6 +304,20 @@ class NonBlockingPages(unittest.TestCase):
         self.assertNotIn("Ładuję dane".encode(), r.data)
 
 
+class ForkSafety(unittest.TestCase):
+    def test_background_restarts_in_new_process(self):
+        from unittest import mock
+        st = bootstrap.State(os.path.join(_TMP, "fork.db"))
+        with mock.patch.object(bootstrap, "start_background") as sb:
+            self.assertTrue(bootstrap.ensure_background(st))
+            self.assertFalse(bootstrap.ensure_background(st))      # ten sam proces - drugi raz nie
+            st.model_lock.acquire()                                  # kopia po fork z „zamkniętą” blokadą
+            st.bg_pid = -1
+            self.assertTrue(bootstrap.ensure_background(st))
+        self.assertEqual(sb.call_count, 2)
+        self.assertFalse(st.model_lock.locked())                     # świeża blokada w nowym procesie
+
+
 class StartTimes(unittest.TestCase):
     def test_when_statuses(self):
         from tnpred import views as V

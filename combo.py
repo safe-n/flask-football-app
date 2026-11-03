@@ -16,3 +16,9 @@ from tnpred.web import create_app as _tennis  # noqa: E402
 
 tennis = _tennis()
 app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {"/tennis": tennis})
+
+
+@app.before_request
+def _tennis_background():
+    # UptimeRobot pinguje /healthz piłki - przy okazji upewniamy się, że tenis ma działający wątek tła w tym procesie
+    tennis.config["TN_ENSURE_BG"]()

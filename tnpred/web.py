@@ -65,8 +65,12 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
         bootstrap.load_local(st)
     except Exception as e:  # noqa: BLE001
         st.step("historia z repo", False, str(e))
-    if background if background is not None else config.AUTO_BOOTSTRAP:
-        bootstrap.start_background(st)
+    use_bg = background if background is not None else config.AUTO_BOOTSTRAP
+    app.config["TN_ENSURE_BG"] = (lambda: bootstrap.ensure_background(st)) if use_bg else (lambda: False)
+    if use_bg:
+        @app.before_request
+        def _bg():
+            bootstrap.ensure_background(st)     # wątek tła startuje w procesie obsługującym strony (nie przy imporcie)
 
     cache: dict = {}
 
