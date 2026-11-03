@@ -1,3 +1,8 @@
+## 0.3.7 - strony nie czekają na przeliczanie modelu (502 na Renderze)
+- Podczas liczenia modelu (start, nowe wyniki) każde wejście na tenisa czekało - na darmowym Renderze kilka minut, więc
+  Render zwracał 502. Teraz: w trakcie przeliczania strony działają na poprzednim modelu; przy pierwszym starcie od razu
+  pokazują „Ładuję dane…” z automatycznym odświeżaniem. Zakładka Dane działa zawsze (widać postęp startu).
+
 ## 0.3.6 - BŁĄD: od 0.2.0 nie pobierały się mecze z kursami
 - Przy odchudzaniu danych (0.2.0) zniknęła kolumna „location”, z której korzystało dopasowanie nawierzchni turnieju
   z The Odds API -> krok „kursy” kończył się błędem 'location' i lista meczów zostawała pusta. Naprawione + test regresji.

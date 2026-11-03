@@ -68,17 +68,23 @@ class State:
             with self.model_lock:
                 if self.model is None or self.model_version != self.data_version:
                     v = self.data_version
-                    self.model = None
-                    self._lookup = None
+                    new = TennisModel(db.load_matches(self.conn))     # stary model obsługuje strony, dopóki nowy się liczy
+                    self.model, self._lookup, self.model_version = new, None, v
+                    del new
                     free_memory()
-                    self.model = TennisModel(db.load_matches(self.conn))
-                    self.model_version = v
-                    free_memory()
+        return self.model
+
+    def model_for_web(self):
+        """Dla stron: nigdy nie czekamy minutami na przeliczenie (Render po ok. minucie zwraca 502).
+        Jest model (nawet sprzed nowych danych) -> używamy go, a nowy liczy się w tle. Brak modelu -> None (strona „Ładuję…”)."""
+        stale = self.model is None or self.model_version != self.data_version
+        if stale and not self.model_lock.locked():
+            threading.Thread(target=self.get_model, daemon=True, name="tnpred-model").start()
         return self.model
 
     def lookup(self, tour, date, p1, p2):
         """Wynik meczu p1–p2 (dowolna kolejność) w oknie [data-3, data+4] - albo None."""
-        m = self.get_model()
+        m = self.model if self.model is not None else self.get_model()
         if self._lookup is None:
             idx: dict = {}
             for i, (t, w, l) in enumerate(zip(m.df.tour.astype(str), m.df.winner.astype(str), m.df.loser.astype(str))):

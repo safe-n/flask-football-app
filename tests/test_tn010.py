@@ -276,6 +276,34 @@ class GhCheck(unittest.TestCase):
         self.assertIn(f"tenis v{__version__}".encode(), c.get("/data").data)
 
 
+class NonBlockingPages(unittest.TestCase):
+    def test_loading_page_while_model_builds(self):
+        from tnpred.web import create_app
+        st = bootstrap.State(os.path.join(_TMP, "load.db"))
+        db.upsert_matches(st.conn, demo_df())
+        app = create_app(st, background=False)
+        st.mark_changed()
+        st.model = None
+        with st.model_lock:                    # symulacja: model właśnie się liczy
+            r = app.test_client().get("/")
+            d = app.test_client().get("/data")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("Ładuję dane".encode(), r.data)
+        self.assertIn(b"historia z repo", d.data)
+
+    def test_stale_model_serves_pages(self):
+        from tnpred.web import create_app
+        st = bootstrap.State(os.path.join(_TMP, "stale.db"))
+        db.upsert_matches(st.conn, demo_df())
+        app = create_app(st, background=False)
+        st.get_model()
+        st.mark_changed()                      # nowe dane -> model nieaktualny
+        with st.model_lock:
+            r = app.test_client().get("/ranking")
+        self.assertEqual(r.status_code, 200)
+        self.assertNotIn("Ładuję dane".encode(), r.data)
+
+
 class StartTimes(unittest.TestCase):
     def test_when_statuses(self):
         from tnpred import views as V
