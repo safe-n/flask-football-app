@@ -229,6 +229,8 @@ def update_from_source(leagues: list[str], seasons: list[int] | None = None, his
                 if lg in NO_CSV:                       # Liga Mistrzów: football-data.org, Liga Europy: TheSportsDB
                     from . import extsource
                     rows = extsource.fetch_season(lg, y)
+                    if extsource.partial():
+                        log(f"  {lg} {y}: UWAGA - limit zapytań API urwał pobieranie, wynik częściowy; uruchom komendę ponownie za minutę")
                 else:
                     rows = csvdata.parse_csv(csvdata.download(lg, y), lg, y)
                 res = save_matches(rows, hd)

@@ -1,2 +1,2 @@
 """fbpred - modele prawdopodobieństw dla meczów piłkarskich."""
-__version__ = "0.9.4"
+__version__ = "0.9.5"

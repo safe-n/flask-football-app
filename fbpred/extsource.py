@@ -20,3 +20,8 @@ def fetch_season(league: str, season: int) -> list[dict]:
 
 def source_name(league: str) -> str:
     return "TheSportsDB" if sportsdb.enabled(league) else "football-data.org"
+
+
+def partial() -> bool:
+    """True, gdy ostatnie pobranie z TheSportsDB urwał limit zapytań (wynik niepełny - uruchom ponownie za minutę)."""
+    return sportsdb.PARTIAL["flag"]

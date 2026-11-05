@@ -72,6 +72,29 @@ class TestParse(unittest.TestCase):
         self.assertTrue(any("liga w danych" in x for x in out))
 
 
+class TestRateLimit(unittest.TestCase):
+    def test_partial_result_kept(self):
+        old_p, sportsdb.ROUND_PAUSE = sportsdb.ROUND_PAUSE, 0
+
+        def fake(path, params=None):
+            if path == "eventsseason.php":
+                return [ev(1, "2026-09-24", "A", "B", "1", "0", "Match Finished")]
+            if params["r"] == 1:
+                return [ev(2, "2026-10-01", "C", "D", "2", "2", "Match Finished")]
+            raise sportsdb.RateLimited("limit")
+        old, sportsdb._get = sportsdb._get, fake
+        try:
+            rows = sportsdb.fetch_season("EL", 2026)
+            self.assertEqual(len(rows), 2)                                           # nie tracimy tego, co się udało
+            self.assertTrue(extsource.partial())
+            sportsdb._get = lambda path, params=None: (_ for _ in ()).throw(sportsdb.RateLimited("limit"))
+            with self.assertRaises(sportsdb.RateLimited):                            # nic nie pobrano -> błąd
+                sportsdb.fetch_season("EL", 2026)
+        finally:
+            sportsdb._get = old
+            sportsdb.ROUND_PAUSE = old_p
+
+
 class TestLeagueFilter(unittest.TestCase):
     def test_conference_league_rejected(self):
         e = ev(1, "2026-09-24", "A", "B", "1", "0", "Match Finished", strLeague="UEFA Conference League")

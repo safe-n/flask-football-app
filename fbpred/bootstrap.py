@@ -263,7 +263,7 @@ def refresh(leagues_: list[str] | None = None, log_predictions: bool = True, log
             try:
                 rows = extsource.fetch_season(lg, y)
                 db.upsert_matches(conn, rows)
-                d[src] = f"ok: {len(rows)} meczów sezonu {y} (wyniki + terminarz)"
+                d[src] = f"ok: {len(rows)} meczów sezonu {y} (wyniki + terminarz)" + (" - CZĘŚCIOWO (limit zapytań API), reszta przy następnym odświeżeniu" if extsource.partial() else "")
             except Exception as e:  # noqa: BLE001
                 d[src] = f"błąd: {e}"
                 log(f"[refresh] {lg}: {e}")

@@ -27,6 +27,13 @@ class SportsDbError(RuntimeError):
     pass
 
 
+class RateLimited(SportsDbError):
+    """Darmowy klucz publiczny jest wspólny dla wszystkich - limit zapytań bywa wyczerpany."""
+
+
+PARTIAL = {"flag": False}                     # czy ostatnie pobranie urwał limit zapytań (wynik częściowy)
+
+
 def enabled(league: str) -> bool:
     return league in LEAGUE_IDS
 
@@ -45,7 +52,7 @@ def _get(path: str, params: dict | None = None) -> list[dict]:
         except ValueError as e:
             raise SportsDbError(f"TheSportsDB zwróciło nie-JSON dla {path}") from e
         return (data or {}).get("events") or []
-    raise SportsDbError(f"TheSportsDB: limit zapytań ({path})")
+    raise RateLimited(f"TheSportsDB: limit zapytań ({path})")
 
 
 def season_label(year: int) -> str:
@@ -90,7 +97,7 @@ def parse_event(e: dict, league: str, season: int) -> dict | None:
                 hg=hg, ag=ag, kickoff=kickoff_of(e))
 
 
-ROUND_PAUSE = 2.2                              # darmowy limit ~30 zapytań/min
+ROUND_PAUSE = 3.0                              # darmowy limit ~30 zapytań/min
 EXTRA_ROUNDS = (16, 32, 125, 150, 200)         # numeracja TheSportsDB dla fazy pucharowej bywa nietypowa
 
 
@@ -98,24 +105,29 @@ def fetch_events(league: str, season: int, rounds: bool = True) -> list[dict]:
     """Surowe zdarzenia sezonu. Darmowe API ucina listę sezonu do 15 zdarzeń, więc pobieramy kolejka po kolejce
     (+ ostatnie/następne) i deduplikujemy po idEvent."""
     lid, label = LEAGUE_IDS[league], season_label(season)
-    ev = {str(e.get("idEvent")): e for e in _get("eventsseason.php", {"id": lid, "s": label})}
-    if rounds:
-        empty = 0
-        for r in list(range(1, 15)) + list(EXTRA_ROUNDS):
-            if r < 15 and empty >= 3:                  # 3 puste kolejki z rzędu: reszta numerów ligowych pusta, idziemy do pucharowych
-                continue
-            time.sleep(ROUND_PAUSE)
-            got = _get("eventsround.php", {"id": lid, "r": r, "s": label})
-            empty = empty + 1 if not got else 0
-            for e in got:
-                ev.setdefault(str(e.get("idEvent")), e)
-    if season == (date.today().year if date.today().month >= 7 else date.today().year - 1):
-        for path in ("eventspastleague.php", "eventsnextleague.php"):
-            try:
+    PARTIAL["flag"] = False
+    ev: dict[str, dict] = {}
+    try:
+        for e in _get("eventsseason.php", {"id": lid, "s": label}):
+            ev[str(e.get("idEvent"))] = e
+        if rounds:
+            empty = 0
+            for r in list(range(1, 15)) + list(EXTRA_ROUNDS):
+                if r < 15 and empty >= 3:              # 3 puste kolejki z rzędu: reszta numerów ligowych pusta, idziemy do pucharowych
+                    continue
+                time.sleep(ROUND_PAUSE)
+                got = _get("eventsround.php", {"id": lid, "r": r, "s": label})
+                empty = empty + 1 if not got else 0
+                for e in got:
+                    ev.setdefault(str(e.get("idEvent")), e)
+        if season == (date.today().year if date.today().month >= 7 else date.today().year - 1):
+            for path in ("eventspastleague.php", "eventsnextleague.php"):
                 for e in _get(path, {"id": lid}):
                     ev.setdefault(str(e.get("idEvent")), e)
-            except SportsDbError:
-                pass
+    except RateLimited:
+        PARTIAL["flag"] = True                         # zwracamy to, co się udało; kolejne odświeżenie dociągnie resztę
+        if not ev:
+            raise
     return list(ev.values())
 
 

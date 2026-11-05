@@ -1,4 +1,7 @@
 
+## 0.9.5 - Liga Europy: odporność na limit zapytań
+- Probe potwierdził, że kolejki TheSportsDB dają pełne dane EL (72 mecze z wynikami do 5.11, terminarz do stycznia, 126 meczów z godzinami po filtrach). Publiczny klucz jest jednak współdzielony i bywa limitowany - pobieranie zwraca teraz wynik częściowy zamiast błędu (flaga w Dane / komunikat przy history-init), przerwa między zapytaniami 3 s.
+
 ## 0.9.4 - Liga Europy: pobieranie kolejka po kolejce
 - Wynik `sportsdb-probe` pokazał, że darmowe API ucina listę sezonu do 15 zdarzeń. Teraz zawsze pobieramy kolejki (r=1..14 + numery pucharowe) z przerwą 2,2 s (limit zapytań), a zdarzenia z innej ligi niż „Europa League” (np. Conference) są odrzucane. Probe pokazuje nazwę ligi i statystyki każdej kolejki.
 
