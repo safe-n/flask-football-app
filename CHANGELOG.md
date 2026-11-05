@@ -1,4 +1,9 @@
 
+## 0.9.2 - godzina i status meczu, przycisk PDF na górze Zestawienia
+- Mecze: godzina startu (czas lokalny, domyślnie Europe/Warsaw - zmienna FB_TZ) i status jak w tenisie: „za 45 min”, „▶ rozpoczęty”, „zakończony?”; mecze pogrupowane po dniach i posortowane wg godziny. Godzina także w Zestawieniu i w PDF.
+- Źródła godzin: football-data.org (utcDate) i kolumna Time z fixtures.csv (czas brytyjski -> UTC). Nowa kolumna `kickoff` tylko w bazie SQLite (pliki history/*.csv bez zmian); starsze bazy migrują się same.
+- Zestawienie: link „📄 Eksport PDF” na górze strony (jak w tenisie), widoczny gdy w zestawieniu są typy.
+
 ## 0.9.1 - eksport do PDF i link do tenisa
 - Menu: przycisk „🎾 Tenis” (link do /tennis/).
 - PDF (wszystkie ligi w jednym pliku, zielone/czerwone pola jak w aplikacji): `/export/recent.pdf?days=14` (Ostatnie), `/export/journal.pdf` (Dziennik), `/export/coupon.pdf` (Zestawienie z AKO). Przyciski w zakładkach Ostatnie, Dziennik i Zestawienie.

@@ -59,6 +59,12 @@ def _team(t: dict, resolver: Callable | None) -> str:
     return short or full
 
 
+def _kickoff(utc) -> str | None:
+    """'2026-11-05T20:00:00Z' -> '2026-11-05 20:00' (UTC); None, gdy brak godziny."""
+    s = str(utc or "")
+    return s[:16].replace("T", " ") if len(s) >= 16 and ":" in s else None
+
+
 def parse_match(m: dict, league: str, season: int, resolver: Callable | None = None) -> dict | None:
     """Mecz z API -> wiersz bazy. None dla meczów, których nie umiemy uczciwie wykorzystać."""
     status = m.get("status")
@@ -82,7 +88,7 @@ def parse_match(m: dict, league: str, season: int, resolver: Callable | None = N
     ref = next((r.get("name") for r in refs if r.get("type") in (None, "REFEREE") and r.get("name")), None)
     return dict(fixture_id=ID_OFFSET + int(m["id"]), league=league, season=season, date=str(m["utcDate"])[:10],
                 home=_team(m["homeTeam"], resolver), away=_team(m["awayTeam"], resolver), referee=ref, status=st,
-                hg=hg, ag=ag, hg_ht=hg_ht, ag_ht=ag_ht)
+                hg=hg, ag=ag, hg_ht=hg_ht, ag_ht=ag_ht, kickoff=_kickoff(m.get("utcDate")))
 
 
 def fetch_season(league: str, season: int, resolver: Callable | None = None, token: str | None = None) -> list[dict]:

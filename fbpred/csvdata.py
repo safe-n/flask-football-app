@@ -62,6 +62,19 @@ def download_fixtures(timeout: int = 30) -> str:
     return r.content.decode("utf-8-sig", errors="replace")
 
 
+def _kickoff_utc(t, day) -> str | None:
+    """Kolumna Time z football-data.co.uk (czas brytyjski) -> 'YYYY-MM-DD HH:MM' w UTC; None, gdy brak/nieczytelna."""
+    import re
+    m = re.fullmatch(r"\s*(\d{1,2}):(\d{2})\s*", str(t)) if t is not None and t == t else None
+    if not m:
+        return None
+    try:
+        loc = pd.Timestamp(day).normalize() + pd.Timedelta(hours=int(m.group(1)), minutes=int(m.group(2)))
+        return loc.tz_localize("Europe/London", ambiguous=True, nonexistent="shift_forward").tz_convert("UTC").strftime("%Y-%m-%d %H:%M")
+    except (ValueError, TypeError):
+        return None
+
+
 def parse_csv(text: str, league: str, year: int | None = None, only_div: bool = False) -> list[dict]:
     """year=None -> sezon wyliczany z daty (lipiec+ = nowy sezon). only_div: filtruj kolumnę Div == league."""
     df = pd.read_csv(io.StringIO(text), on_bad_lines="skip")
@@ -79,6 +92,7 @@ def parse_csv(text: str, league: str, year: int | None = None, only_div: bool = 
         ou = _first(r, ODDS_OU)
         fid = zlib.crc32(f"{league}|{date}|{h}|{a}".encode()) & 0x7FFFFFFF
         has_stats = _int(r.get("HY")) is not None
+        kick = _kickoff_utc(r.get("Time"), r["_d"])
         rows.append(dict(
             fixture_id=fid, league=league, season=yr, date=date, home=h, away=a,
             referee=(str(r["Referee"]).strip() if pd.notna(r.get("Referee")) else None),
@@ -90,7 +104,7 @@ def parse_csv(text: str, league: str, year: int | None = None, only_div: bool = 
             h_corners=_int(r.get("HC")), a_corners=_int(r.get("AC")),
             h_yellow=_int(r.get("HY")), a_yellow=_int(r.get("AY")),
             h_red=_int(r.get("HR")), a_red=_int(r.get("AR")),
-            stats_done=1 if has_stats else 0,
+            stats_done=1 if has_stats else 0, kickoff=kick,
             o_home=o[0], o_draw=o[1], o_away=o[2], o_over25=ou[0], o_under25=ou[1],
         ))
     return rows

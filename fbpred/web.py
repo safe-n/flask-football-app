@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
 
-from . import ai, avail, bets as bets_mod, pdfexport, bootstrap, h2h as h2h_mod, config, db, draws, gh_store, history, ledger, leagues as lg_cat, params as prm, profile as prof, recent as recent_mod, recent_vis, stats, suggest as sg
+from . import ai, avail, bets as bets_mod, kickoff as kick_mod, pdfexport, bootstrap, h2h as h2h_mod, config, db, draws, gh_store, history, ledger, leagues as lg_cat, params as prm, profile as prof, recent as recent_mod, recent_vis, stats, suggest as sg
 from .betmarkets import GROUPS as BET_GROUPS, book_odds, catalogue, parse_leg
 from .odds import apply_blend, value_picks
 from .simulate import simulate_table
@@ -182,6 +182,10 @@ def create_app() -> Flask:
                               "h2h_flag": h2h_mod.flag(hh, x["1"], x["2"], r["home"], r["away"]),
                               "form_h": {"all": h2h_mod.form(hist_df, r["home"]), "venue": h2h_mod.form(hist_df, r["home"], venue="home")},
                               "form_a": {"all": h2h_mod.form(hist_df, r["away"]), "venue": h2h_mod.form(hist_df, r["away"], venue="away")}})
+        now = pd.Timestamp.now(tz="UTC")
+        for it in items:
+            it["when"] = kick_mod.when(it["row"].get("kickoff"), it["row"]["date"], now)
+        items.sort(key=lambda it: (it["when"]["day"], it["when"]["sort"]))
         return render_template("index.html", items=items, base=base, margin=margin, league=league, leagues=league_options(), skipped=skipped,
                                title=f"Mecze · {lg_cat.name(league)}")
 
@@ -388,7 +392,8 @@ def create_app() -> Flask:
                 continue
             league, date, home, away, key = tup
             row = match_row(league, home, away, date)
-            base = {"id": lid, "liga": league, "data": date, "mecz": f"{home} – {away}", "key": key}
+            base = {"id": lid, "liga": league, "data": date, "mecz": f"{home} – {away}", "key": key,
+                    "godz": kick_mod.when(row.get("kickoff") if row else None, date)["time"]}
             if row is None:
                 out_legs.append({**base, "blad": "mecz niedostępny (rozegrany lub usunięty z terminarza)"})
                 continue

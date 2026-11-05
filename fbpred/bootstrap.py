@@ -174,10 +174,15 @@ def fill_upcoming(conn, lg: str, season_rows, log=_log) -> tuple[int, str]:
                               (d + pd.Timedelta(days=1)).strftime("%Y-%m-%d"))).fetchone()
         if found:
             existed += 1
+            if r.get("kickoff"):      # fixtures.csv bywa bez godzin - uzupełnij z football-data.org
+                conn.execute("UPDATE matches SET kickoff=? WHERE league=? AND home=? AND away=? AND date BETWEEN ? AND ? AND kickoff IS NULL",
+                             (r["kickoff"], lg, r["home"], r["away"], (d - pd.Timedelta(days=1)).strftime("%Y-%m-%d"),
+                              (d + pd.Timedelta(days=1)).strftime("%Y-%m-%d")))
+                conn.commit()
             continue
         fid = zlib.crc32(f"{lg}|{r['date']}|{r['home']}|{r['away']}".encode()) & 0x7FFFFFFF
         db.upsert_matches(conn, [dict(fixture_id=fid, league=lg, season=r["season"], date=r["date"], home=r["home"],
-                                      away=r["away"], referee=r.get("referee"), status="NS")])
+                                      away=r["away"], referee=r.get("referee"), status="NS", kickoff=r.get("kickoff"))])
         added += 1
     msg = f"terminarz: dodano {added} nadchodzących (bez kursów), {existed} już było w fixtures.csv"
     return added, msg + (f"; pominięto {skipped} (nierozpoznane nazwy)" if skipped else "")

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block body %}
+<p class="tabs"><a id="pdftop" href="/export/coupon.pdf" target="_blank" style="display:none">📄 Eksport PDF</a></p>
 <div class="card"><div id="coupon" class="m">Ładowanie…</div></div>
 <div class="card" id="aibox" {% if not ai_enabled %}style="display:none"{% endif %}>
   <button id="aibtn">🤖 Analiza AI zestawienia (wiadomości, składy, ryzyka)</button>
@@ -53,8 +54,12 @@ function ako(d,inps,panel){
     line.appendChild(sv);line.appendChild(msg);
   }
 }
+function pdfHref(c){var pt=document.getElementById('pdftop');if(!pt)return;var qq=query(c);try{qq.append('stake',localStorage.getItem('fb_stake')||'');}catch(e){}
+  pt.href='/export/coupon.pdf?'+qq.toString();pt.style.display=c.length?'inline':'none';}
+document.addEventListener('click',function(e){var t=e.target.closest&&e.target.closest('#pdftop');if(t)pdfHref(fbLoad());});
 function draw(){
   var c=fbLoad();
+  pdfHref(c);
   if(!c.length){box.textContent='Zestawienie jest puste. Dodaj typy ze strony Podpowiedzi albo Mecz (przycisk ＋).';return;}
   fetch('/api/coupon?'+query(c).toString()).then(function(r){return r.json().then(function(d){return [r.status,d];});}).then(function(x){
     if(x[0]===202){box.textContent=x[1].komunikat;setTimeout(draw,6000);return;}
@@ -67,7 +72,7 @@ function render(d,c){
   var inps=[];
   d.legs.forEach(function(l,i){
     var r=el('tr');
-    r.appendChild(el('td',(l.data||'').slice(5)+' '+(l.mecz||l.id)));
+    r.appendChild(el('td',(l.data||'').slice(5)+(l.godz?' '+l.godz:'')+' '+(l.mecz||l.id)));
     if(l.blad){var td=el('td',l.blad,'warn');td.colSpan=3;r.appendChild(td);}
     else{r.appendChild(el('td',l.rynek));r.appendChild(el('td',(100*l.p).toFixed(0)+'%'));r.appendChild(el('td',l.kurs_fair.toFixed(2)));}
     var tdo=el('td');

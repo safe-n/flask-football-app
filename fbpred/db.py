@@ -14,6 +14,9 @@ COLUMNS = [
     "o_home", "o_draw", "o_away", "o_over25", "o_under25", "o_btts_yes", "o_btts_no",
 ]
 
+# Godzina startu (UTC, "YYYY-MM-DD HH:MM") jest tylko w bazie - NIE w COLUMNS, żeby nie zmieniać plików history/*.csv
+DB_COLUMNS = COLUMNS + ["kickoff"]
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS matches (
     fixture_id INTEGER PRIMARY KEY,
@@ -30,7 +33,8 @@ CREATE TABLE IF NOT EXISTS matches (
     h_yellow INTEGER, a_yellow INTEGER, h_red INTEGER, a_red INTEGER,
     stats_done INTEGER DEFAULT 0,
     o_home REAL, o_draw REAL, o_away REAL,
-    o_over25 REAL, o_under25 REAL, o_btts_yes REAL, o_btts_no REAL
+    o_over25 REAL, o_under25 REAL, o_btts_yes REAL, o_btts_no REAL,
+    kickoff TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_matches_league_date ON matches (league, date);
 """
@@ -45,6 +49,9 @@ def connect(path: str | Path) -> sqlite3.Connection:
     except sqlite3.DatabaseError:
         pass
     conn.executescript(SCHEMA)
+    if "kickoff" not in {r[1] for r in conn.execute("PRAGMA table_info(matches)")}:
+        conn.execute("ALTER TABLE matches ADD COLUMN kickoff TEXT")      # migracja starszych baz
+        conn.commit()
     return conn
 
 
@@ -53,13 +60,13 @@ def upsert_matches(conn: sqlite3.Connection, rows: list[dict]) -> int:
     if not rows:
         return 0
     updates = ", ".join(
-        f"{c}=COALESCE(excluded.{c}, matches.{c})" for c in COLUMNS if c != "fixture_id"
+        f"{c}=COALESCE(excluded.{c}, matches.{c})" for c in DB_COLUMNS if c != "fixture_id"
     )
     sql = (
-        f"INSERT INTO matches ({', '.join(COLUMNS)}) VALUES ({', '.join('?' * len(COLUMNS))}) "
+        f"INSERT INTO matches ({', '.join(DB_COLUMNS)}) VALUES ({', '.join('?' * len(DB_COLUMNS))}) "
         f"ON CONFLICT(fixture_id) DO UPDATE SET {updates}"
     )
-    conn.executemany(sql, [tuple(r.get(c) for c in COLUMNS) for r in rows])
+    conn.executemany(sql, [tuple(r.get(c) for c in DB_COLUMNS) for r in rows])
     conn.commit()
     return len(rows)
 
@@ -106,7 +113,7 @@ def load_upcoming(conn: sqlite3.Connection, league: str | None = None, since: st
 
 def update_fields(conn: sqlite3.Connection, fixture_id: int, fields: dict) -> None:
     """Aktualizuje wybrane kolumny jednego meczu (bez ruszania reszty)."""
-    bad = set(fields) - set(COLUMNS)
+    bad = set(fields) - set(DB_COLUMNS)
     if bad:
         raise ValueError(f"Nieznane kolumny: {bad}")
     sets = ", ".join(f"{k}=?" for k in fields)

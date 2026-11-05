@@ -156,7 +156,7 @@ def coupon_pdf(data: dict, stake: float | None = None) -> bytes:
     """data: wynik compute_coupon (legs, laczne, ostrzezenia)."""
     legs = [l for l in data["legs"] if not l.get("blad")]
     story = [_p("Zestawienie typów", H1)]
-    rows = [[l["data"], Paragraph(escape(l["mecz"]), CELL), Paragraph(escape(l["rynek"]), CELL), _pct(l["p"]), f"{l['kurs_fair']:.2f}",
+    rows = [[(l["data"] + (" " + l["godz"] if l.get("godz") else "")), Paragraph(escape(l["mecz"]), CELL), Paragraph(escape(l["rynek"]), CELL), _pct(l["p"]), f"{l['kurs_fair']:.2f}",
              f"{l['kurs_uzyty']:.2f}" if l.get("kurs_uzyty") else "–"] for l in legs]
     story.append(_table(["data", "mecz", "rynek", "szansa (model)", "uczciwy kurs", "kurs"], rows, [], [48, 200, 170, 60, 60, 50]))
     n = len(legs)
