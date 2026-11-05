@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 
@@ -16,6 +17,10 @@ from .odds import edge, kelly, valid
 
 NAV = [("/", "Mecze"), ("/match", "Mecz"), ("/suggest", "Podpowiedzi"), ("/coupon", "Zestawienie"), ("/ranking", "Ranking Elo"),
        ("/recent", "Ostatnie"), ("/backtest", "Backtest"), ("/track", "Dziennik"), ("/bets", "Moje zakłady"), ("/data", "Dane")]
+
+
+RECENT_D = float(os.getenv("TN_RECENT_D", "0.05"))          # zakładka Ostatnie: over/TB kolorowane, gdy model odbiega od średniej ≥ 5 pp
+RECENT_D_WIN = float(os.getenv("TN_RECENT_D_WIN", "0.10"))  # faworyt kolorowany od 60% (50% + 10 pp)
 
 
 def _f(x):
@@ -543,22 +548,76 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
                               ("Tie-break", float(c.tb.mean()), float(c.p_tb.mean()), b_tb if b_tb == b_tb else None),
                               ("Bez straty seta", float(c.straight.mean()), float(c.p_straight.mean()), None),
                               ("TB w 1. secie", float(c.set1_tb.mean()), float(c.p_set1_tb.mean()), None)])
+        d_win, d_mk = RECENT_D_WIN, RECENT_D
+
+        def judge(p, ref, d, happened):
+            """Kolor = czy wynik zgodny z ODCHYLENIEM prognozy od punktu odniesienia (dla over/TB: średnia touru,
+            nawierzchni i formatu; dla zwycięzcy: 50%). Model wyraźnie wyżej (≥ d) i weszło -> zielony, nie weszło -> czerwony;
+            wyraźnie niżej - odwrotnie; w granicach ±d = szary (model nie różni się od średniej, nie rozliczamy)."""
+            if p is None or p != p or ref is None or ref != ref:
+                return "mid", None
+            if p - ref >= d:
+                return ("yes", 1) if happened else ("no", 0)
+            if ref - p >= d:
+                return ("yes", 1) if not happened else ("no", 0)
+            return "mid", None
+
+        def _ll1(q, y):
+            q = min(max(float(q), 1e-4), 1 - 1e-4)
+            return -(y * np.log(q) + (1 - y) * np.log(1 - q))
+
+        tally = {k: {"hit": 0, "n": 0, "ll_m": 0.0, "ll_b": 0.0, "cnt": 0} for k in ("fav", "over", "tb")}
         trs = []
         for r in c.sort_values("date", ascending=False).head(150).itertuples():
             fav1 = r.p >= 0.5
-            ok = fav1 == (r.y == 1)
+            pf = max(r.p, 1 - r.p)
             over = r.total_games > r.line
+            bs = base[(r.tour, r.surface, r.best_of)]
+            b_over = bs.get("over", {}).get(f"{r.line}", np.nan)
+            b_tb = bs.get("p_tb", np.nan)
+            cf, hf = judge(pf, 0.5, d_win, fav1 == (r.y == 1))
+            co, ho = judge(r.p_over, b_over, d_mk, over)
+            ct, ht = judge(r.p_tb, b_tb, d_mk, bool(r.tb))
+            for key, h, q, ref, y in (("fav", hf, pf, 0.5, float(fav1 == (r.y == 1))), ("over", ho, r.p_over, b_over, float(over)),
+                                      ("tb", ht, r.p_tb, b_tb, float(r.tb))):
+                t = tally[key]
+                if h is not None:
+                    t["hit"] += h
+                    t["n"] += 1
+                if key != "fav" and ref == ref and q == q:
+                    t["ll_m"] += _ll1(q, y)
+                    t["ll_b"] += _ll1(ref, y)
+                    t["cnt"] += 1
+
+            def tip(q, ref):
+                return f' title="model {V.pct(q)} · średnia {V.pct(ref)}"' if ref == ref and q == q else ""
             trs.append(f'<tr><td class="mt1"><span class="dt">{r.date:%m-%d}</span>{escape(r.p1)} – {escape(r.p2)}</td><td>{escape(r.score)}</td>'
-                       f'<td class="mc {"yes" if ok else "no"}">{escape(V.short(r.p1 if fav1 else r.p2))} <small>{V.pct(max(r.p, 1 - r.p))}</small></td>'
-                       f'<td class="mc {"yes" if over else "no"}">{int(r.total_games)} <small>{V.pct(r.p_over)}</small></td>'
-                       f'<td class="mc {"yes" if r.tb else "no"}">{"TAK" if r.tb else "nie"} <small>{V.pct(r.p_tb)}</small></td></tr>')
+                       f'<td class="mc {cf}">{escape(V.short(r.p1 if fav1 else r.p2))} <small>{V.pct(pf)}</small></td>'
+                       f'<td class="mc {co}"{tip(r.p_over, b_over)}>{int(r.total_games)} <small>{V.pct(r.p_over)}</small></td>'
+                       f'<td class="mc {ct}"{tip(r.p_tb, b_tb)}>{"TAK" if r.tb else "nie"} <small>{V.pct(r.p_tb)}</small></td></tr>')
+        n_shown = min(len(c), 150)
+
+        def calib(label, t, vs_avg=True):
+            if t["n"]:
+                txt = f"trafione {t['hit']} z {t['n']} wyraźnych sygnałów · szare {n_shown - t['n']}"
+            else:
+                txt = "brak wyraźnych sygnałów (wszystko szare)"
+            if vs_avg and t["cnt"]:
+                gain = 100 * (t["ll_b"] - t["ll_m"]) / t["ll_b"]
+                txt += f" · model vs średnia: {'lepszy' if gain > 0 else 'gorszy'} o {abs(gain):.1f}% (log-loss, wszystkie mecze)"
+            return f"<span><b>{label}</b>: {txt}</span>"
+        calib_html = ('<div class="card"><div class="cap">Rozliczenie kolorów. Over i tie-break oceniane względem średniej dla touru, nawierzchni '
+                      f'i formatu (najedź na komórkę): zielony = model był wyraźnie (≥ {round(100 * d_mk)} pp) wyżej/niżej od średniej i wynik poszedł '
+                      f'w tę stronę, czerwony = w przeciwną, szary = model ≈ średnia. Faworyt: szary, gdy szansa poniżej {V.pct(0.5 + d_win)}. '
+                      'Pojedynczy mecz to loteria - liczy się bilans; „model vs średnia” mówi, czy model w ogóle wie więcej niż sama średnia.</div><div class="calib">'
+                      + calib("faworyt", tally["fav"], vs_avg=False) + calib("over gemów", tally["over"]) + calib("tie-break", tally["tb"]) + "</div></div>")
         table = ('<div class="card rt"><table><tr><th>mecz</th><th>wynik</th><th>faworyt modelu</th><th>gemy (szansa over)</th><th>tie-break (szansa)</th></tr>'
                  + "".join(trs) + "</table></div>")
         tabs = [("7 dni", "/recent?days=7"), ("14 dni", "/recent?days=14"), ("30 dni", "/recent?days=30"), ("ATP", f"/recent?days={days}&tour=ATP"), ("WTA", f"/recent?days={days}&tour=WTA")]
         return page("Ostatnie", ("tabs", tabs), ("html", k),
                     ("html", f'<div class="card"><div class="cap">Forma modelu (najnowsze z lewej): ✓ = faworyt modelu wygrał</div><div class="fstrip">{strip}</div></div>'),
                     ("html", f'<div class="card"><div class="cap">Rynki: słupek = jak często zaszło, biała kreska = średnia szansa wg modelu, kropka = średnia nawierzchni</div>{bars}</div>'),
-                    ("html", table),
+                    ("html", calib_html), ("html", table),
                     ("p", "Prognozy sprzed meczu (Elo zna tylko wcześniejsze mecze). Mała próba = dużo szumu: tydzień dobrych lub złych wyników niewiele mówi."))
 
     @app.get("/backtest")
