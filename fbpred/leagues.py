@@ -20,10 +20,11 @@ CATALOG: dict[str, tuple[str, str, str | None]] = {
     "G1": ("Super League", "GRE", None),
     "SC0": ("Scottish Premiership", "SCO", None),
     "CL": ("Liga Mistrzów", "EUR", "CL"),
+    "EL": ("Liga Europy", "EUR", None),             # dane z TheSportsDB (sportsdb.py), bez połówek/kartek/rożnych
 }
 
-# ligi, których NIE ma w football-data.co.uk (dane tylko z football-data.org, wymaga darmowego tokenu)
-NO_CSV = {"CL"}
+# ligi, których NIE ma w football-data.co.uk (CL: football-data.org z darmowym tokenem; EL: TheSportsDB)
+NO_CSV = {"CL", "EL"}
 
 
 def name(code: str) -> str:

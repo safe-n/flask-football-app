@@ -1,4 +1,10 @@
 
+## 0.9.3 - Liga Europy (EL) z TheSportsDB - wersja próbna
+- Nowa liga `EL` (Liga Europy): wyniki i terminarz z darmowego API TheSportsDB (`fbpred/sportsdb.py`, router źródeł `fbpred/extsource.py`; Liga Mistrzów nadal z football-data.org). Faza ligowa od września, eliminacje i mecze po dogrywce/karnych pomijane.
+- Ograniczenia: brak wyników do przerwy, kartek i rożnych (zakładki pokazują tylko rynki z goli), model uczy się tylko na meczach EL (mała próba na początku sezonu).
+- Komenda `python -m fbpred sportsdb-probe` pokazuje, co faktycznie zwraca API. Opcjonalna zmienna `SPORTSDB_KEY` (domyślnie darmowy klucz publiczny).
+- EL jest pomijana w testach zbiorczych (profile, fatigue) tak jak LM.
+
 ## 0.9.2 - godzina i status meczu, przycisk PDF na górze Zestawienia
 - Mecze: godzina startu (czas lokalny, domyślnie Europe/Warsaw - zmienna FB_TZ) i status jak w tenisie: „za 45 min”, „▶ rozpoczęty”, „zakończony?”; mecze pogrupowane po dniach i posortowane wg godziny. Godzina także w Zestawieniu i w PDF.
 - Źródła godzin: football-data.org (utcDate) i kolumna Time z fixtures.csv (czas brytyjski -> UTC). Nowa kolumna `kickoff` tylko w bazie SQLite (pliki history/*.csv bez zmian); starsze bazy migrują się same.

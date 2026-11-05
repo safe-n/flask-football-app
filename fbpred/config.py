@@ -76,3 +76,4 @@ AI_MAX_TOKENS = int(os.getenv("AI_MAX_TOKENS", "900"))
 
 TZ = os.getenv("FB_TZ", "Europe/Warsaw")                          # strefa do wyświetlania godzin meczów
 MATCH_HOURS = float(os.getenv("FB_MATCH_HOURS", "2.5"))             # po tylu godzinach od startu mecz uznajemy za „pewnie zakończony”
+SPORTSDB_KEY = os.getenv("SPORTSDB_KEY", "123")                   # TheSportsDB: darmowy klucz publiczny (Liga Europy)

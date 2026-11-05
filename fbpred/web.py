@@ -643,7 +643,7 @@ def create_app() -> Flask:
         balance = max(0.02, min(float(request.args.get("balance", 10)) / 100, 0.4))
         conn = db.connect(config.DB_PATH)
         df = db.load_matches(conn, None if request.args.get("all") == "1" else league)
-        df = df[~df["league"].isin(["DEMO", "CL"])]
+        df = df[~df["league"].isin(["DEMO", "CL", "EL"])]
         res = prof.odds_profile(df, balance)
         scope = "wszystkie ligi w bazie" if request.args.get("all") == "1" else lg_cat.name(league)
         if not res["n"]:

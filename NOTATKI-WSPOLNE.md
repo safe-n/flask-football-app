@@ -37,6 +37,7 @@ Zmiany w obszarze drugiej rozmowy: tylko gdy właściciel poprosi, a jeśli to k
 - **Tenis – kursy**: The Odds API (`ODDS_API_KEY`, 500 kredytów/mies., budżet w aplikacji 450).
 
 ## Dziennik zmian (najnowsze na górze)
+- **2026-11-05 · piłka 0.9.3** (wątek piłki): Liga Europy `EL` z TheSportsDB (`fbpred/sportsdb.py`, `extsource.py`), wersja próbna - aktywuje się dopiero po pojawieniu się `history/EL_*.csv` (komenda `history-init --league EL` na PC). Nowa opcjonalna zmienna `SPORTSDB_KEY`.
 - **2026-11-05 · piłka 0.9.2** (wątek piłki): godzina startu i status meczu w Mecze/Zestawieniu/PDF (`fbpred/kickoff.py`, kolumna `kickoff` tylko w SQLite, zmienne `FB_TZ`, `FB_MATCH_HOURS`), link „Eksport PDF” na górze Zestawienia. Liga Europy: brak w darmowym football-data.org - czeka na decyzję o źródle.
 - **2026-11-05 · tenis 0.3.10** (wątek tenisa): styl zawodnika w tie-breakach ATP (`tnpred/style.py`, `tennis_params/style.json`),
   kolory w „Ostatnich” względem średniej touru/nawierzchni, `PYTHONUTF8=1` w `aktualizuj_tenis_auto.bat`.

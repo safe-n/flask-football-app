@@ -102,6 +102,11 @@ def cmd_avail_probe(a):
     avail.probe(a.league)
 
 
+def cmd_sportsdb_probe(a):
+    from . import sportsdb
+    sportsdb.probe(a.league, a.season)
+
+
 def cmd_upcoming(a):
     from .fetch import ApiClient, fetch_upcoming
     conn = db.connect(config.DB_PATH)
@@ -232,7 +237,7 @@ def cmd_profile(a):
     """Czy metoda 'wyrównane kursy + lekka przewaga gości => remis w 1. lub 2. połowie' działa na historii?"""
     conn = db.connect(config.DB_PATH)
     if a.leagues == "auto":
-        lgs = [r[0] for r in conn.execute("SELECT DISTINCT league FROM matches ORDER BY 1") if r[0] not in ("DEMO", "CL")]
+        lgs = [r[0] for r in conn.execute("SELECT DISTINCT league FROM matches ORDER BY 1") if r[0] not in ("DEMO", "CL", "EL")]
     else:
         lgs = [x.strip() for x in a.leagues.split(",")]
     df = pd.concat([db.load_matches(conn, lg) for lg in lgs], ignore_index=True) if lgs else pd.DataFrame()
@@ -544,6 +549,9 @@ def main(argv=None):
     s.add_argument("--seasons", default="2023")
     s.add_argument("--stats-limit", type=int, default=80)
     add("avail-probe", cmd_avail_probe, "sprawdź klucz API-Football i dostępne rynki kursów/kontuzje (kilka zapytań)")
+    s = add("sportsdb-probe", cmd_sportsdb_probe, "sprawdź, co zwraca TheSportsDB dla Ligi Europy (kilka zapytań)", league=False)
+    s.add_argument("--league", default="EL")
+    s.add_argument("--season", type=int, default=None, help="rok startu sezonu, np. 2026")
     s = add("upcoming", cmd_upcoming, "pobierz nadchodzące mecze i kursy (API)")
     s.add_argument("--days", type=int, default=7)
     add("check", cmd_check, "kontrola jakości danych")

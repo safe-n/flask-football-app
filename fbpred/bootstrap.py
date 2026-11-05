@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import config, csvdata, db, fdorg, gh_store, history, names
+from . import config, csvdata, db, extsource, fdorg, gh_store, history, names
 from .leagues import NO_CSV
 
 
@@ -98,10 +98,10 @@ def ensure_data(leagues_: list[str] | None = None, years: int = 4, min_matches: 
         for y in missing:
             try:
                 if lg in NO_CSV:
-                    if not fdorg.enabled():
+                    if not extsource.enabled(lg):
                         d["sezony"] = "brak tokenu football-data.org - nie uzupełniam"
                         break
-                    rows = fdorg.fetch_season(lg, y)
+                    rows = extsource.fetch_season(lg, y)
                 else:
                     rows = history.apply_aliases(csvdata.parse_csv(csvdata.download(lg, y), lg, y))
                 db.upsert_matches(conn, rows)
@@ -256,15 +256,16 @@ def refresh(leagues_: list[str] | None = None, log_predictions: bool = True, log
         d = DIAG.setdefault(lg, {})
         y = season_now()
         if lg in NO_CSV:
-            if not fdorg.enabled():
-                d["football-data.org"] = "brak tokenu FOOTBALL_DATA_ORG_TOKEN - brak odświeżania"
+            src = extsource.source_name(lg)
+            if not extsource.enabled(lg):
+                d[src] = "brak tokenu FOOTBALL_DATA_ORG_TOKEN - brak odświeżania"
                 continue
             try:
-                rows = fdorg.fetch_season(lg, y)
+                rows = extsource.fetch_season(lg, y)
                 db.upsert_matches(conn, rows)
-                d["football-data.org"] = f"ok: {len(rows)} meczów sezonu {y} (wyniki + terminarz)"
+                d[src] = f"ok: {len(rows)} meczów sezonu {y} (wyniki + terminarz)"
             except Exception as e:  # noqa: BLE001
-                d["football-data.org"] = f"błąd: {e}"
+                d[src] = f"błąd: {e}"
                 log(f"[refresh] {lg}: {e}")
             continue
         try:                                                                  # wyniki bieżącego sezonu
