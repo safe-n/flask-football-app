@@ -19,6 +19,14 @@ Wyłączenie: `autostart_wylacz.bat`.
 W Claude Desktop możesz też włączyć „Keep computer awake”; zamknięcie klapy laptopa i tak go usypia
 (Panel sterowania → Opcje zasilania → „Wybierz działanie po zamknięciu pokrywy” → „Nic nie rób” przy zasilaniu z sieci).
 
+## 2a. Aktualizacja kodu i restart – jednym przyciskiem
+Przy każdym starcie `uruchom_aplikacje.bat` sam pobiera najnowszy kod z GitHuba (git wbudowany w GitHub Desktop) i doinstalowuje
+biblioteki. Po zmianach wysłanych przez Claude nie trzeba więc klikać Pull ani zamykać okna:
+otwórz **`http://localhost:5000/restart`** (z telefonu: `http://NAZWA-KOMPUTERA:5000/restart`, link jest też w tenis → Dane)
+i kliknij **„🔄 Aktualizuj i zrestartuj”**. Po ok. minucie strona wróci sama. Na Renderze ten przycisk jest wyłączony
+(Render aktualizuje się sam). Jeśli w oknie pojawi się „Nie udało się pobrać zmian”, w folderze są zmienione pliki –
+sprawdź zakładkę Changes w GitHub Desktop.
+
 ## 3. Dostęp z telefonu (Tailscale, bezpłatnie)
 1. Laptop: zainstaluj Tailscale z **tailscale.com/download**, zaloguj się (np. kontem Google).
 2. Telefon: aplikacja **Tailscale** ze sklepu, zaloguj się **tym samym kontem**, włącz połączenie.

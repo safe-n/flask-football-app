@@ -25,7 +25,9 @@ Zmiany w obszarze drugiej rozmowy: tylko gdy właściciel poprosi, a jeśli to k
 - **Render** (darmowy plan, usługa `flask-football-app`): piłka pod `/`, tenis pod `/tennis/` (`combo.py`).
   UptimeRobot pinguje `/healthz`. Render zostaje jako zapas, gdy PC jest wyłączony.
 - **Kopia lokalna na PC** (`C:\GitHub\flask-football-app`, nazwa komputera `desktop-8r4t2nq`):
-  `lokalnie\uruchom_aplikacje.bat` → waitress na porcie 5000, autostart `lokalnie\autostart_wlacz.bat`.
+  `lokalnie\uruchom_aplikacje.bat` → `lokalnie\serwer.py` (git pull + pip + waitress na porcie 5000, pętla restartu),
+  autostart `lokalnie\autostart_wlacz.bat`. **Nowy kod na PC: strona `/restart` → „Aktualizuj i zrestartuj”**
+  (działa tylko lokalnie, `LOCAL_RESTART=1`). Nie wgrywaj plików bezpośrednio na PC – tylko przez GitHub, wtedy pull jest czysty.
   Telefon przez Tailscale: `http://desktop-8r4t2nq:5000/` (lub adres 100.x). Zapora: reguła na port 5000 tylko z 100.64.0.0/10.
 - **Kopia lokalna ma osobne dane**, żeby nie nadpisywać Rendera (ustawiane w `uruchom_aplikacje.bat` – nie zmieniaj nazw tych zmiennych):
   `DB_PATH=data\football_local.db`, `TN_DB_PATH=data\tennis_local.db`, `LEDGER_BRANCH` / `TN_LEDGER_BRANCH=ledger-data-local`.
@@ -37,6 +39,8 @@ Zmiany w obszarze drugiej rozmowy: tylko gdy właściciel poprosi, a jeśli to k
 - **Tenis – kursy**: The Odds API (`ODDS_API_KEY`, 500 kredytów/mies., budżet w aplikacji 450).
 
 ## Dziennik zmian (najnowsze na górze)
+- **2026-11-05 · infrastruktura**: przycisk `/restart` (w `combo.py`) + `lokalnie/serwer.py`: kopia na PC sama pobiera
+  kod z GitHuba przy starcie i po kliknięciu restartu; harmonogram „Tenis - aktualizacja wynikow” co 4 h ustawiony na PC.
 - **2026-11-05 · piłka 0.9.3** (wątek piłki): Liga Europy `EL` z TheSportsDB (`fbpred/sportsdb.py`, `extsource.py`), wersja próbna - aktywuje się dopiero po pojawieniu się `history/EL_*.csv` (komenda `history-init --league EL` na PC). Nowa opcjonalna zmienna `SPORTSDB_KEY`.
 - **2026-11-05 · piłka 0.9.2** (wątek piłki): godzina startu i status meczu w Mecze/Zestawieniu/PDF (`fbpred/kickoff.py`, kolumna `kickoff` tylko w SQLite, zmienne `FB_TZ`, `FB_MATCH_HOURS`), link „Eksport PDF” na górze Zestawienia. Liga Europy: brak w darmowym football-data.org - czeka na decyzję o źródle.
 - **2026-11-05 · tenis 0.3.10** (wątek tenisa): styl zawodnika w tie-breakach ATP (`tnpred/style.py`, `tennis_params/style.json`),

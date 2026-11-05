@@ -719,6 +719,9 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
                 busy += f'<div class="warn m" style="white-space:normal">Długo trwa. Wątek stoi w: {escape(bootstrap.stuck_where(st))}</div>'
         refresh_btn = (f'<form method="post" action="{request.script_root}/refresh"><button>Odśwież teraz</button> '
                        f'<span class="m">{busy}</span></form>')
+        if os.getenv("LOCAL_RESTART") == "1":   # kopia lokalna na PC (lokalnie/serwer.py)
+            refresh_btn += ('<p class="m"><a href="/restart?back=/tennis/data">🔄 Aktualizuj kod i zrestartuj aplikację na PC</a> '
+                            '– pobiera z GitHuba to, co wysłał Claude.</p>')
         return page("Dane", ("html", refresh_btn + fresh), ("t", info) if len(info) else ("p", "Baza pusta."),
                     ("html", f'<div class="card"><table><tr><th class="l">krok</th><th>stan</th><th class="l">opis</th><th>UTC</th></tr>{steps}</table></div>'),
                     ("h", "Parametry modelu"), ("t", params), ("p", f"Waga modelu w mieszance z rynkiem: {m.w}. Źródło: "
