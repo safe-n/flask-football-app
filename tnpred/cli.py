@@ -102,8 +102,32 @@ def cmd_push_history(a):
         text = json.dumps(params, indent=2, ensure_ascii=False)
         gh_store.push(text, gh_store.history_path("model.json"), message="tennis: parametry modelu")
         print("wysłano parametry modelu:", ", ".join(f"{k} {v}" for k, v in sorted(s0.items())))
+        _push_style(m)
     print(f"Gotowe: {sent} plik(ów) wysłanych. Aplikacja wczyta je przy najbliższym sprawdzeniu (co ok. 3 h) "
           f"albo od razu po kliknięciu „Odśwież teraz” w zakładce Dane.")
+
+
+def _push_style(m) -> dict:
+    """Liczy styl TB zawodników (kilkadziesiąt s), zapisuje lokalnie i wysyła do gałęzi z historią (Render wczyta)."""
+    from . import gh_store, style
+    st = style.compute(m)
+    style.save(st)
+    if gh_store.enabled():
+        gh_store.push(style.to_text(st), gh_store.history_path("style.json"), message="tennis: styl zawodników (TB)")
+    n = sum(len(v) for v in st["players"].values())
+    print(f"styl zawodników: {n} zawodników ({', '.join(st['tours'])})" + (" - wysłano" if gh_store.enabled() else ""))
+    return st
+
+
+def cmd_style(a):
+    """Policz (i wyślij) styl TB zawodników bez pobierania wyników; pokaż skrajnych."""
+    from . import style
+    m = _model()
+    st = _push_style(m) if not a.show else style.load()
+    for t in st.get("tours", []):
+        print(f"\n{t}: najwięcej / najmniej tie-breaków ponad model (styl po ściągnięciu, liczba meczów)")
+        for p, v, n in style.top(st, t, a.n):
+            print(f"  {p:24s} {100 * v:+5.1f} pp  ({n})")
 
 
 def cmd_install_task(a):
@@ -183,6 +207,10 @@ def main(argv=None):
     it.add_argument("--every", type=int, default=4, help="co ile godzin (domyślnie 4)")
     it.add_argument("--remove", action="store_true", help="usuń zaplanowane zadanie")
     it.set_defaults(fn=cmd_install_task)
+    sy = sub.add_parser("style", help="policz styl TB zawodników -> tennis_params/style.json (+ wyślij do GitHuba)")
+    sy.add_argument("--show", action="store_true", help="tylko pokaż zapisany")
+    sy.add_argument("-n", type=int, default=10)
+    sy.set_defaults(fn=cmd_style)
     t = sub.add_parser("tune", help="dobierz s0 (serwis) i wagę rynku -> tennis_params/model.json")
     t.set_defaults(fn=cmd_tune)
     b = sub.add_parser("backtest", help="walk-forward: model vs rynek, gemy, tie-breaki, kalibracja")

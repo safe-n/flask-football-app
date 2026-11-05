@@ -1,3 +1,17 @@
+## 0.3.10 - styl zawodnika w tie-breakach (ATP) + uczciwe kolory w „Ostatnich”
+- Model liczył tie-break wyłącznie z siły (szansa zwycięstwa) i nawierzchni: mecz dwóch „wielkich serwisów” i dwóch
+  „ścianiarzy” o tej samej różnicy Elo dostawał ten sam %. Nowy moduł `style.py`: dla każdego zawodnika średnia
+  „było TB - model przewidywał” z ostatnich 80 meczów, ściągnięta do zera przy małej próbie (k = 40), dodana w skali logit.
+  Walidacja (uczone 2023-2025, test 2026, 4671 meczów): ATP log-loss TB 0.6702 -> 0.6631; WTA bez zysku -> tylko ATP.
+  Surowa „średnia TB obu zawodników” wypadła gorzej nawet od samej średniej touru (szum małej próby, rywale, siła).
+  Przykłady: Mpetshi +16, Opelka +14, Hurkacz +10 pp; Báez -15, Munar -13 pp.
+- Liczenie (~45 s) robi komputer: `push-history` (lub `python -m tnpred style`) zapisuje `tennis_params/style.json`
+  i wysyła `style.json` do gałęzi z historią; Render tylko wczytuje. Strona meczu pokazuje styl i TB przed/po korekcie.
+- Backtest i „Ostatnie” liczą nadal model bez stylu (bez zaglądania w przyszłość).
+- „Ostatnie”: kolor = czy wynik poszedł w stronę odchylenia prognozy od średniej touru/nawierzchni/formatu (over, TB, ±5 pp,
+  `TN_RECENT_D`), faworyt od 60%; reszta szara. Karta rozliczenia + „model vs średnia” (log-loss).
+- `aktualizuj_tenis_auto.bat`: `PYTHONUTF8=1` (log Harmonogramu bez błędów kodowania).
+
 ## 0.3.9 - wątek tła w procesie, który obsługuje strony + 5× szybsze liczenie modelu
 - Przyczyna „wiecznego” ładowania i pustej zakładki Dane: serwer wczytuje aplikację w jednym procesie, a strony obsługuje
   w kopii tego procesu - wątki z oryginału w kopii nie istnieją, a blokady skopiowane w trakcie liczenia zostają zamknięte.

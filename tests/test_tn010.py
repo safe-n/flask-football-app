@@ -449,5 +449,31 @@ class AppTests(unittest.TestCase):
         self.assertEqual(conn.execute("SELECT status FROM bets WHERE id=?", (bid,)).fetchone()[0], "won")
 
 
+class PlayerStyle(unittest.TestCase):
+    def test_adjust(self):
+        from tnpred import style
+        st = {"b": 3.45, "tours": ["ATP"], "players": {"ATP": {"Big S.": 0.13, "Grinder G.": -0.12}}}
+        up, info = style.adjust(st, "ATP", "Big S.", "Other O.", 0.40)
+        self.assertGreater(up, 0.48)
+        self.assertEqual(info, [("Big S.", 0.13)])
+        down, _ = style.adjust(st, "ATP", "Grinder G.", "Other O.", 0.40)
+        self.assertLess(down, 0.32)
+        self.assertEqual(style.adjust(st, "WTA", "Big S.", "x", 0.40), (0.40, []))      # WTA bez korekty
+        self.assertEqual(style.adjust(st, "ATP", "Nobody", "x", 0.40), (0.40, []))      # brak danych = bez zmian
+
+    def test_compute_and_predict(self):
+        from tnpred import style
+        m = TennisModel(demo_df(), params={})
+        st = style.compute(m, tours=["ATP", "WTA"], min_matches=5)
+        self.assertTrue(st["players"].get("ATP"))
+        name, val = next(iter(st["players"]["ATP"].items()))
+        self.assertLess(abs(val), 1.0)
+        m.style = {**st, "players": {"ATP": {name: 0.2}}, "tours": ["ATP"]}
+        other = [n for n in st["players"]["ATP"] if n != name][0]
+        p = m.predict("ATP", "Hard", 3, name, other)
+        self.assertGreater(p["m"]["p_tb"], p["p_tb_base"])
+        self.assertEqual(p["style"][0][0], name)
+
+
 if __name__ == "__main__":
     unittest.main()

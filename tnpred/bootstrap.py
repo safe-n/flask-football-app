@@ -334,6 +334,12 @@ def sync_history(st: State) -> int:
                 save_params(json.loads(gh_store.pull_raw(gh_store.history_path(name)) or "{}"))
                 names.append("parametry modelu")
                 n += 1
+            elif name == "style.json":            # styl TB zawodników - liczy Twój komputer (push-history)
+                import json
+                from . import style as _style
+                _style.save(json.loads(gh_store.pull_raw(gh_store.history_path(name)) or "{}"))
+                names.append("styl zawodników")
+                n += 1
             db.meta_set(st.conn, key, sha)
         except Exception as e:  # noqa: BLE001
             st.step(f"wyniki z GitHuba: {name}", False, str(e))

@@ -325,11 +325,15 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
                   f'<p class="m">Punkt przy serwisie (z modelu): {escape(V.short(p["p1"]))} {V.pct(p["serve"][0], 1)}, '
                   f'{escape(V.short(p["p2"]))} {V.pct(p["serve"][1], 1)} (średnia nawierzchni {V.pct(p["s0"], 1)}). '
                   f'Średni handicap gemów: {p["m"]["diff_mean"]:+.1f}. Średnia nawierzchni: {p["base"].get("games_mean", float("nan")):.1f} gemów, '
-                  f'tie-break {V.pct(p["base"].get("p_tb"))}.</p></div>')
+                  f'tie-break {V.pct(p["base"].get("p_tb"))}.</p>'
+                  + (('<p class="m">Styl zawodników (tie-breaki ponad siłę i nawierzchnię, ostatnie mecze, ściągnięte do średniej): '
+                      + ", ".join(f'{escape(V.short(n))} {100 * v:+.0f} pp' for n, v in p["style"])
+                      + f' → tie-break {V.pct(p["p_tb_base"])} → <b>{V.pct(p["m"]["p_tb"])}</b>.</p>') if p.get("style") else "")
+                  + '</div>')
         players = '<div class="grid">' + V.player_block(m.df, p, 0) + V.player_block(m.df, p, 1) + "</div>"
         note = ('<p class="small">Gemy, sety i tie-breaki wynikają z jednej liczby - szansy wygrania punktu przy serwisie, dobranej tak, by zgadzała się '
-                'z szansą zwycięstwa. Model nie zna jeszcze indywidualnego stylu (np. „wielki serwis” = więcej tie-breaków) - przy takich zawodnikach '
-                'over/tie-break mogą być zaniżone. Zmęczenie i H2H są tylko informacyjne (nie zmieniają liczb).</p>')
+                'z szansą zwycięstwa. Indywidualny styl (np. „wielki serwis” = więcej tie-breaków) koryguje na razie tylko tie-break w ATP; '
+                'over gemów i WTA - bez korekty (test na 2026 nie pokazał tam zysku). Zmęczenie i H2H są tylko informacyjne (nie zmieniają liczb).</p>')
         return page(f"{p['p1']} – {p['p2']}", ("html", form + head + detail + players), ("html", V.sections(p, date, row)), ("html", note))
 
     # ------------------------------------------------------------------ Podpowiedzi

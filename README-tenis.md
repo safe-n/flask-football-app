@@ -7,6 +7,8 @@ Model ≈ rynek: to narzędzie do selekcji i oceny, nie „pewniaki”.
 
 tennis-data.co.uk nie wpuszcza serwerów (Render, GitHub), więc wyniki pobiera Twój komputer i wysyła je do GitHuba.
 Aplikacja sprawdza je co ok. 3 h. Bez Commit/Push i bez przebudowy Rendera.
+Przy nowych wynikach komputer liczy też **styl zawodników** (tie-breaki ponad siłę i nawierzchnię, na razie ATP) i wysyła
+`style.json`; ręcznie: `python -m tnpred style` (podgląd: `python -m tnpred style --show`).
 
 1. **Token GitHub** (jednorazowo): github.com → Settings → Developer settings → Personal access tokens → Fine-grained tokens →
    Generate new token. Repository access: *Only select repositories* → `flask-football-app`.

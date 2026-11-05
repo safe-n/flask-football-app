@@ -81,6 +81,8 @@ class TennisModel:
         self.s0 = {**S0_DEFAULT, **self.params.get("s0", {})}
         self.w = {**W_DEFAULT, **self.params.get("blend_w", {})}
         self.sigma = {**SIGMA_DEFAULT, **self.params.get("sigma", {})}
+        from . import style as _style
+        self.style = _style.load()            # styl TB zawodników (tennis_params/style.json, liczony na Twoim komputerze)
         self.names = {t: NameIndex(pd.concat([df[df.tour == t].winner, df[df.tour == t].loser]).astype(str).tolist())
                       for t in (df.tour.unique() if len(df) else [])}
         self.base = self._base_rates()
@@ -148,6 +150,11 @@ class TennisModel:
         pa, pb = serve_probs(p, s0, sg)
         dist = mixture_dist(pa, pb, sg, best_of, final_tb(best_of, series))
         m = summarize(dist, best_of)
+        from . import style as _style
+        p_tb_base = m["p_tb"]
+        p_tb_adj, style_info = _style.adjust(self.style, tour, n1, n2, p_tb_base)
+        if style_info:
+            m = {**m, "p_tb": p_tb_adj}
         warn = []
         for i in (i1, i2):
             if not i["known"]:
@@ -157,7 +164,8 @@ class TennisModel:
         return {"tour": tour, "surface": surface, "best_of": best_of, "p1": n1, "p2": n2, "info": [i1, i2],
                 "p_elo": p_elo, "p_market": mk[0] if mk else None, "p": p, "w": w_used if mk else None,
                 "s0": s0, "sigma": sg, "serve": (pa, pb), "m": m, "base": self.base_for(tour, surface, best_of),
-                "o1": o1, "o2": o2, "warn": warn}
+                "o1": o1, "o2": o2, "warn": warn,
+                "style": style_info, "p_tb_base": p_tb_base}
 
     # ---------------------------------------------------------------- strojenie
     def fit_s0(self, years: float = 3, sample: int = 1500, verbose=False, with_sigma: bool = True) -> dict:
