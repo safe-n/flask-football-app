@@ -63,6 +63,9 @@ def kickoff_of(e: dict) -> str | None:
 
 def parse_event(e: dict, league: str, season: int) -> dict | None:
     """Zdarzenie API -> wiersz bazy; None, gdy nie umiemy go uczciwie wykorzystać (eliminacje, dogrywka, przełożony...)."""
+    lname = str(e.get("strLeague") or "").lower()
+    if lname and ("europa league" not in lname or "conference" in lname):       # zabezpieczenie przed pomyłką id ligi
+        return None
     day = str(e.get("dateEvent") or "")[:10]
     home, away = (e.get("strHomeTeam") or "").strip(), (e.get("strAwayTeam") or "").strip()
     if len(day) != 10 or not home or not away:
@@ -87,19 +90,25 @@ def parse_event(e: dict, league: str, season: int) -> dict | None:
                 hg=hg, ag=ag, kickoff=kickoff_of(e))
 
 
+ROUND_PAUSE = 2.2                              # darmowy limit ~30 zapytań/min
+EXTRA_ROUNDS = (16, 32, 125, 150, 200)         # numeracja TheSportsDB dla fazy pucharowej bywa nietypowa
+
+
 def fetch_events(league: str, season: int, rounds: bool = True) -> list[dict]:
-    """Surowe zdarzenia sezonu: lista sezonu + (gdy ucięta) kolejki + ostatnie/następne - bez duplikatów."""
+    """Surowe zdarzenia sezonu. Darmowe API ucina listę sezonu do 15 zdarzeń, więc pobieramy kolejka po kolejce
+    (+ ostatnie/następne) i deduplikujemy po idEvent."""
     lid, label = LEAGUE_IDS[league], season_label(season)
     ev = {str(e.get("idEvent")): e for e in _get("eventsseason.php", {"id": lid, "s": label})}
-    if rounds and (len(ev) >= 90 or not ev):                           # darmowe API potrafi ucinać do ~100 zdarzeń
+    if rounds:
         empty = 0
-        for r in range(1, 40):
+        for r in list(range(1, 15)) + list(EXTRA_ROUNDS):
+            if r < 15 and empty >= 3:                  # 3 puste kolejki z rzędu: reszta numerów ligowych pusta, idziemy do pucharowych
+                continue
+            time.sleep(ROUND_PAUSE)
             got = _get("eventsround.php", {"id": lid, "r": r, "s": label})
             empty = empty + 1 if not got else 0
             for e in got:
                 ev.setdefault(str(e.get("idEvent")), e)
-            if empty >= 3:
-                break
     if season == (date.today().year if date.today().month >= 7 else date.today().year - 1):
         for path in ("eventspastleague.php", "eventsnextleague.php"):
             try:
@@ -117,30 +126,47 @@ def fetch_season(league: str, season: int) -> list[dict]:
 
 
 def probe(league: str = "EL", season: int | None = None, out=print) -> None:
-    """Co faktycznie zwraca API: liczby zdarzeń, statusy, zakres dat, próbki - do jednorazowej weryfikacji."""
+    """Co faktycznie zwraca API: nazwy lig, liczby zdarzeń na kolejkę, statusy, daty - do jednorazowej weryfikacji."""
     season = season or (date.today().year if date.today().month >= 7 else date.today().year - 1)
     lid, label = LEAGUE_IDS[league], season_label(season)
     out(f"TheSportsDB, liga {league} (id {lid}), sezon {label}, klucz {'publiczny 123' if config.SPORTSDB_KEY == '123' else 'własny'}")
+    seen: dict[str, dict] = {}
     for name, path, params in (("sezon", "eventsseason.php", {"id": lid, "s": label}), ("ostatnie", "eventspastleague.php", {"id": lid}),
-                               ("następne", "eventsnextleague.php", {"id": lid}), ("kolejka 1", "eventsround.php", {"id": lid, "r": 1, "s": label})):
+                               ("następne", "eventsnextleague.php", {"id": lid})):
         try:
-            ev = _get(path, params)
+            got = _get(path, params)
         except Exception as e:  # noqa: BLE001
             out(f"  {name}: BŁĄD {e}")
             continue
-        days = sorted(str(x.get("dateEvent")) for x in ev if x.get("dateEvent"))
-        stat: dict[str, int] = {}
-        for x in ev:
-            stat[str(x.get("strStatus"))] = stat.get(str(x.get("strStatus")), 0) + 1
-        out(f"  {name}: {len(ev)} zdarzeń" + (f", daty {days[0]} .. {days[-1]}" if days else "") + f", statusy {stat}")
-        for x in ev[:2] + ev[-1:]:
-            out(f"     {x.get('dateEvent')} {x.get('strTime')} ts={x.get('strTimestamp')} r={x.get('intRound')} "
-                f"{x.get('strHomeTeam')} {x.get('intHomeScore')}-{x.get('intAwayScore')} {x.get('strAwayTeam')} [{x.get('strStatus')}]")
-    try:
-        rows = fetch_season(league, season)
-    except Exception as e:  # noqa: BLE001
-        out(f"  pełne pobranie: BŁĄD {e}")
-        return
+        out(f"  {name}: {len(got)} zdarzeń; liga w danych: {sorted({str(x.get('strLeague')) for x in got})}")
+        for x in got:
+            seen.setdefault(str(x.get("idEvent")), x)
+    out("  kolejki (liczba zdarzeń | daty | statusy | liga):")
+    empty = 0
+    for r in list(range(1, 15)) + list(EXTRA_ROUNDS):
+        if r < 15 and empty >= 3:
+            continue
+        time.sleep(ROUND_PAUSE)
+        try:
+            got = _get("eventsround.php", {"id": lid, "r": r, "s": label})
+        except Exception as e:  # noqa: BLE001
+            out(f"    r={r}: BŁĄD {e}")
+            continue
+        empty = empty + 1 if not got else 0
+        if got:
+            days = sorted(str(x.get("dateEvent")) for x in got)
+            st: dict[str, int] = {}
+            for x in got:
+                st[str(x.get("strStatus"))] = st.get(str(x.get("strStatus")), 0) + 1
+            out(f"    r={r}: {len(got)} | {days[0]} .. {days[-1]} | {st} | {sorted({str(x.get('strLeague')) for x in got})}")
+            late = [x for x in got if str(x.get("dateEvent")) >= f"{season}-09-01"][:2]
+            for x in late:
+                out(f"        {x.get('dateEvent')} ts={x.get('strTimestamp')} {x.get('strHomeTeam')} {x.get('intHomeScore')}-{x.get('intAwayScore')} {x.get('strAwayTeam')} [{x.get('strStatus')}]")
+        for x in got:
+            seen.setdefault(str(x.get("idEvent")), x)
+    rows = [parse_event(e, league, season) for e in seen.values()]
+    rows = [r for r in rows if r]
     fin = [r for r in rows if r["status"] == "FT"]
-    out(f"Po filtrach (od {season}-{FIRST_MONTH:02d}-01, bez dogrywek): {len(rows)} meczów, w tym {len(fin)} z wynikiem, "
-        f"{len(rows) - len(fin)} nadchodzących, {sum(1 for r in rows if r.get('kickoff'))} z godziną. Drużyn: {len({r['home'] for r in rows} | {r['away'] for r in rows})}.")
+    out(f"Po filtrach (od {season}-{FIRST_MONTH:02d}-01, tylko Europa League, bez dogrywek): {len(rows)} meczów, w tym {len(fin)} z wynikiem, "
+        f"{len(rows) - len(fin)} nadchodzących, {sum(1 for r in rows if r.get('kickoff'))} z godziną. "
+        f"Drużyn: {len({r['home'] for r in rows} | {r['away'] for r in rows})}.")

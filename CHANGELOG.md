@@ -1,4 +1,7 @@
 
+## 0.9.4 - Liga Europy: pobieranie kolejka po kolejce
+- Wynik `sportsdb-probe` pokazał, że darmowe API ucina listę sezonu do 15 zdarzeń. Teraz zawsze pobieramy kolejki (r=1..14 + numery pucharowe) z przerwą 2,2 s (limit zapytań), a zdarzenia z innej ligi niż „Europa League” (np. Conference) są odrzucane. Probe pokazuje nazwę ligi i statystyki każdej kolejki.
+
 ## 0.9.3 - Liga Europy (EL) z TheSportsDB - wersja próbna
 - Nowa liga `EL` (Liga Europy): wyniki i terminarz z darmowego API TheSportsDB (`fbpred/sportsdb.py`, router źródeł `fbpred/extsource.py`; Liga Mistrzów nadal z football-data.org). Faza ligowa od września, eliminacje i mecze po dogrywce/karnych pomijane.
 - Ograniczenia: brak wyników do przerwy, kartek i rożnych (zakładki pokazują tylko rynki z goli), model uczy się tylko na meczach EL (mała próba na początku sezonu).

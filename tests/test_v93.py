@@ -34,6 +34,12 @@ class TestParse(unittest.TestCase):
         r = sportsdb.parse_event(ev(1, "2026-09-24", "Roma", "Lille"), "EL", 2026)
         self.assertEqual(r["fixture_id"], zlib.crc32(b"EL|2026-09-24|Roma|Lille") & 0x7FFFFFFF)
 
+    def setUp(self):
+        self._pause, sportsdb.ROUND_PAUSE = sportsdb.ROUND_PAUSE, 0
+
+    def tearDown(self):
+        sportsdb.ROUND_PAUSE = self._pause
+
     def test_fetch_merges_and_dedupes_when_truncated(self):
         calls = []
         season_ev = [ev(i, "2026-09-24", f"H{i}", f"A{i}", "1", "0", "Match Finished") for i in range(100)]   # ucięte do 100
@@ -55,12 +61,25 @@ class TestParse(unittest.TestCase):
 
     def test_probe_runs_offline(self):
         out = []
+        old_p, sportsdb.ROUND_PAUSE = sportsdb.ROUND_PAUSE, 0
         old, sportsdb._get = sportsdb._get, lambda path, params=None: [ev(1, "2026-09-24", "A", "B", "1", "0", "Match Finished", "2026-09-24T19:45:00")]
         try:
             sportsdb.probe("EL", 2026, out=out.append)
         finally:
             sportsdb._get = old
+            sportsdb.ROUND_PAUSE = old_p
         self.assertTrue(any("1 z wynikiem" in x for x in out))
+        self.assertTrue(any("liga w danych" in x for x in out))
+
+
+class TestLeagueFilter(unittest.TestCase):
+    def test_conference_league_rejected(self):
+        e = ev(1, "2026-09-24", "A", "B", "1", "0", "Match Finished", strLeague="UEFA Conference League")
+        self.assertIsNone(sportsdb.parse_event(e, "EL", 2026))
+        e["strLeague"] = "UEFA Europa League"
+        self.assertIsNotNone(sportsdb.parse_event(e, "EL", 2026))
+        e.pop("strLeague")
+        self.assertIsNotNone(sportsdb.parse_event(e, "EL", 2026))                    # brak nazwy: nie odrzucamy
 
 
 class TestRouting(unittest.TestCase):
