@@ -70,7 +70,7 @@ Symulacja typów (edge ≥ 3%): zakłady 19, ROI -12.26% _(mała próba = głów
 
 ## N1
 
-Rozliczone prognozy: **14**, oczekujące: **8**
+Rozliczone prognozy: **14**, oczekujące: **9**
 
 Log-loss na żywo (mniej = lepiej):
 
@@ -87,7 +87,7 @@ Symulacja typów (edge ≥ 3%): zakłady 13, ROI -3.85% _(mała próba = główn
 
 ## P1
 
-Rozliczone prognozy: **14**, oczekujące: **8**
+Rozliczone prognozy: **14**, oczekujące: **9**
 
 Log-loss na żywo (mniej = lepiej):
 
