@@ -7,3 +7,4 @@ id,created_at,leg,tour,date,p1,p2,key,label,grp,p,ref,kurs,status,settled_at,cou
 7,2026-11-10T21:46:41+00:00,ATP~2026-11-11~Humbert U.~Gojo B.~Hard~3~w1,ATP,2026-11-11,Humbert U.,Gojo B.,w1,Humbert U. wygra,Zwycięzca – faworyt,0.6437802998611246,,,open,,
 8,2026-11-10T21:46:45+00:00,ATP~2026-11-11~Ruud C.~Shevchenko A.~Hard~3~w1,ATP,2026-11-11,Ruud C.,Shevchenko A.,w1,Ruud C. wygra,Zwycięzca – faworyt,0.7844334065609269,,,open,,
 9,2026-11-10T21:47:01+00:00,ATP~2026-11-11~Rune H.~Kecmanovic M.~Hard~3~w1,ATP,2026-11-11,Rune H.,Kecmanovic M.,w1,Rune H. wygra,Zwycięzca – faworyt,0.8042216401986135,,,open,,
+10,2026-11-10T21:47:44+00:00,WTA~2026-11-11~Svitolina E.~Muchova K.~Hard~3~w2,WTA,2026-11-11,Svitolina E.,Muchova K.,w2,Muchova K. wygra,Zwycięzca – faworyt,0.5795219474944242,0.5764503883374064,1.67,open,,
