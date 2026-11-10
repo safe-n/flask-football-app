@@ -40,6 +40,9 @@ Zmiany w obszarze drugiej rozmowy: tylko gdy właściciel poprosi, a jeśli to k
 - **Tenis – łatka ESPN**: wyniki z ostatnich dni + terminarz bez kursów (feed nieoficjalny, może zniknąć; `TN_ESPN=0` wyłącza).
 
 ## Dziennik zmian (najnowsze na górze)
+- **2026-11-10 · tenis 0.3.13** (wątek tenisa): kupony w „Moich typach” (szkic → zatwierdzony na stałe, AKO gdy są kursy).
+  **Dla wątku piłki:** użytkownik chce tej samej funkcji w piłce (aktywne kafelki → Moje typy → kupony, zestawienie z wydrukiem).
+  Pełny opis i lista kontrolna: `docs/WZORZEC-MOJE-TYPY.md` (kod wzorcowy w `tnpred/picks.py`, `templates/picks.html`).
 - **2026-11-10 · tenis 0.3.12** (wątek tenisa): „Moje typy” - klikalne kafelki, rozliczanie wszedł/nie wszedł, zestawienie
   skuteczności z wydrukiem (`tnpred/picks.py`, plik `picks.csv` w gałęzi dziennika).
 - **2026-11-10 · infrastruktura**: lokalny commit na PC („update history”: `history/EL_2025.csv`, styl TB) blokował `git pull --ff-only`

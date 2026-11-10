@@ -497,7 +497,10 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
         except ValueError as e:
             return jsonify({"ok": False, "blad": str(e)}), 400
         if leg in picks_mod.legs(st.conn):
-            picks_mod.remove(st.conn, leg=leg)
+            try:
+                picks_mod.remove(st.conn, leg=leg)
+            except picks_mod.Locked as e:
+                return jsonify({"ok": False, "on": True, "blad": str(e)}), 409
             bootstrap.sync_up_bg(st, ("picks",))
             return jsonify({"ok": True, "on": False})
         row = _pick_row(t, a, b)
@@ -519,6 +522,7 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
         df = picks_mod.load(st.conn)
         if len(df) and tour:
             df = df[df.tour == tour]
+        since = ""
         if len(df) and days != "all":
             since = f"{pd.Timestamp.today() - pd.Timedelta(days=int(_f(days) or 30)):%Y-%m-%d}"
             df = df[df.date >= since]
@@ -529,21 +533,48 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
         q = lambda **k: "?" + "&".join(f"{a}={v}" for a, v in {"days": days, "tour": tour or "", **k}.items() if v)  # noqa: E731
         filters = {"days": [("Wszystko", q(days="all")), ("30 dni", q(days="30")), ("90 dni", q(days="90"))],
                    "tour": [("ATP+WTA", q(tour="")), ("ATP", q(tour="ATP")), ("WTA", q(tour="WTA"))]}
+        dr = picks_mod.draft(st.conn)
+        draft = dr.astype(object).where(dr.notna(), None).to_dict("records") if len(dr) else []
+        d_odds = float(np.prod([x["kurs"] for x in draft])) if draft and all(x["kurs"] for x in draft) else None
+        d_p = float(np.prod([x["p"] for x in draft])) if draft else None
+        cps = picks_mod.coupons(st.conn)
+        if tour:
+            cps = [c for c in cps if any(l["tour"] == tour for l in c["legs"])]
+        if days != "all":
+            cps = [c for c in cps if str(c["created_at"])[:10] >= since]
+        for c in cps:
+            c["date"] = pd.Timestamp(c["created_at"]).tz_convert("Europe/Warsaw").strftime("%d.%m.%Y %H:%M")
         return render("picks.html", "Moje typy", rows=rows, s=picks_mod.summary(df), filters=filters, days=days, tour=tour,
+                      draft=draft, d_odds=d_odds, d_p=d_p, coupons=cps, cs=picks_mod.coupon_summary(cps),
+                      msg=request.args.get("msg"),
                       persisted=gh_store.enabled(), now=pd.Timestamp.now(tz="Europe/Warsaw").strftime("%Y-%m-%d %H:%M"))
+
+    @app.post("/picks/confirm")
+    def picks_confirm():
+        try:
+            cid = picks_mod.confirm(st.conn, request.form.get("note") or "")
+            msg = f"Kupon nr {cid} zatwierdzony"
+        except ValueError as e:
+            msg = str(e)
+        bootstrap.sync_up_bg(st, ("picks", "coupons"))
+        return redirect(request.script_root + "/picks?msg=" + msg)
 
     @app.post("/picks/<int:pick_id>/<action>")
     def picks_action(pick_id, action):
-        if action == "delete":
-            picks_mod.remove(st.conn, pick_id=pick_id)
-        elif action in ("hit", "miss", "void", "open"):
-            picks_mod.set_status(st.conn, pick_id, action)
-        elif action == "kurs":
-            picks_mod.set_kurs(st.conn, pick_id, _f(request.form.get("kurs")))
-        else:
-            abort(404)
+        msg = ""
+        try:
+            if action == "delete":
+                picks_mod.remove(st.conn, pick_id=pick_id)
+            elif action in ("hit", "miss", "void", "open"):
+                picks_mod.set_status(st.conn, pick_id, action)
+            elif action == "kurs":
+                picks_mod.set_kurs(st.conn, pick_id, _f(request.form.get("kurs")))
+            else:
+                abort(404)
+        except picks_mod.Locked as e:
+            msg = str(e)
         bootstrap.sync_up_bg(st, ("picks",))
-        return redirect(request.script_root + "/picks" + (("?" + request.query_string.decode()) if request.query_string else ""))
+        return redirect(request.script_root + "/picks" + ("?msg=" + msg if msg else ""))
 
     # ------------------------------------------------------------------ Ranking / zawodnik
     @app.get("/ranking")

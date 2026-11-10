@@ -37,3 +37,9 @@ Od 0.3.11 lukę wypełnia darmowy feed ESPN (bez klucza): wyniki z ostatnich dni
 - Godziny i status meczów, eksport PDF (Mecze → 📄 Eksport PDF), zakłady, dziennik, backtest – opis w `CHANGELOG-tenis.md`.
 - Pamięć Render: zalecana zmienna `MALLOC_ARENA_MAX=2` (Render → Environment).
 - Nadchodzące mecze z kursami: zmienna `ODDS_API_KEY` (darmowy klucz z the-odds-api.com) albo ręcznie w zakładce Mecze.
+
+
+## Moje typy i kupony (od 0.3.12)
+Kliknij kafelek z procentem w zakładce Mecze - typ trafi do szkicu kuponu w zakładce „Moje typy”. „Zatwierdź kupon” zapisuje go na stałe
+(kursy opcjonalne; gdy są przy każdym typie - AKO). Po meczu typy rozliczają się same (zielony = wszedł, czerwony = nie wszedł), a zestawienie
+porównuje Twoją skuteczność z procentami modelu (wg rodzaju typu i przedziału szansy). Wydruk / PDF: przycisk w zakładce. Opis wzorca: `docs/WZORZEC-MOJE-TYPY.md`.

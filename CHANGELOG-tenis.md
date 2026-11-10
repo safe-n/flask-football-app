@@ -1,3 +1,11 @@
+## 0.3.13 - kupony w Moich typach
+- Typy kliknięte od ostatniego zatwierdzenia tworzą **szkic kuponu**; „✅ Zatwierdź kupon” (z notatką) zapisuje go na stałe -
+  zatwierdzonego typu nie można usunąć (kafelek zwraca 409) ani zmienić kursu, można tylko poprawić wynik ręcznie.
+- Kupon bez kursów = zestaw typów; gdy każdy typ ma kurs - AKO (lub pojedynczy) z kursem i zyskiem przy stawce 1 j.
+  Status kuponu liczony z typów (nie wszedł / w grze / wszedł / zwrot; zwroty wypadają z kursu).
+- Tabela `coupons` + kolumna `picks.coupon` (migracja automatyczna; stare typy trafiają do szkicu), zapis `coupons.csv` w GitHubie.
+- Opis wzorca dla wątku piłki: `docs/WZORZEC-MOJE-TYPY.md`.
+
 ## 0.3.12 - Moje typy: klikalne kafelki i zestawienie skuteczności
 - Kafelki z procentami (zwycięzca, Over, Tie-break, bez straty seta) w Meczach i w Meczu są klikalne: kliknięcie zapisuje typ
   (✓ w rogu, drugie kliknięcie usuwa) z szansą modelu, punktem odniesienia (rynek / średnia) i kursem z bazy z chwili kliknięcia.

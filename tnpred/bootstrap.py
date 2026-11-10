@@ -411,18 +411,20 @@ def sync_down(st: State) -> None:
         a = gh_store.sync_down("predictions", lambda t: ledger.import_text(st.conn, t))
         b = gh_store.sync_down("bets", lambda t: bets_mod.import_text(st.conn, t))
         c = gh_store.sync_down("manual", lambda t: manual_import(st, t))
+        gh_store.sync_down("coupons", lambda t: picks_mod.import_coupons(st.conn, t))
         d = gh_store.sync_down("picks", lambda t: picks_mod.import_text(st.conn, t))
         st.step("GitHub: odczyt", True, f"prognozy {a}, zakłady {b}, typy {d}, ręczne mecze {c} (gałąź {config.LEDGER_BRANCH}, folder {config.LEDGER_PREFIX})")
     except Exception as e:  # noqa: BLE001
         st.step("GitHub: odczyt", False, str(e))
 
 
-def sync_up(st: State, kinds=("predictions", "bets", "picks", "manual")) -> None:
+def sync_up(st: State, kinds=("predictions", "bets", "picks", "coupons", "manual")) -> None:
     if not gh_store.enabled():
         return
     ex = {"predictions": (lambda: ledger.export_text(st.conn), "prognoz"),
           "bets": (lambda: bets_mod.export_text(st.conn), "zakładów"),
           "picks": (lambda: picks_mod.export_text(st.conn), "typów"),
+          "coupons": (lambda: picks_mod.export_coupons(st.conn), "kuponów"),
           "manual": (lambda: manual_export(st), "ręcznych meczów")}
     for k in kinds:
         try:

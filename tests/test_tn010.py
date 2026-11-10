@@ -660,5 +660,80 @@ class PicksTests(unittest.TestCase):
         self.assertEqual(picks.load(c3).status.iloc[0], "void")
 
 
+class CouponTests(unittest.TestCase):
+    """0.3.13: szkic -> zatwierdzony kupon (na stałe), AKO gdy wszystkie kursy, migracja bazy z 0.3.12."""
+
+    def mk(self, key, a="A X.", b="B Y."):
+        return bm.leg_id("ATP", "2026-11-09", a, b, "Hard", 3, key)
+
+    def test_confirm_lock_and_status(self):
+        from tnpred import picks
+        conn = sqlite3.connect(":memory:")
+        with self.assertRaises(ValueError):
+            picks.confirm(conn)                                    # pusty szkic
+        picks.add(conn, self.mk("w1"), "A wygra", 0.7, None, 1.5)
+        picks.add(conn, self.mk("tb", "C Z.", "D W."), "TB", 0.4, None, 2.0)
+        self.assertEqual(len(picks.draft(conn)), 2)
+        c1 = picks.confirm(conn, "pierwszy")
+        self.assertEqual(len(picks.draft(conn)), 0)
+        pid = int(picks.load(conn).id.iloc[0])
+        with self.assertRaises(picks.Locked):
+            picks.remove(conn, pick_id=pid)
+        with self.assertRaises(picks.Locked):
+            picks.set_kurs(conn, pid, 3.0)
+        picks.add(conn, self.mk("str", "E V.", "F U."), "bez straty", 0.6)      # nowy szkic, bez kursu
+        c2 = picks.confirm(conn)
+        cps = {c["id"]: c for c in picks.coupons(conn)}
+        self.assertEqual((cps[c1]["kind"], round(cps[c1]["odds"], 2), round(cps[c1]["p"], 2)), ("AKO", 3.0, 0.28))
+        self.assertEqual((cps[c2]["kind"], cps[c2]["odds"]), ("bez kursów", None))
+        res = {"A X.": {"winner": "A X.", "loser": "B Y.", "w1": 6, "l1": 4, "w2": 6, "l2": 2, "comment": "Completed"},
+               "C Z.": {"winner": "C Z.", "loser": "D W.", "w1": 7, "l1": 6, "w2": 6, "l2": 3, "comment": "Completed"}}
+        picks.settle_open(conn, lambda t, d, a, b: res.get(a))
+        cps = {c["id"]: c for c in picks.coupons(conn)}
+        self.assertEqual((cps[c1]["status"], round(cps[c1]["profit"], 2)), ("won", 2.0))
+        self.assertEqual(cps[c2]["status"], "open")
+        cs = picks.coupon_summary(list(cps.values()))
+        self.assertEqual((cs["n"], cs["won"], cs["n_kurs"]), (1, 1, 1))
+        # eksport/import z kuponami
+        c9 = sqlite3.connect(":memory:")
+        picks.import_coupons(c9, picks.export_coupons(conn)[0])
+        picks.import_text(c9, picks.export_text(conn)[0])
+        self.assertEqual([c["n"] for c in picks.coupons(c9)], [1, 2])
+
+    def test_migration_from_0312(self):
+        from tnpred import picks
+        conn = sqlite3.connect(":memory:")
+        conn.execute("CREATE TABLE picks (id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT, leg TEXT UNIQUE, tour TEXT, "
+                     "date TEXT, p1 TEXT, p2 TEXT, key TEXT, label TEXT, grp TEXT, p REAL, ref REAL, kurs REAL, status TEXT, settled_at TEXT)")
+        conn.execute("INSERT INTO picks (leg, tour, date, p1, p2, key, label, grp, p, status) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                     (self.mk("w1"), "ATP", "2026-11-09", "A X.", "B Y.", "w1", "x", "g", 0.6, "open"))
+        self.assertEqual(len(picks.draft(conn)), 1)                # stare typy = szkic
+        old_csv = "id,created_at,leg,tour,date,p1,p2,key,label,grp,p,ref,kurs,status,settled_at\n5,,%s,ATP,2026-11-09,C,D,tb,tb,g,0.4,,,open,\n" % self.mk("tb", "C", "D")
+        self.assertEqual(picks.import_text(conn, old_csv), 1)
+        self.assertEqual(picks.confirm(conn), 1)
+
+    def test_web_confirm_flow(self):
+        from tnpred.web import create_app
+        st = bootstrap.State(os.path.join(_TMP, "coupon.db"))
+        df = demo_df()
+        db.upsert_matches(st.conn, df)
+        db.upsert_upcoming(st.conn, synthetic.upcoming(df, n=2))
+        app = create_app(st, background=False)
+        bootstrap.refresh(st, network=False)
+        c = app.test_client()
+        import html as _h
+        legs_ = [_h.unescape(x) for x in re.findall(r'data-pick="([^"]+)"', c.get("/").data.decode())]
+        for leg in legs_[:2]:
+            self.assertTrue(c.post("/api/picks", json={"leg": leg}).get_json()["on"])
+        self.assertIn("Zatwierdź kupon", c.get("/picks").data.decode())
+        r = c.post("/picks/confirm", data={"note": "test"})
+        self.assertEqual(r.status_code, 302)
+        page = c.get("/picks").data.decode()
+        self.assertIn("Kupon nr 1", page)
+        r = c.post("/api/picks", json={"leg": legs_[0]})
+        self.assertEqual(r.status_code, 409)                       # zatwierdzony typ nie znika z kafelka
+        self.assertIn("pk on", c.get("/").data.decode())
+
+
 if __name__ == "__main__":
     unittest.main()

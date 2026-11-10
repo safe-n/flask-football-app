@@ -19,16 +19,31 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS picks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at TEXT, leg TEXT UNIQUE, tour TEXT, date TEXT, p1 TEXT, p2 TEXT, key TEXT, label TEXT, grp TEXT,
-    p REAL, ref REAL, kurs REAL, status TEXT, settled_at TEXT
+    p REAL, ref REAL, kurs REAL, status TEXT, settled_at TEXT, coupon INTEGER
 );
+CREATE TABLE IF NOT EXISTS coupons (id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT, note TEXT);
 """
-COLS = ["id", "created_at", "leg", "tour", "date", "p1", "p2", "key", "label", "grp", "p", "ref", "kurs", "status", "settled_at"]
+COLS = ["id", "created_at", "leg", "tour", "date", "p1", "p2", "key", "label", "grp", "p", "ref", "kurs", "status", "settled_at",
+        "coupon"]
+CCOLS = ["id", "created_at", "note"]
 BUCKETS = [(0.0, 0.35, "< 35%"), (0.35, 0.5, "35–50%"), (0.5, 0.65, "50–65%"), (0.65, 0.8, "65–80%"), (0.8, 1.01, "≥ 80%")]
 
 
 def ensure(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
+    if "coupon" not in {r[1] for r in conn.execute("PRAGMA table_info(picks)")}:      # baza z 0.3.12
+        conn.execute("ALTER TABLE picks ADD COLUMN coupon INTEGER")
     conn.commit()
+
+
+class Locked(ValueError):
+    """Typ jest na zatwierdzonym kuponie - nie można go usunąć ani zmienić kursu."""
+
+
+def _locked(conn, leg=None, pick_id=None) -> bool:
+    q, a = ("leg=?", leg) if pick_id is None else ("id=?", int(pick_id))
+    r = conn.execute(f"SELECT coupon FROM picks WHERE {q}", (a,)).fetchone()
+    return bool(r and r[0] is not None)
 
 
 def kind(key: str, p: float | None = None) -> str:
@@ -65,6 +80,8 @@ def add(conn, leg: str, label: str, p: float, ref: float | None = None, kurs: fl
 
 def remove(conn, leg: str | None = None, pick_id: int | None = None) -> None:
     ensure(conn)
+    if _locked(conn, leg, pick_id):
+        raise Locked("ten typ jest na zatwierdzonym kuponie - zostaje na stałe")
     if pick_id is not None:
         conn.execute("DELETE FROM picks WHERE id=?", (int(pick_id),))
     else:
@@ -81,8 +98,76 @@ def set_status(conn, pick_id: int, status: str) -> None:
 
 
 def set_kurs(conn, pick_id: int, kurs: float | None) -> None:
+    if _locked(conn, pick_id=pick_id):
+        raise Locked("kupon jest zatwierdzony - kursu nie można już zmienić")
     conn.execute("UPDATE picks SET kurs=? WHERE id=?", (kurs if kurs and kurs > 1 else None, int(pick_id)))
     conn.commit()
+
+
+def draft(conn) -> pd.DataFrame:
+    """Szkic kuponu: typy kliknięte od ostatniego zatwierdzenia."""
+    ensure(conn)
+    return pd.read_sql_query("SELECT * FROM picks WHERE coupon IS NULL ORDER BY date, id", conn)
+
+
+def confirm(conn, note: str = "") -> int:
+    """Zatwierdza szkic jako kupon (na stałe). -> numer kuponu."""
+    ensure(conn)
+    ids = [r[0] for r in conn.execute("SELECT id FROM picks WHERE coupon IS NULL")]
+    if not ids:
+        raise ValueError("szkic jest pusty - najpierw kliknij kafelki z procentami")
+    cur = conn.execute("INSERT INTO coupons (created_at, note) VALUES (?, ?)",
+                       (datetime.now(timezone.utc).isoformat(timespec="seconds"), (note or "")[:200]))
+    cid = int(cur.lastrowid)
+    conn.execute(f"UPDATE picks SET coupon=? WHERE id IN ({','.join('?' * len(ids))})", (cid, *ids))
+    conn.commit()
+    return cid
+
+
+def coupon_status(legs: pd.DataFrame) -> str:
+    st = set(legs.status)
+    if "miss" in st:
+        return "lost"
+    if "open" in st:
+        return "open"
+    if st <= {"void"}:
+        return "void"
+    return "won"
+
+
+def coupons(conn) -> list[dict]:
+    """Zatwierdzone kupony (najnowsze pierwsze): typy, status, szansa całości wg modelu, kurs AKO (gdy każdy typ ma kurs)."""
+    ensure(conn)
+    cs = pd.read_sql_query("SELECT * FROM coupons ORDER BY id DESC", conn)
+    pk = pd.read_sql_query("SELECT * FROM picks WHERE coupon IS NOT NULL ORDER BY date, id", conn)
+    out = []
+    for c in cs.to_dict("records"):
+        legs = pk[pk.coupon == c["id"]]
+        if legs.empty:
+            continue
+        live = legs[legs.status != "void"]
+        has_odds = len(live) > 0 and live.kurs.notna().all()
+        odds = float(np.prod(live.kurs)) if has_odds else None
+        status = coupon_status(legs)
+        p_all = float(np.prod(live.p)) if len(live) else None
+        profit = None
+        if odds and status in ("won", "lost"):
+            profit = odds - 1 if status == "won" else -1.0
+        out.append({**c, "legs": legs.astype(object).where(legs.notna(), None).to_dict("records"), "n": len(legs),
+                    "status": status, "odds": odds, "p": p_all, "profit": profit,
+                    "kind": ("AKO" if len(legs) > 1 else "Pojedynczy") if has_odds else "bez kursów"})
+    return out
+
+
+def coupon_summary(cps: list[dict]) -> dict:
+    done = [c for c in cps if c["status"] in ("won", "lost")]
+    if not done:
+        return {}
+    won = sum(c["status"] == "won" for c in done)
+    k = [c for c in done if c["profit"] is not None]
+    pr = sum(c["profit"] for c in k)
+    return {"n": len(done), "won": won, "rate": won / len(done), "exp": float(np.mean([c["p"] for c in done if c["p"] is not None] or [np.nan])),
+            "n_kurs": len(k), "profit": pr if k else None, "roi": pr / len(k) if k else None}
 
 
 def settle_open(conn, match_lookup) -> int:
@@ -145,6 +230,25 @@ def export_text(conn) -> tuple[str, int]:
     return df.to_csv(index=False), len(df)
 
 
+def export_coupons(conn) -> tuple[str, int]:
+    ensure(conn)
+    df = pd.read_sql_query(f"SELECT {', '.join(CCOLS)} FROM coupons ORDER BY id", conn)
+    return df.to_csv(index=False), len(df)
+
+
+def import_coupons(conn, text: str) -> int:
+    ensure(conn)
+    if not text or not text.strip():
+        return 0
+    df = pd.read_csv(io.StringIO(text))
+    df = df.astype(object).where(df.notna(), None)
+    before = conn.total_changes
+    conn.executemany(f"INSERT OR IGNORE INTO coupons ({', '.join(CCOLS)}) VALUES (?,?,?)",
+                     [tuple(r.get(c) for c in CCOLS) for r in df.to_dict("records")])
+    conn.commit()
+    return conn.total_changes - before
+
+
 def import_text(conn, text: str) -> int:
     ensure(conn)
     if not text or not text.strip():
@@ -152,6 +256,8 @@ def import_text(conn, text: str) -> int:
     df = pd.read_csv(io.StringIO(text))
     if df.empty:
         return 0
+    if "coupon" in df.columns:
+        df["coupon"] = df["coupon"].astype("Int64")
     df = df.astype(object).where(df.notna(), None)
     before = conn.total_changes
     conn.executemany(f"INSERT OR IGNORE INTO picks ({', '.join(COLS)}) VALUES ({', '.join('?' * len(COLS))})",

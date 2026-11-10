@@ -48,7 +48,7 @@ th:first-child,td:first-child{text-align:left}td.l,th.l{text-align:left}.m{color
 .gpmf i.hi{background:var(--up);opacity:1}.gax{display:flex;justify-content:space-between;font-size:10px;color:var(--mut)}
 .bk{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}.bet{background:var(--card);border-radius:12px;padding:10px;margin:8px 0}
 .bet .hd{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-weight:700}.st{border-radius:6px;padding:2px 8px;font-size:12px;font-weight:700;color:#fff}
-.st.won{background:var(--w)}.st.lost{background:var(--p)}.st.void,.st.open{background:var(--r)}.bet ul{margin:6px 0;padding-left:18px;font-size:13px}
+.st.won,.st.hit{background:var(--w)}.st.lost{background:var(--p)}.st.void,.st.open{background:var(--r)}.bet ul{margin:6px 0;padding-left:18px;font-size:13px}
 .bet form{display:inline}.bet button{font-size:12px;padding:3px 8px;margin-right:4px}.pos{color:var(--up)}.neg{color:var(--dn)}
 .add{background:var(--acc);color:#fff;border:0;border-radius:6px;padding:3px 9px;cursor:pointer;font-size:13px}.add.on{background:#6b7280}
 .form{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;align-items:end}.form label{font-size:12px;color:var(--mut);display:block}.form input,.form select{width:100%}
@@ -65,7 +65,8 @@ th:first-child,td:first-child{text-align:left}td.l,th.l{text-align:left}.m{color
 .pt tr.miss td.r{background:rgba(217,83,79,.2);color:var(--dn);font-weight:700}.pt tr.open td.r,.pt tr.void td.r{color:var(--mut)}
 .pt td.r{border-radius:6px;text-align:center;font-size:15px;min-width:44px}.pt details{margin-top:3px}.pt details summary{font-weight:400}.pt form{display:inline}.pt button{font-size:11px;padding:2px 6px}
 .pt input{width:58px;font-size:12px;padding:2px 4px}.diff.pos{color:var(--up)}.diff.neg{color:var(--dn)}
-.printonly{display:none}
+.printonly{display:none}.cp .hd{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center}
+.cp.won{box-shadow:inset 4px 0 0 var(--w)}.cp.lost{box-shadow:inset 4px 0 0 var(--p)}.cp.draft{box-shadow:inset 0 0 0 2px var(--acc)}
 @media print{body{background:#fff;color:#000;max-width:none;padding:0;font-size:11px}nav,.ver,.noprint,form,button,.small{display:none!important}
 .printonly{display:block}.card,.kpi{background:#fff;border:1px solid #ccc;break-inside:avoid}.pt tr{break-inside:avoid}
 .pt tr.hit td.r{background:#d7f0df;color:#0b5d2a}.pt tr.miss td.r{background:#f7d9d6;color:#8b1e14}.kv.g,.diff.pos{color:#0b5d2a}.kv.r,.diff.neg{color:#8b1e14}
