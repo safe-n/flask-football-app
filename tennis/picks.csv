@@ -4,4 +4,3 @@ id,created_at,leg,tour,date,p1,p2,key,label,grp,p,ref,kurs,status,settled_at,cou
 3,2026-11-10T20:33:13+00:00,WTA~2026-11-11~Sabalenka A.~Andreeva M.~Hard~3~o22.5,WTA,2026-11-11,Sabalenka A.,Andreeva M.,o22.5,Over 22.5 gemów,Over gemów,0.45180630850383147,0.3943080599608951,,open,,1.0
 4,2026-11-10T21:46:16+00:00,ATP~2026-11-11~Tabilo A.~Sonego L.~Hard~3~w2,ATP,2026-11-11,Tabilo A.,Sonego L.,w2,Sonego L. wygra,Zwycięzca – underdog,0.4165226116783929,,,open,,
 5,2026-11-10T21:46:23+00:00,ATP~2026-11-11~Norrie C.~Fritz T.~Hard~3~w2,ATP,2026-11-11,Norrie C.,Fritz T.,w2,Fritz T. wygra,Zwycięzca – faworyt,0.7301165222241555,,,open,,
-6,2026-11-10T21:46:36+00:00,ATP~2026-11-11~Humbert U.~Gojo B.~Hard~3~w1,ATP,2026-11-11,Humbert U.,Gojo B.,w1,Humbert U. wygra,Zwycięzca – faworyt,0.6437802998611246,,,open,,
