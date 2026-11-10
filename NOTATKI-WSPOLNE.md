@@ -36,9 +36,12 @@ Zmiany w obszarze drugiej rozmowy: tylko gdy właściciel poprosi, a jeśli to k
 - **Tenis – wyniki**: tennis-data.co.uk blokuje serwery (HTTP 403), wpuszcza PC. `python -m tnpred push-history`
   (Harmonogram co 4 h: `python -m tnpred install-task`) wysyła bieżący rok + parametry + styl zawodników do `ledger-data/tennis/history/`;
   Render sprawdza co 3 h. Strona aktualizuje pliki raz w tygodniu, po turniejach → dane bywają kilka dni w plecy.
-- **Tenis – kursy**: The Odds API (`ODDS_API_KEY`, 500 kredytów/mies., budżet w aplikacji 450).
+- **Tenis – kursy**: The Odds API (`ODDS_API_KEY`, 500 kredytów/mies., budżet w aplikacji 450) - tylko duże turnieje.
+- **Tenis – łatka ESPN**: wyniki z ostatnich dni + terminarz bez kursów (feed nieoficjalny, może zniknąć; `TN_ESPN=0` wyłącza).
 
 ## Dziennik zmian (najnowsze na górze)
+- **2026-11-10 · tenis 0.3.11** (wątek tenisa): `tnpred/espn.py` - łatka świeżych wyników i terminarz z feedu ESPN
+  (bez klucza) dla turniejów, których nie ma w The Odds API (ATP 250, Finals). Nowe opcjonalne zmienne `TN_ESPN`, `TN_ESPN_DAYS`.
 - **2026-11-10 · piłka 0.9.5 + dokumentacja** (wątek piłki): zamknięty Rozdział 1 - katalog `docs/` (koncepcja, architektura, instrukcja, operacje, podsumowanie i plan Rozdziału 2). Od 0.9.3 doszły: 0.9.4 (EL kolejka po kolejce) i 0.9.5 (odporność na limit TheSportsDB). Liga Europy nadal nieaktywna na Renderze - brak `history/EL_*.csv` (do dokończenia `history-init --league EL --seasons 2026-2026` na PC).
 - **2026-11-05 · infrastruktura**: przycisk `/restart` (w `combo.py`) + `lokalnie/serwer.py`: kopia na PC sama pobiera
   kod z GitHuba przy starcie i po kliknięciu restartu; harmonogram „Tenis - aktualizacja wynikow” co 4 h ustawiony na PC.

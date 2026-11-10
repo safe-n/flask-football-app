@@ -475,5 +475,121 @@ class PlayerStyle(unittest.TestCase):
         self.assertEqual(p["style"][0][0], name)
 
 
+def _espn_comp(n1, n2, status="STATUS_FINAL", done=True, rnd="Round 1", date="2026-11-09T12:00Z", sets=((6, 4), (7, 6)), w=0):
+    c = []
+    for i, n in enumerate((n1, n2)):
+        ls = [{"value": s[0] if i == w else s[1]} for s in sets] if done else []
+        c.append({"athlete": {"displayName": n}, "winner": done and i == w, "linescores": ls})
+    return {"date": date, "timeValid": True, "status": {"type": {"name": status, "completed": done, "detail": "x"}},
+            "round": {"displayName": rnd}, "competitors": c}
+
+
+def _espn_event(name, city, comps, doubles=()):
+    return {"name": name, "major": False, "venue": {"displayName": f"{city}, X"},
+            "groupings": [{"grouping": {"displayName": "Women's Singles"}, "competitions": comps},
+                          {"grouping": {"displayName": "Women's Doubles"}, "competitions": list(doubles)}]}
+
+
+class EspnPatch(unittest.TestCase):
+    """0.3.11: łatka wyników + terminarz z ESPN (bez internetu - feed podstawiony)."""
+
+    def setUp(self):
+        from tnpred import espn
+        self.espn = espn
+        self.st = bootstrap.State(":memory:")
+        df = demo_df()
+        db.upsert_matches(self.st.conn, df)
+        self.st.mark_changed()
+        self.m = self.st.get_model()
+        w = df[df.tour == "WTA"]
+        self.city = str(w.location.iloc[-1])
+        pl = sorted(set(w.winner) | set(w.loser))
+        self.a, self.b, self.c, self.d = pl[:4]
+        full = lambda td: f"{td.split()[-1][0]}xx {' '.join(td.split()[:-1])}"      # „Moro A.” -> „Axx Moro”
+        self.fa, self.fb, self.fc, self.fd = (full(x) for x in (self.a, self.b, self.c, self.d))
+        today = pd.Timestamp.now(tz="UTC")
+        self.day = f"{today:%Y-%m-%d}"
+        self.data = {"events": [
+            _espn_event("Some Open", self.city, [
+                _espn_comp(self.fa, self.fb, date=f"{self.day}T10:00Z"),
+                _espn_comp(self.fc, self.fd, status="STATUS_RETIRED", date=f"{self.day}T11:00Z", sets=((6, 3), (2, 1)), w=1),
+                _espn_comp(self.fa, self.fc, rnd="Qualifying 1st Round", date=f"{self.day}T09:00Z"),
+                _espn_comp(self.fb, self.fd, status="STATUS_WALKOVER", date=f"{self.day}T09:00Z", sets=()),
+                _espn_comp(self.fa, self.fd, status="STATUS_SCHEDULED", done=False, rnd="Round 2",
+                           date=f"{(today + pd.Timedelta(days=1)):%Y-%m-%d}T15:00Z"),
+                _espn_comp("Nowa Zawodniczka", self.fc, status="STATUS_SCHEDULED", done=False, rnd="Round 2",
+                           date=f"{(today + pd.Timedelta(days=1)):%Y-%m-%d}T17:00Z")],
+                doubles=[_espn_comp(self.fa, self.fb)]),
+            _espn_event("Austin 125", self.city, [_espn_comp(self.fb, self.fc)]),
+            _espn_event("Unknown City Cup", "Sopo", [_espn_comp(self.fb, self.fc)]),
+        ]}
+
+    def getter(self, tour, start, end):
+        return self.data if tour == "WTA" else {"events": []}
+
+    def test_parse_filters_and_scores(self):
+        known = self.espn.places(db.load_matches(self.st.conn)).get("WTA", {})
+        res, sched, skipped = self.espn.parse("WTA", self.data, known, self.m.resolve)
+        self.assertEqual(len(res), 2)                         # bez kwalifikacji, walkowera, debla, 125 i obcego miasta
+        self.assertEqual({"Austin 125", "Unknown City Cup"}, skipped)
+        r1, r2 = res
+        self.assertEqual((r1["winner"], r1["loser"], r1["w2"], r1["l2"], r1["wsets"], r1["lsets"]), (self.a, self.b, 7, 6, 2, 0))
+        self.assertEqual((r2["winner"], r2["comment"], r2["lsets"], r2["wsets"]), (self.d, "Retired", 0, 1))      # przy kreczu liczą się tylko skończone sety
+        self.assertEqual(r1["round"], "1st Round")
+        self.assertEqual(r1["location"], "ESPN")
+        self.assertEqual(len(sched), 2)
+        self.assertEqual(sched[1]["p1"], "Zawodniczka N.")    # nieznana - zapis jak w tennis-data
+        self.assertEqual(sched[0]["source"], "espn")
+
+    def test_uncovered_drops_matches_already_in_tennis_data(self):
+        row = {"tour": "WTA", "date": self.day, "winner": self.a, "loser": self.b}
+        hist = pd.DataFrame([{"tour": "WTA", "date": pd.Timestamp(self.day) - pd.Timedelta(days=2), "winner": self.b,
+                              "loser": self.a, "location": "X"}])
+        self.assertEqual(self.espn.uncovered([row], hist), [])
+        hist.loc[0, "date"] = pd.Timestamp(self.day) - pd.Timedelta(days=9)
+        self.assertEqual(len(self.espn.uncovered([row], hist)), 1)
+
+    def test_bootstrap_step_adds_results_schedule_and_is_idempotent(self):
+        from unittest import mock
+        from tnpred import espn
+        odds_row = {"source": "oddsapi", "tour": "WTA", "tournament": "T", "surface": "Hard", "best_of": 3,
+                    "date": f"{(pd.Timestamp.now(tz='UTC') + pd.Timedelta(days=1)):%Y-%m-%d} 15:00",
+                    "p1": self.d, "p2": self.a, "o1": 1.8, "o2": 2.0}
+        db.upsert_upcoming(self.st.conn, [odds_row])
+        v0 = self.st.data_version
+        with mock.patch.object(espn, "fetch", self.getter):
+            n = bootstrap.fetch_espn(self.st)
+            self.assertEqual(n, 2)
+            self.assertGreater(self.st.data_version, v0)
+            m = self.st.get_model()
+            self.assertEqual(str(m.df.date.max())[:10], self.day)      # świeże wyniki w modelu
+            up = db.load_upcoming(self.st.conn, include_past_days=1)
+            self.assertEqual(sorted(up.source), ["espn", "oddsapi"])    # mecz z kursami nie nadpisany
+            self.assertEqual(float(up[up.source == "oddsapi"].o1.iloc[0]), 1.8)
+            v1 = self.st.data_version
+            bootstrap.fetch_espn(self.st)                                # drugi raz: bez zmian, bez przeliczania modelu
+            self.assertEqual(self.st.data_version, v1)
+            # tennis-data publikuje ten mecz -> łatka znika
+            td = pd.DataFrame([{**{c: None for c in tdata.COLS}, "date": self.day, "tour": "WTA", "tournament": "Some Open",
+                                "location": self.city, "surface": "Hard", "round": "1st Round", "best_of": 3,
+                                "winner": self.a, "loser": self.b, "w1": 6, "l1": 4, "w2": 7, "l2": 6, "wsets": 2, "lsets": 0,
+                                "comment": "Completed"}])
+            db.upsert_matches(self.st.conn, tdata._from_norm(td))
+            self.assertEqual(bootstrap.fetch_espn(self.st), 1)
+            self.assertEqual(len(db.espn_signature(self.st.conn)), 1)
+
+    def test_feed_error_is_visible_and_harmless(self):
+        from unittest import mock
+        from tnpred import espn
+
+        def boom(*a, **k):
+            raise espn.EspnError("ESPN WTA: HTTP 403")
+        with mock.patch.object(espn, "fetch", boom):
+            self.assertEqual(bootstrap.fetch_espn(self.st), 0)
+        step = [s for s in self.st.diag["kroki"] if s["krok"].startswith("ESPN")][-1]
+        self.assertFalse(step["ok"])
+        self.assertIn("403", step["opis"])
+
+
 if __name__ == "__main__":
     unittest.main()

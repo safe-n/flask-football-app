@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 import pandas as pd
 
-from . import bets as bets_mod, config, db, gh_store, ledger, oddsapi, synthetic, tdata
+from . import bets as bets_mod, config, db, espn, gh_store, ledger, oddsapi, synthetic, tdata
 from .model import TennisModel, load_params, save_params
 from .names import norm
 
@@ -237,6 +237,56 @@ def fetch_odds(st: State, force: bool = False) -> int:
     return n
 
 
+def fetch_espn(st: State) -> int:
+    """ESPN: (1) wyniki z ostatnich dni, których nie ma jeszcze w tennis-data - znikają, gdy tennis-data je opublikuje;
+    (2) terminarz na dziś/jutro dla meczów, których nie zna The Odds API (bez kursów)."""
+    name = "ESPN: wyniki i terminarz"
+    if not config.ESPN:
+        st.step(name, True, "wyłączone (TN_ESPN=0)")
+        return 0
+    m = st.get_model()
+    hist = db.load_matches(st.conn)
+    now = datetime.now(timezone.utc)
+    res, sched, info = espn.fetch_all(hist, resolve=m.resolve, tours=config.TOURS, days_back=config.ESPN_DAYS, now=now)
+    if info["errors"] and not res and not sched:
+        st.step(name, False, "feed niedostępny - zostają same dane tennis-data i The Odds API: " + "; ".join(info["errors"])[:300])
+        return 0
+    # wyniki: nowe z feedu + starsze łatki spoza okna (dopóki tennis-data ich nie ma, max 30 dni)
+    since = f"{now - pd.Timedelta(days=config.ESPN_DAYS):%Y-%m-%d}"
+    old = hist[(hist["location"].astype(str) == espn.MARK)] if len(hist) else hist
+    keep = []
+    if len(old):
+        o = old[(old.date < pd.Timestamp(since)) & (old.date >= pd.Timestamp(now.date()) - pd.Timedelta(days=30))].copy()
+        o["date"] = o["date"].dt.strftime("%Y-%m-%d")
+        keep = o.astype(object).where(o.notna(), None).to_dict("records")
+    rows = espn.uncovered(res + keep, hist)
+    changed = db.set_espn_matches(st.conn, espn.results_frame(rows))
+    if changed:
+        st.mark_changed()
+    # terminarz: tylko mecze, których nie ma z innego źródła (The Odds API / ręczne)
+    up = db.load_upcoming(st.conn, include_past_days=2)
+    other = up[up.source != "espn"] if len(up) else up
+    pairs = {(t, frozenset((a, b))): str(d)[:10] for t, a, b, d in zip(other.tour, other.p1, other.p2, other.date)} if len(other) else {}
+    with db._LOCK:
+        st.conn.execute("DELETE FROM upcoming WHERE source='espn'")
+        st.conn.commit()
+    add = []
+    for r in sched:
+        d = pairs.get((r["tour"], frozenset((r["p1"], r["p2"]))))
+        if d and abs((pd.Timestamp(d) - pd.Timestamp(r["date"][:10])).days) <= 1:
+            continue
+        r = {k: v for k, v in r.items() if k != "live"}
+        if r["date"][:10] < f"{now - pd.Timedelta(days=1):%Y-%m-%d}":
+            continue
+        add.append(r)
+    n_up = db.upsert_upcoming(st.conn, add)
+    last = max((r["date"] for r in rows), default="-")
+    st.step(name, True, f"wyniki: {len(rows)} meczów spoza tennis-data (ostatni {last}); terminarz: {n_up} meczów bez kursów "
+            f"(The Odds API ich nie ma)" + (f"; pominięte turnieje (ITF/125/spoza tennis-data): {', '.join(info['skipped'][:6])}"
+                                           if info["skipped"] else "") + (f"; problemy: {'; '.join(info['errors'])}" if info["errors"] else ""))
+    return len(rows)
+
+
 def keep_prematch_odds(st: State, rows: list[dict]) -> list[dict]:
     """Mecz już trwa -> The Odds API zwraca kursy NA ŻYWO. Zostawiamy zapisane kursy sprzed meczu (albo żadnych)."""
     from .views import start_time
@@ -421,6 +471,10 @@ def refresh(st: State, force: bool = False, network: bool = True) -> None:
             fetch_odds(st, force=force)       # najpierw mecze z kursami - nie mogą czekać na GitHuba ani tennis-data
             sync_history(st)
             fetch_results(st, force=force)
+            try:
+                fetch_espn(st)                # po tennis-data: łatka tylko tego, czego tam jeszcze nie ma
+            except Exception as e:  # noqa: BLE001
+                st.step("ESPN: wyniki i terminarz", False, f"{type(e).__name__}: {e}")
         m = st.get_model()
         st.step("model", True, f"{len(m.df)} meczów, {sum(1 for _ in m.elo.r)} zawodników; ostatni mecz {m.df.date.max():%Y-%m-%d}"
                 if len(m.df) else "brak meczów w bazie")

@@ -59,6 +59,8 @@ ODDS_REGIONS = os.getenv("TN_ODDS_REGIONS", "eu")
 ODDS_MARKETS = os.getenv("TN_ODDS_MARKETS", "h2h")             # np. "h2h,totals,spreads" (3× droższe, nie zawsze dostępne)
 ODDS_REFRESH_HOURS = float(os.getenv("TN_ODDS_REFRESH_HOURS", "12"))
 ODDS_MONTHLY_BUDGET = int(os.getenv("TN_ODDS_BUDGET", "450"))  # zostaw zapas z 500
+ESPN = os.getenv("TN_ESPN", "1") != "0"                       # łatka wyników + terminarz z ESPN (bez klucza)
+ESPN_DAYS = int(os.getenv("TN_ESPN_DAYS", "14"))              # ile dni wstecz łatać wyniki (tennis-data ma do ~8 dni zwłoki)
 
 TZ = os.getenv("TN_TZ", "Europe/Warsaw")                       # strefa czasu do wyświetlania godzin meczów
 MATCH_HOURS = float(os.getenv("TN_MATCH_HOURS", "4"))          # po ilu godzinach od startu uznajemy mecz za „pewnie zakończony”

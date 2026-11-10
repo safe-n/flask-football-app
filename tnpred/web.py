@@ -160,7 +160,7 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
                 e = f" ({100 * edge(pp, o):+.0f}%)" if o else ""
                 legs.append(V.add_btn(bm.leg_id(p["tour"], day, p["p1"], p["p2"], p["surface"], p["best_of"], k),
                                       f"＋ {V.short(who)} {V.fair(pp)}{e}"))
-            src = "ręczny" if r.get("source") == "manual" else ("demo" if r.get("source") == "demo" else "")
+            src = {"manual": "ręczny", "demo": "demo", "espn": "terminarz ESPN"}.get(r.get("source"), "")
             warn = "".join(f'<div class="warn m">⚠ {escape(w)}</div>' for w in p["warn"])
             started = w["status"] in ("live", "done", "past")
             if started:

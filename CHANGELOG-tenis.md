@@ -1,3 +1,16 @@
+## 0.3.11 - łatka ESPN: świeże wyniki i terminarz meczów spoza The Odds API
+- Przyczyna pustej listy meczów 10.11: The Odds API nie ma w ogóle kluczy dla ATP 250 (np. Stockholm), ATP/WTA Finals
+  ani Challengerów - po Paris Masters lista była pusta („0 meczów; kredyty: None” = brak aktywnego turnieju w API).
+- Nowy moduł `espn.py` (darmowy, nieoficjalny feed ESPN, bez klucza, jedno zapytanie na tour co odświeżenie):
+  * wyniki z ostatnich 14 dni (`TN_ESPN_DAYS`), których nie ma jeszcze w tennis-data - trafiają do modelu od razu
+    (kolumna location = „ESPN”), znikają, gdy tennis-data opublikuje ten sam mecz (ta sama para ±3 dni); tylko znani
+    zawodnicy, bez kwalifikacji, walkowerów i debli; przy kreczu liczą się tylko skończone sety (jak w tennis-data),
+  * terminarz na dziś/jutro: mecze bez kursów (etykieta „terminarz ESPN”), gdy The Odds API ich nie zna; mecz z kursami
+    lub dodany ręcznie nie jest nadpisywany.
+  Filtr poziomu: miasto turnieju musi występować w historii tennis-data danego touru (odpada ITF/125/Challenger) albo Finals.
+- Awaria feedu = krok „ESPN: wyniki i terminarz” na czerwono w Dane, reszta działa jak dotąd. Wyłączenie: `TN_ESPN=0`.
+- `push-history` nadal wysyła wyłącznie dane tennis-data (łatka ESPN zostaje w bazie aplikacji).
+
 ## 0.3.10 - styl zawodnika w tie-breakach (ATP) + uczciwe kolory w „Ostatnich”
 - Model liczył tie-break wyłącznie z siły (szansa zwycięstwa) i nawierzchni: mecz dwóch „wielkich serwisów” i dwóch
   „ścianiarzy” o tej samej różnicy Elo dostawał ten sam %. Nowy moduł `style.py`: dla każdego zawodnika średnia

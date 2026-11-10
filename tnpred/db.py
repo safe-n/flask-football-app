@@ -56,6 +56,22 @@ def upsert_matches(conn, df: pd.DataFrame) -> int:
         return conn.total_changes - before
 
 
+def espn_signature(conn) -> list:
+    with _LOCK:
+        return conn.execute("SELECT id, w1, l1, w2, l2, w3, l3, w4, l4, w5, l5 FROM matches WHERE location='ESPN' ORDER BY id").fetchall()
+
+
+def set_espn_matches(conn, df: pd.DataFrame) -> bool:
+    """Zastępuje wszystkie mecze z łatki ESPN nowym zestawem. -> czy coś się zmieniło."""
+    before = espn_signature(conn)
+    with _LOCK:
+        conn.execute("DELETE FROM matches WHERE location='ESPN'")
+        conn.commit()
+    if df is not None and len(df):
+        upsert_matches(conn, df)
+    return espn_signature(conn) != before
+
+
 def load_matches(conn) -> pd.DataFrame:
     with _LOCK:
         df = pd.read_sql_query("SELECT * FROM matches", conn)

@@ -30,6 +30,8 @@ Przy nowych wynikach komputer liczy też **styl zawodników** (tie-breaki ponad 
 
 Uwaga: sama strona tennis-data nie zawsze aktualizuje pliki codziennie – zadanie wyśle nowe wyniki, gdy tylko się pojawią.
 
+Od 0.3.11 lukę wypełnia darmowy feed ESPN (bez klucza): wyniki z ostatnich dni trafiają do modelu od razu i są zastępowane danymi tennis-data po ich publikacji, a mecze turniejów, których nie zna The Odds API (np. ATP 250, Finals), pojawiają się w zakładce Mecze bez kursów („terminarz ESPN”). Feed jest nieoficjalny – gdy przestanie działać, aplikacja wraca do samych tennis-data i The Odds API (błąd widać w Dane). Wyłączenie: `TN_ESPN=0`.
+
 ## Pozostałe
 
 - Godziny i status meczów, eksport PDF (Mecze → 📄 Eksport PDF), zakłady, dziennik, backtest – opis w `CHANGELOG-tenis.md`.
