@@ -1,4 +1,4 @@
 id,created_at,leg,tour,date,p1,p2,key,label,grp,p,ref,kurs,status,settled_at
-1,2026-11-10T20:01:19+00:00,WTA~2026-11-10~Gauff C.~Noskova L.~Hard~3~o22.5,WTA,2026-11-10,Gauff C.,Noskova L.,o22.5,Over 22.5 gemów,Over gemów,0.43823577427895755,0.3943998263512047,1.8,open,
+1,2026-11-10T20:01:19+00:00,WTA~2026-11-10~Gauff C.~Noskova L.~Hard~3~o22.5,WTA,2026-11-10,Gauff C.,Noskova L.,o22.5,Over 22.5 gemów,Over gemów,0.43823577427895755,0.3943998263512047,,open,
 2,2026-11-10T20:01:34+00:00,WTA~2026-11-11~Svitolina E.~Muchova K.~Hard~3~o22.5,WTA,2026-11-11,Svitolina E.,Muchova K.,o22.5,Over 22.5 gemów,Over gemów,0.44536626956271225,0.3943998263512047,1.8,open,
 3,2026-11-10T20:01:40+00:00,WTA~2026-11-11~Sabalenka A.~Andreeva M.~Hard~3~o22.5,WTA,2026-11-11,Sabalenka A.,Andreeva M.,o22.5,Over 22.5 gemów,Over gemów,0.45180630850383147,0.3943998263512047,1.9,open,
