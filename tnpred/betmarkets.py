@@ -2,7 +2,7 @@
 
 Identyfikator typu: tour~data~zawodnik1~zawodnik2~nawierzchnia~sety~klucz (np. ATP~2026-11-02~Sinner J.~Alcaraz C.~Hard~3~o22.5).
 Klucze: w1/w2 (zwycięzca), o22.5/u22.5 (gemy), h1-3.5 / h2+2.5 (handicap gemów), s2-0 / s1-2 (wynik w setach, z perspektywy 1),
-tb/notb (tie-break w meczu), fs1/fs2 (1. set), ws1/ws2 (wygra co najmniej seta), f1o9.5/f1u9.5 (gemy w 1. secie).
+tb/notb (tie-break w meczu), str (zwycięzca bez straty seta), fs1/fs2 (1. set), ws1/ws2 (wygra co najmniej seta), f1o9.5/f1u9.5 (gemy w 1. secie).
 Krecz / walkower: typ = zwrot (zasady bukmacherów się różnią - sprawdź u swojego).
 """
 from __future__ import annotations
@@ -38,6 +38,8 @@ def catalogue(pred: dict) -> dict[str, dict]:
         add(f"h2{inv}", f"{b} {inv} gemów", "Handicap", 1 - p)
     for sc, p in m["sets"].items():
         add(f"s{sc}", f"Wynik w setach {sc} ({_short(a)}–{_short(b)})", "Sety", p)
+    if m.get("straight") is not None:
+        add("str", "Bez straty seta (zwycięzca, np. 2:0 / 0:2)", "Sety", m["straight"])
     add("ws1", f"{a} wygra co najmniej seta", "Sety", m["win_a_set"]["1"])
     add("ws2", f"{b} wygra co najmniej seta", "Sety", m["win_a_set"]["2"])
     add("tb", "Tie-break w meczu – tak", "Tie-break", m["p_tb"])
@@ -132,6 +134,8 @@ def leg_won(key: str, res: dict | None) -> bool | None:
     if key.startswith("s") and "-" in key:
         x, y = key[1:].split("-")
         return (s1, s2) == (int(x), int(y))
+    if key == "str":
+        return s1 == 0 or s2 == 0
     if key == "ws1":
         return s1 >= 1
     if key == "ws2":

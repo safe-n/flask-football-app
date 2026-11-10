@@ -77,13 +77,18 @@ def cls_for(p, base, hl_pp: float) -> str:
     return ""
 
 
-def tile(label: str, p, base=None, base_label="śr.", hl_pp: float = 8, title: str = "") -> str:
+def tile(label: str, p, base=None, base_label="śr.", hl_pp: float = 8, title: str = "", pick: str | None = None,
+         picked: bool = False) -> str:
     sub = ""
     if base is not None:
         d = round(100 * (p - base))
         sub = f"<small>{escape(base_label)} {pct(base)} ({'±0' if d == 0 else f'{d:+d}'})</small>"
+    if pick:
+        title = (title + " · " if title else "") + ("Kliknij, aby usunąć z Moich typów" if picked else "Kliknij, aby dodać do Moich typów")
     t = f' title="{escape(title)}"' if title else ""
-    return f'<div class="b {cls_for(p, base, hl_pp)}"{t}>{escape(label)}<b>{pct(p)}</b>{sub}</div>'
+    pk = (f' data-pick="{escape(pick)}" role="button" tabindex="0"' if pick else "")
+    c = cls_for(p, base, hl_pp) + (" pk" if pick else "") + (" on" if picked else "")
+    return f'<div class="b {c}"{t}{pk}>{escape(label)}<b>{pct(p)}</b>{sub}</div>'
 
 
 def fair(p) -> str:
@@ -98,19 +103,34 @@ def short(name: str) -> str:
     return " ".join(toks)
 
 
-def tiles_for(pred: dict, line: float | None, hl_pp: float) -> str:
+def tile_specs(pred: dict, line: float | None) -> list[dict]:
+    """Kafelki z listy meczów: klucz typu, etykieta, szansa modelu, punkt odniesienia (rynek / średnia)."""
     m, base = pred["m"], pred["base"] or {}
-    a, b = short(pred["p1"]), short(pred["p2"])
     pm = pred.get("p_market")
-    out = [tile(a, m["p1"], pm, "rynek", hl_pp, f"{pred['p1']} wygra: model (Elo zmieszane z rynkiem) vs kurs bez marży"),
-           tile(b, m["p2"], None if pm is None else 1 - pm, "rynek", hl_pp, f"{pred['p2']} wygra")]
     ln = line if line else (22.5 if pred["best_of"] == 3 else 38.5)
     p_over = sum(v for k, v in m["games_pmf"].items() if k > float(ln))
-    out.append(tile(f"Over {ln:g}", p_over, (base.get("over") or {}).get(f"{float(ln)}"), "śr.", hl_pp,
-                    f"Średnia liczba gemów: model {m['games_mean']:.1f}, nawierzchnia {base.get('games_mean', float('nan')):.1f}"))
-    out.append(tile("Tie-break", m["p_tb"], base.get("p_tb"), "śr.", hl_pp, "Co najmniej jeden tie-break w meczu"))
     need = pred["best_of"] // 2 + 1
-    out.append(tile(f"{need}:0 / 0:{need}", m["straight"], base.get("straight"), "śr.", hl_pp, "Mecz bez straconego seta przez zwycięzcę"))
+    return [
+        {"key": "w1", "tile": short(pred["p1"]), "label": f"{pred['p1']} wygra", "p": m["p1"], "ref": pm, "rl": "rynek",
+         "title": f"{pred['p1']} wygra: model (Elo zmieszane z rynkiem) vs kurs bez marży"},
+        {"key": "w2", "tile": short(pred["p2"]), "label": f"{pred['p2']} wygra", "p": m["p2"], "ref": None if pm is None else 1 - pm,
+         "rl": "rynek", "title": f"{pred['p2']} wygra"},
+        {"key": f"o{float(ln):g}", "tile": f"Over {ln:g}", "label": f"Over {ln:g} gemów", "p": p_over,
+         "ref": (base.get("over") or {}).get(f"{float(ln)}"), "rl": "śr.",
+         "title": f"Średnia liczba gemów: model {m['games_mean']:.1f}, nawierzchnia {base.get('games_mean', float('nan')):.1f}"},
+        {"key": "tb", "tile": "Tie-break", "label": "Tie-break w meczu", "p": m["p_tb"], "ref": base.get("p_tb"), "rl": "śr.",
+         "title": "Co najmniej jeden tie-break w meczu"},
+        {"key": "str", "tile": f"{need}:0 / 0:{need}", "label": f"Bez straty seta ({need}:0 / 0:{need})", "p": m["straight"],
+         "ref": base.get("straight"), "rl": "śr.", "title": "Mecz bez straconego seta przez zwycięzcę"},
+    ]
+
+
+def tiles_for(pred: dict, line: float | None, hl_pp: float, date: str | None = None, picked: set | None = None) -> str:
+    """date podane -> kafelki klikalne (Moje typy)."""
+    out = []
+    for t in tile_specs(pred, line):
+        leg = bm.leg_id(pred["tour"], date, pred["p1"], pred["p2"], pred["surface"], pred["best_of"], t["key"]) if date else None
+        out.append(tile(t["tile"], t["p"], t["ref"], t["rl"], hl_pp, t["title"], pick=leg, picked=bool(leg and picked and leg in picked)))
     return '<div class="row">' + "".join(out) + "</div>"
 
 

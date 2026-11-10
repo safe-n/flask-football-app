@@ -11,12 +11,13 @@ import pandas as pd
 from flask import Flask, abort, jsonify, redirect, render_template, request
 from markupsafe import escape
 
-from . import __version__, backtest, bets as bets_mod, betmarkets as bm, bootstrap, config, db, features as ft, gh_store, ledger, views as V
+from . import __version__, backtest, bets as bets_mod, picks as picks_mod, betmarkets as bm, bootstrap, config, db, features as ft, gh_store, ledger, views as V
 from .elo import SURFACES
 from .odds import edge, kelly, valid
 
 NAV = [("/", "Mecze"), ("/match", "Mecz"), ("/suggest", "Podpowiedzi"), ("/coupon", "Zestawienie"), ("/ranking", "Ranking Elo"),
-       ("/recent", "Ostatnie"), ("/backtest", "Backtest"), ("/track", "Dziennik"), ("/bets", "Moje zakłady"), ("/data", "Dane")]
+       ("/recent", "Ostatnie"), ("/backtest", "Backtest"), ("/track", "Dziennik"), ("/bets", "Moje zakłady"), ("/picks", "Moje typy"),
+       ("/data", "Dane")]
 
 
 RECENT_D = float(os.getenv("TN_RECENT_D", "0.05"))          # zakładka Ostatnie: over/TB kolorowane, gdy model odbiega od średniej ≥ 5 pp
@@ -141,6 +142,7 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
         last_day = None
         now = pd.Timestamp.now(tz="UTC")
         items = sorted(items, key=lambda rp: (V.when(rp[0]["date"], now)["day"], V.start_time(rp[0]["date"]) or now + pd.Timedelta(days=9999)))
+        mine = picks_mod.legs(st.conn)
         for r, p in items:
             day = str(r["date"])[:10]          # dzień w identyfikatorze typu (UTC, jak w bazie)
             w = V.when(r["date"], now)
@@ -172,7 +174,7 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
                 f'<span class="m">{escape(p["tour"])} · {escape(r.get("tournament") or "")} · {escape(p["surface"])} · do {p["best_of"] // 2 + 1} setów{o_txt}'
                 f'{" · " + src if src else ""}</span></div>'
                 f'<div class="bar2" title="{escape(p["p1"])} {V.pct(p["m"]["p1"])}"><i style="width:{100 * p["m"]["p1"]:.0f}%"></i></div>'
-                f'{V.tiles_for(p, line, h)}{V.h2h_row(m.df, p)}'
+                f'{V.tiles_for(p, line, h, day, mine)}{V.h2h_row(m.df, p)}'
                 f'<div class="pgrow"><span class="lb">forma {escape(V.short(p["p1"]))}</span>{ft.form(m.df, p["tour"], p["p1"], 5)["html"]}</div>'
                 f'<div class="pgrow"><span class="lb">forma {escape(V.short(p["p2"]))}</span>{ft.form(m.df, p["tour"], p["p2"], 5)["html"]}</div>'
                 f'{warn}<div class="row" style="align-items:center">{"".join(legs)} <a href="{href}">szczegóły →</a>'
@@ -186,7 +188,9 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
         legend = ('<p class="small">Kafelki: wartość modelu, pod nią średnia dla touru i nawierzchni (ostatnie 3 lata) albo rynek, w nawiasie różnica w pp. '
                   f'Zielony/czerwony = odchylenie ≥ {h / 2:g} pp, ramka ≥ {h:g} pp (zmień: ?hl=6). H2H i forma: najnowsze z lewej, najedź, by zobaczyć mecz. '
                   '⚑ = faworyt rzadko wygrywa z tym rywalem (mała próba - traktuj jako sygnał do sprawdzenia, nie przewagę). '
-                  'Przyciski ＋: uczciwy kurs z modelu, w nawiasie przewaga względem kursu bukmachera z bazy (ujemna = kurs za niski).</p>')
+                  'Przyciski ＋: uczciwy kurs z modelu, w nawiasie przewaga względem kursu bukmachera z bazy (ujemna = kurs za niski). '
+                  'Kliknięcie kafelka z procentem zapisuje typ w „Moich typach” (✓ = zapisany, drugie kliknięcie usuwa); '
+                  'po meczu rozlicza się sam.</p>')
         return page("Mecze", ("tabs", tabs), ("html", "".join(cards) + empty + _manual_form(m) + legend),
                     refresh=st.refreshing and not items)
 
@@ -319,7 +323,7 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
                 f'<span class="m">{escape(tour)} · {escape(p["surface"])} · Bo{bo} · {escape(date)}</span></div>'
                 f'<div class="bar2"><i style="width:{100 * p["m"]["p1"]:.0f}%"></i></div>'
                 f'<div class="m">{escape(V.short(p["p1"]))} {V.pct(p["m"]["p1"])} ({V.fair(p["m"]["p1"])}) – {escape(V.short(p["p2"]))} {V.pct(p["m"]["p2"])} ({V.fair(p["m"]["p2"])}) · {mk}</div>'
-                f'{V.tiles_for(p, _f(row.get("total_line")), hl())}{V.h2h_row(m.df, p)}'
+                f'{V.tiles_for(p, _f(row.get("total_line")), hl(), date[:10], picks_mod.legs(st.conn))}{V.h2h_row(m.df, p)}'
                 + "".join(f'<div class="warn m">⚠ {escape(w)}</div>' for w in p["warn"]) + "</div>")
         detail = (f'<div class="card">{V.games_chart(p, _f(row.get("total_line")))}'
                   f'<p class="m">Punkt przy serwisie (z modelu): {escape(V.short(p["p1"]))} {V.pct(p["serve"][0], 1)}, '
@@ -473,6 +477,73 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
             abort(404)
         bootstrap.sync_up_bg(st, ("bets",))
         return redirect(request.script_root + "/bets")
+
+    # ------------------------------------------------------------------ Moje typy
+    def _pick_row(t, a, b):
+        up = db.load_upcoming(st.conn, include_past_days=3)
+        if len(up):
+            hit = up[(up.tour == t) & (up.p1 == a) & (up.p2 == b)]
+            if len(hit):
+                return hit.iloc[0].to_dict()
+        return {}
+
+    @app.post("/api/picks")
+    def api_picks():
+        """Przełącz typ z kafelka: dodaj (z szansą modelu i odniesieniem z chwili kliknięcia) albo usuń."""
+        d = request.get_json(silent=True) or request.form
+        leg = str(d.get("leg") or "")
+        try:
+            t, day, a, b, s, bo, key = bm.parse_leg(leg)
+        except ValueError as e:
+            return jsonify({"ok": False, "blad": str(e)}), 400
+        if leg in picks_mod.legs(st.conn):
+            picks_mod.remove(st.conn, leg=leg)
+            bootstrap.sync_up_bg(st, ("picks",))
+            return jsonify({"ok": True, "on": False})
+        row = _pick_row(t, a, b)
+        p = model().predict(t, s, bo, a, b, row.get("o1"), row.get("o2"))
+        line = None
+        if key.startswith("o"):
+            line = _f(key[1:])
+        spec = next((x for x in V.tile_specs(p, line) if x["key"] == key), None)
+        if spec is None:
+            return jsonify({"ok": False, "blad": "nieznany typ"}), 400
+        picks_mod.add(st.conn, leg, spec["label"], spec["p"], spec["ref"], bm.book_odds(row, key))
+        bootstrap.sync_up_bg(st, ("picks",))
+        return jsonify({"ok": True, "on": True})
+
+    @app.get("/picks")
+    def picks_page():
+        days = request.args.get("days") or "all"
+        tour = (request.args.get("tour") or "").upper() or None
+        df = picks_mod.load(st.conn)
+        if len(df) and tour:
+            df = df[df.tour == tour]
+        if len(df) and days != "all":
+            since = f"{pd.Timestamp.today() - pd.Timedelta(days=int(_f(days) or 30)):%Y-%m-%d}"
+            df = df[df.date >= since]
+        rows = df.astype(object).where(df.notna(), None).to_dict("records") if len(df) else []
+        for r in rows:
+            r["kind"] = r["grp"]
+            r["match"] = f'{r["p1"]} – {r["p2"]}'
+        q = lambda **k: "?" + "&".join(f"{a}={v}" for a, v in {"days": days, "tour": tour or "", **k}.items() if v)  # noqa: E731
+        filters = {"days": [("Wszystko", q(days="all")), ("30 dni", q(days="30")), ("90 dni", q(days="90"))],
+                   "tour": [("ATP+WTA", q(tour="")), ("ATP", q(tour="ATP")), ("WTA", q(tour="WTA"))]}
+        return render("picks.html", "Moje typy", rows=rows, s=picks_mod.summary(df), filters=filters, days=days, tour=tour,
+                      persisted=gh_store.enabled(), now=pd.Timestamp.now(tz="Europe/Warsaw").strftime("%Y-%m-%d %H:%M"))
+
+    @app.post("/picks/<int:pick_id>/<action>")
+    def picks_action(pick_id, action):
+        if action == "delete":
+            picks_mod.remove(st.conn, pick_id=pick_id)
+        elif action in ("hit", "miss", "void", "open"):
+            picks_mod.set_status(st.conn, pick_id, action)
+        elif action == "kurs":
+            picks_mod.set_kurs(st.conn, pick_id, _f(request.form.get("kurs")))
+        else:
+            abort(404)
+        bootstrap.sync_up_bg(st, ("picks",))
+        return redirect(request.script_root + "/picks" + (("?" + request.query_string.decode()) if request.query_string else ""))
 
     # ------------------------------------------------------------------ Ranking / zawodnik
     @app.get("/ranking")

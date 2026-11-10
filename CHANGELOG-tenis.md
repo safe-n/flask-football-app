@@ -1,3 +1,13 @@
+## 0.3.12 - Moje typy: klikalne kafelki i zestawienie skuteczności
+- Kafelki z procentami (zwycięzca, Over, Tie-break, bez straty seta) w Meczach i w Meczu są klikalne: kliknięcie zapisuje typ
+  (✓ w rogu, drugie kliknięcie usuwa) z szansą modelu, punktem odniesienia (rynek / średnia) i kursem z bazy z chwili kliknięcia.
+- Nowa zakładka „Moje typy” (`tnpred/picks.py`, `templates/picks.html`): rozliczenie automatyczne po wyniku (tennis-data lub
+  łatka ESPN) - zielony = wszedł, czerwony = nie wszedł, krecz/walkower = zwrot; ręczna korekta i kurs do wpisania.
+  Zestawienie: trafione vs oczekiwane (średnia szansa modelu), wg rodzaju typu (faworyt / underdog / over / TB / bez straty seta)
+  i wg przedziału szansy, zysk przy stawce 1 j. dla typów z kursem, Brier. Filtry 30/90 dni, ATP/WTA, wydruk / PDF.
+- Nowy rynek `str` (zwycięzca bez straty seta) w katalogu i rozliczaniu.
+- Zapis trwały: `picks.csv` w gałęzi dziennika (jak zakłady).
+
 ## 0.3.11 - łatka ESPN: świeże wyniki i terminarz meczów spoza The Odds API
 - Przyczyna pustej listy meczów 10.11: The Odds API nie ma w ogóle kluczy dla ATP 250 (np. Stockholm), ATP/WTA Finals
   ani Challengerów - po Paris Masters lista była pusta („0 meczów; kredyty: None” = brak aktywnego turnieju w API).

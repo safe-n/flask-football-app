@@ -58,6 +58,18 @@ th:first-child,td:first-child{text-align:left}td.l,th.l{text-align:left}.m{color
 .tm{font-weight:800;margin-right:6px}.match.started{opacity:.75}
 .ver{font-size:11px;color:var(--mut);text-align:right;margin:-4px 0 -6px}
 .ok{color:var(--up)}.bad{color:var(--dn)}details summary{cursor:pointer;font-weight:600}
+.b.pk{cursor:pointer;position:relative;-webkit-tap-highlight-color:transparent}.b.pk:hover{filter:brightness(1.08)}
+.b.pk.on{background:rgba(79,179,232,.22);box-shadow:inset 0 0 0 2px var(--acc)}
+.b.pk.on::after{content:"✓";position:absolute;top:2px;right:4px;font-size:11px;font-weight:800;color:var(--acc)}.b.pk.busy{opacity:.5}
+.pt{width:100%}.pt td{white-space:normal}.pt td.c{text-align:center}.pt tr.hit td.r{background:rgba(31,157,92,.24);color:var(--up);font-weight:700}
+.pt tr.miss td.r{background:rgba(217,83,79,.2);color:var(--dn);font-weight:700}.pt tr.open td.r,.pt tr.void td.r{color:var(--mut)}
+.pt td.r{border-radius:6px;text-align:center;font-size:15px;min-width:44px}.pt details{margin-top:3px}.pt details summary{font-weight:400}.pt form{display:inline}.pt button{font-size:11px;padding:2px 6px}
+.pt input{width:58px;font-size:12px;padding:2px 4px}.diff.pos{color:var(--up)}.diff.neg{color:var(--dn)}
+.printonly{display:none}
+@media print{body{background:#fff;color:#000;max-width:none;padding:0;font-size:11px}nav,.ver,.noprint,form,button,.small{display:none!important}
+.printonly{display:block}.card,.kpi{background:#fff;border:1px solid #ccc;break-inside:avoid}.pt tr{break-inside:avoid}
+.pt tr.hit td.r{background:#d7f0df;color:#0b5d2a}.pt tr.miss td.r{background:#f7d9d6;color:#8b1e14}.kv.g,.diff.pos{color:#0b5d2a}.kv.r,.diff.neg{color:#8b1e14}
+a{color:#000;text-decoration:none}}
 </style>
 <script>
 var TN_R='{{ R }}',FB_KEY='tn_coupon';
@@ -73,6 +85,13 @@ function fbSync(){document.querySelectorAll('.add[data-id]').forEach(function(t)
   t.title=on?'Kliknij, aby usunąć z zestawienia':'Kliknij, aby dodać ten typ do zestawienia';});}
 document.addEventListener('click',function(e){var t=e.target.closest&&e.target.closest('.add[data-id]');if(!t)return;
   var id=t.getAttribute('data-id');if(fbHas(id))fbRemove(id);else fbAdd(id);fbSync();});
+function pkToggle(t){if(t.classList.contains('busy'))return;t.classList.add('busy');
+  fetch(TN_R+'/api/picks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({leg:t.getAttribute('data-pick')})})
+  .then(function(r){return r.json();}).then(function(j){t.classList.remove('busy');if(!j.ok){alert(j.blad||'Nie udało się zapisać typu');return;}
+    t.classList.toggle('on',j.on);t.title=j.on?'Zapisany w Moich typach - kliknij, aby usunąć':'Kliknij, aby dodać do Moich typów';})
+  .catch(function(){t.classList.remove('busy');});}
+document.addEventListener('click',function(e){var t=e.target.closest&&e.target.closest('.b.pk[data-pick]');if(t)pkToggle(t);});
+document.addEventListener('keydown',function(e){var t=e.target.closest&&e.target.closest('.b.pk[data-pick]');if(t&&(e.key==='Enter'||e.key===' ')){e.preventDefault();pkToggle(t);}});
 document.addEventListener('DOMContentLoaded',function(){fbBadge();fbSync();});
 window.addEventListener('pageshow',function(){fbBadge();fbSync();});
 </script>

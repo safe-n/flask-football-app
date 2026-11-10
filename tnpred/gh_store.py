@@ -14,7 +14,7 @@ import requests
 from . import config
 
 API = "https://api.github.com"
-FILES = {"predictions": "predictions.csv", "bets": "bets.csv", "manual": "upcoming_manual.csv"}
+FILES = {"predictions": "predictions.csv", "bets": "bets.csv", "manual": "upcoming_manual.csv", "picks": "picks.csv"}
 
 
 class GhStoreError(RuntimeError):

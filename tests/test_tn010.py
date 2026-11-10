@@ -1,4 +1,6 @@
 """Testy tnpred 0.1.0 (tenis). Izolacja: baza, historia i parametry w katalogach tymczasowych, bez internetu."""
+import sqlite3
+import re
 import os
 import tempfile
 
@@ -589,6 +591,73 @@ class EspnPatch(unittest.TestCase):
         step = [s for s in self.st.diag["kroki"] if s["krok"].startswith("ESPN")][-1]
         self.assertFalse(step["ok"])
         self.assertIn("403", step["opis"])
+
+
+class PicksTests(unittest.TestCase):
+    """0.3.12: klikalne kafelki -> Moje typy, rozliczenie wszedł/nie wszedł, zestawienie."""
+
+    @classmethod
+    def setUpClass(cls):
+        from tnpred.web import create_app
+        cls.st = bootstrap.State(os.path.join(_TMP, "picks.db"))
+        df = demo_df()
+        db.upsert_matches(cls.st.conn, df)
+        db.upsert_upcoming(cls.st.conn, synthetic.upcoming(df, n=3))
+        cls.app = create_app(cls.st, background=False)
+        bootstrap.refresh(cls.st, network=False)
+        cls.c = cls.app.test_client()
+
+    def test_tiles_clickable_toggle_and_page(self):
+        from tnpred import picks
+        html = self.c.get("/").data.decode()
+        legs_ = re.findall(r'data-pick="([^"]+)"', html)
+        self.assertGreaterEqual(len(legs_), 5)
+        keys = {l.split("~")[-1] for l in legs_}
+        self.assertTrue({"w1", "w2", "tb", "str"} <= keys and any(k.startswith("o") for k in keys))
+        leg = next(l for l in legs_ if l.endswith("~tb"))
+        import html as _h
+        leg = _h.unescape(leg)
+        r = self.c.post("/api/picks", json={"leg": leg}).get_json()
+        self.assertEqual(r, {"ok": True, "on": True})
+        self.assertIn('pk on', self.c.get("/").data.decode())             # zaznaczony po odświeżeniu
+        df = picks.load(self.st.conn)
+        self.assertEqual(len(df), 1)
+        self.assertTrue(0 < df.p.iloc[0] < 1)
+        self.assertEqual(df.grp.iloc[0], "Tie-break")
+        self.assertEqual(self.c.post("/api/picks", json={"leg": leg}).get_json()["on"], False)   # drugie kliknięcie usuwa
+        self.assertEqual(len(picks.load(self.st.conn)), 0)
+        self.assertEqual(self.c.post("/api/picks", json={"leg": "zly"}).status_code, 400)
+        self.c.post("/api/picks", json={"leg": leg})
+        r = self.c.get("/picks")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("w grze", r.data.decode())
+
+    def test_settle_and_summary(self):
+        from tnpred import picks
+        conn = sqlite3.connect(":memory:")
+        mk = lambda key: bm.leg_id("ATP", "2026-11-09", "A X.", "B Y.", "Hard", 3, key)  # noqa: E731
+        for key, p in (("w1", 0.7), ("w2", 0.3), ("tb", 0.4), ("str", 0.6), ("o22.5", 0.5)):
+            picks.add(conn, mk(key), key, p, None, 2.0 if key == "w2" else None)
+        res = {"winner": "A X.", "loser": "B Y.", "w1": 7, "l1": 6, "w2": 6, "l2": 3, "comment": "Completed"}
+        n = picks.settle_open(conn, lambda t, d, a, b: res)
+        self.assertEqual(n, 5)
+        st = dict(zip(*[picks.load(conn)[c] for c in ("key", "status")]))
+        self.assertEqual(st, {"w1": "hit", "w2": "miss", "tb": "hit", "str": "hit", "o22.5": "miss"})   # 22 gemy < 22.5
+        s = picks.summary(picks.load(conn))
+        self.assertEqual((s["all"]["hit"], s["all"]["n"]), (3, 5))
+        self.assertAlmostEqual(s["all"]["exp"], 0.5)
+        self.assertEqual(s["all"]["n_kurs"], 1)
+        self.assertAlmostEqual(s["all"]["profit"], -1.0)
+        self.assertIn("Zwycięzca – underdog", [k["label"] for k in s["kinds"]])
+        text, k = picks.export_text(conn)
+        c2 = sqlite3.connect(":memory:")
+        self.assertEqual(picks.import_text(c2, text), 5)
+        self.assertEqual(picks.import_text(c2, text), 0)
+        # krecz = zwrot
+        c3 = sqlite3.connect(":memory:")
+        picks.add(c3, mk("w1"), "w1", 0.7)
+        picks.settle_open(c3, lambda *a: {**res, "comment": "Retired"})
+        self.assertEqual(picks.load(c3).status.iloc[0], "void")
 
 
 if __name__ == "__main__":

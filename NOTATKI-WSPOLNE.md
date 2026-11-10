@@ -40,6 +40,10 @@ Zmiany w obszarze drugiej rozmowy: tylko gdy właściciel poprosi, a jeśli to k
 - **Tenis – łatka ESPN**: wyniki z ostatnich dni + terminarz bez kursów (feed nieoficjalny, może zniknąć; `TN_ESPN=0` wyłącza).
 
 ## Dziennik zmian (najnowsze na górze)
+- **2026-11-10 · tenis 0.3.12** (wątek tenisa): „Moje typy” - klikalne kafelki, rozliczanie wszedł/nie wszedł, zestawienie
+  skuteczności z wydrukiem (`tnpred/picks.py`, plik `picks.csv` w gałęzi dziennika).
+- **2026-11-10 · infrastruktura**: lokalny commit na PC („update history”: `history/EL_2025.csv`, styl TB) blokował `git pull --ff-only`
+  w `lokalnie/serwer.py` od 7.11 - przeniesiony na master (aba870b). Gdy wersja na PC nie rośnie po restarcie: GitHub Desktop, „↑” przy Pull.
 - **2026-11-10 · tenis 0.3.11** (wątek tenisa): `tnpred/espn.py` - łatka świeżych wyników i terminarz z feedu ESPN
   (bez klucza) dla turniejów, których nie ma w The Odds API (ATP 250, Finals). Nowe opcjonalne zmienne `TN_ESPN`, `TN_ESPN_DAYS`.
 - **2026-11-10 · piłka 0.9.5 + dokumentacja** (wątek piłki): zamknięty Rozdział 1 - katalog `docs/` (koncepcja, architektura, instrukcja, operacje, podsumowanie i plan Rozdziału 2). Od 0.9.3 doszły: 0.9.4 (EL kolejka po kolejce) i 0.9.5 (odporność na limit TheSportsDB). Liga Europy nadal nieaktywna na Renderze - brak `history/EL_*.csv` (do dokończenia `history-init --league EL --seasons 2026-2026` na PC).
