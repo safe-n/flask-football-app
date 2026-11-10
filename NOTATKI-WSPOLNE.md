@@ -39,6 +39,7 @@ Zmiany w obszarze drugiej rozmowy: tylko gdy właściciel poprosi, a jeśli to k
 - **Tenis – kursy**: The Odds API (`ODDS_API_KEY`, 500 kredytów/mies., budżet w aplikacji 450).
 
 ## Dziennik zmian (najnowsze na górze)
+- **2026-11-10 · piłka 0.9.5 + dokumentacja** (wątek piłki): zamknięty Rozdział 1 - katalog `docs/` (koncepcja, architektura, instrukcja, operacje, podsumowanie i plan Rozdziału 2). Od 0.9.3 doszły: 0.9.4 (EL kolejka po kolejce) i 0.9.5 (odporność na limit TheSportsDB). Liga Europy nadal nieaktywna na Renderze - brak `history/EL_*.csv` (do dokończenia `history-init --league EL --seasons 2026-2026` na PC).
 - **2026-11-05 · infrastruktura**: przycisk `/restart` (w `combo.py`) + `lokalnie/serwer.py`: kopia na PC sama pobiera
   kod z GitHuba przy starcie i po kliknięciu restartu; harmonogram „Tenis - aktualizacja wynikow” co 4 h ustawiony na PC.
 - **2026-11-05 · piłka 0.9.3** (wątek piłki): Liga Europy `EL` z TheSportsDB (`fbpred/sportsdb.py`, `extsource.py`), wersja próbna - aktywuje się dopiero po pojawieniu się `history/EL_*.csv` (komenda `history-init --league EL` na PC). Nowa opcjonalna zmienna `SPORTSDB_KEY`.

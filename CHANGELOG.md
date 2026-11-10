@@ -1,3 +1,6 @@
+## Dokumentacja Rozdziału 1 (bez zmian w kodzie, wersja nadal 0.9.5)
+- Nowy katalog `docs/`: KONCEPCJA, ARCHITEKTURA, INSTRUKCJA, OPERACJE, ROZDZIAL-1-PODSUMOWANIE oraz indeks `docs/README.md`; link w głównym README.
+
 
 ## 0.9.5 - Liga Europy: odporność na limit zapytań
 - Probe potwierdził, że kolejki TheSportsDB dają pełne dane EL (72 mecze z wynikami do 5.11, terminarz do stycznia, 126 meczów z godzinami po filtrach). Publiczny klucz jest jednak współdzielony i bywa limitowany - pobieranie zwraca teraz wynik częściowy zamiast błędu (flaga w Dane / komunikat przy history-init), przerwa między zapytaniami 3 s.

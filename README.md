@@ -3,6 +3,12 @@
 Prawdopodobieństwa dla meczów ligowych: **1X2, over/under goli, BTTS, dokładne wyniki, remis do przerwy / w 2. połowie
 (w którejkolwiek / w obu), połowa-mecz (HT/FT), żółte kartki (z efektem sędziego), rzuty rożne** + backtest i porównanie z kursami.
 
+## Dokumentacja (Rozdział 1, wersja 0.9.5)
+
+Pełna dokumentacja w katalogu [`docs/`](docs/README.md):
+[Koncepcja i założenia](docs/KONCEPCJA.md) · [Architektura](docs/ARCHITEKTURA.md) · [Instrukcja użytkownika](docs/INSTRUKCJA.md) ·
+[Operacje i wdrożenie](docs/OPERACJE.md) · [Podsumowanie Rozdziału 1 i plan Rozdziału 2](docs/ROZDZIAL-1-PODSUMOWANIE.md).
+
 ## Szybki start (5 minut, bez żadnych kluczy)
 
 ```bash
