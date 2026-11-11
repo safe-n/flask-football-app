@@ -40,6 +40,10 @@ Zmiany w obszarze drugiej rozmowy: tylko gdy właściciel poprosi, a jeśli to k
 - **Tenis – łatka ESPN**: wyniki z ostatnich dni + terminarz bez kursów (feed nieoficjalny, może zniknąć; `TN_ESPN=0` wyłącza).
 
 ## Dziennik zmian (najnowsze na górze)
+- **2026-11-11 · tenis 0.3.14** (wątek tenisa): poprawka utraty danych na Renderze - tnpred zapisywał do GitHuba PRZED odczytem
+  po restarcie (pusta baza nadpisywała typy, kupony, zakłady i dziennik). Dane odtworzone z historii `ledger-data`.
+  **Dla piłki:** fbpred czyta przed zapisem (bootstrap.py ~334 vs ~361), więc problemu nie ma - ale przy każdej nowej synchronizacji
+  zasada: najpierw sync_down, zapis dopiero po udanym odczycie.
 - **2026-11-11 · piłka 0.10.0** (wątek piłki, start Rozdziału 2): „Moje typy” w piłce wg `docs/WZORZEC-MOJE-TYPY.md` - klikalne kafelki
   na stronie Mecze, szkic → kupon na stałe, zestawienie skuteczności z wydrukiem (`fbpred/picks.py`, `templates/picks.html`, `/picks`, `/api/picks`).
   Pliki piłki w gałęzi dziennika: `ledger/picks.csv`, `ledger/pick_coupons.csv` (tenis ma swoje w `tennis/` - nie kolidują). Plików tenisa nie ruszano.

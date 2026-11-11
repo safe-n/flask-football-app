@@ -1,3 +1,12 @@
+## 0.3.14 - poprawka: restart nie kasuje już typów, kuponów, zakładów ani dziennika
+- Błąd (od 0.2.x): wątek tła po starcie najpierw odświeżał dane i ZAPISYWAŁ je do GitHuba, a dopiero potem czytał z GitHuba.
+  Na Renderze baza po restarcie jest pusta, więc każdy restart (np. po aktualizacji piłki 11.11 9:25) nadpisywał
+  `tennis/picks.csv`, `coupons.csv`, `bets.csv` i `predictions.csv` pustymi lub niepełnymi danymi. Na PC baza jest trwała, więc nie było tego widać.
+- Teraz: najpierw odczyt, potem odświeżenie; zapis do GitHuba jest wstrzymany, dopóki odczyt się nie uda (`State.gh_loaded`),
+  a dziennik prognoz i kupony nigdy nie są nadpisywane mniejszą liczbą wierszy (`gh_store.GROW_ONLY`).
+- Dane odtworzone z historii gałęzi `ledger-data`: 10 typów i 2 kupony z 10.11, zakład z 5.11, dziennik prognoz złożony
+  z 33 wersji pliku (58 prognoz od 3.11).
+
 ## 0.3.13 - kupony w Moich typach
 - Typy kliknięte od ostatniego zatwierdzenia tworzą **szkic kuponu**; „✅ Zatwierdź kupon” (z notatką) zapisuje go na stałe -
   zatwierdzonego typu nie można usunąć (kafelek zwraca 409) ani zmienić kursu, można tylko poprawić wynik ręcznie.

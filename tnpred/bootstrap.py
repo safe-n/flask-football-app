@@ -68,6 +68,7 @@ class State:
         self.refresh_thread: int | None = None
         self.bg_thread: int | None = None
         self.bg_pid: int | None = None
+        self.gh_loaded = False          # zapis do GitHuba dopiero po udanym odczycie (ochrona przed nadpisaniem pustą bazą)
         self._lookup = None
 
     # ------------------------------------------------------------------ diagnostyka
@@ -413,6 +414,7 @@ def sync_down(st: State) -> None:
         c = gh_store.sync_down("manual", lambda t: manual_import(st, t))
         gh_store.sync_down("coupons", lambda t: picks_mod.import_coupons(st.conn, t))
         d = gh_store.sync_down("picks", lambda t: picks_mod.import_text(st.conn, t))
+        st.gh_loaded = True
         st.step("GitHub: odczyt", True, f"prognozy {a}, zakłady {b}, typy {d}, ręczne mecze {c} (gałąź {config.LEDGER_BRANCH}, folder {config.LEDGER_PREFIX})")
     except Exception as e:  # noqa: BLE001
         st.step("GitHub: odczyt", False, str(e))
@@ -420,6 +422,10 @@ def sync_down(st: State) -> None:
 
 def sync_up(st: State, kinds=("predictions", "bets", "picks", "coupons", "manual")) -> None:
     if not gh_store.enabled():
+        return
+    if not st.gh_loaded:
+        # 0.3.14: po restarcie Rendera baza jest pusta - zapis przed odczytem nadpisywał dziennik, zakłady i kupony
+        st.step("GitHub: zapis", True, "wstrzymany - najpierw odczyt z GitHuba (ochrona przed nadpisaniem pustą bazą)")
         return
     ex = {"predictions": (lambda: ledger.export_text(st.conn), "prognoz"),
           "bets": (lambda: bets_mod.export_text(st.conn), "zakładów"),
@@ -528,7 +534,7 @@ _START_LOCK = threading.Lock()
 
 
 def start_background(st: State) -> None:
-    """Wątek w tle: najpierw kursy i model (nie zależą od GitHuba), potem GitHub; dalej pętla co TN_REFRESH_HOURS.
+    """Wątek w tle: najpierw odczyt z GitHuba, potem kursy, model i zapis; dalej pętla co TN_REFRESH_HOURS.
     Każdy błąd - także taki, który wcześniej po cichu kończył wątek - trafia do zakładki Dane."""
     def guarded(name, fn):
         try:
@@ -539,10 +545,12 @@ def start_background(st: State) -> None:
     def loop():
         st.bg_thread = threading.get_ident()
         st.step("wątek tła", True, "start")
-        guarded("odświeżanie", lambda: refresh(st))
-        guarded("GitHub", lambda: sync_down(st))
+        guarded("GitHub", lambda: sync_down(st))          # NAJPIERW odczyt (dziennik, zakłady, typy, kupony)
+        guarded("odświeżanie", lambda: refresh(st))       # potem odświeżenie i zapis
         while config.REFRESH_HOURS > 0:
             time.sleep(max(600, config.REFRESH_HOURS * 3600))
+            if not st.gh_loaded:
+                guarded("GitHub", lambda: sync_down(st))
             guarded("odświeżanie", lambda: refresh(st))
 
     threading.Thread(target=loop, daemon=True, name="tnpred-refresh").start()

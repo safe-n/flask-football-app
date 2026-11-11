@@ -146,6 +146,20 @@ def _canonical(text: str | None) -> str:
     return pd.read_csv(io.StringIO(text)).drop(columns=["logged_at", "updated_at"], errors="ignore").to_csv(index=False)
 
 
+GROW_ONLY = {"predictions", "coupons"}
+
+
+def _rows(text: str | None) -> int:
+    import io as _io
+    import pandas as _pd
+    if not text or not text.strip():
+        return 0
+    try:
+        return len(_pd.read_csv(_io.StringIO(text)))
+    except Exception:  # noqa: BLE001
+        return 0
+
+
 def sync_down(kind: str, importer) -> int:
     text, _ = pull(path(kind))
     return importer(text) if text else 0
@@ -156,5 +170,8 @@ def sync_up(kind: str, exporter, label: str) -> str:
     remote, _ = pull(path(kind))
     if _canonical(remote) == _canonical(local):
         return f"bez zmian ({n} {label})"
+    if kind in GROW_ONLY and _rows(local) < _rows(remote):
+        # dziennik prognoz i kupony tylko przybywają - mniej wierszy niż w GitHubie = baza niewczytana, nie nadpisujemy
+        raise RuntimeError(f"pominięto: lokalnie {_rows(local)}, w GitHubie {_rows(remote)} {label} - nie nadpisuję")
     push(local, path(kind), message=f"tennis {kind}: {n} {label}")
     return f"zapisano {n} {label}"

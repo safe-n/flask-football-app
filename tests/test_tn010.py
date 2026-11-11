@@ -735,5 +735,43 @@ class CouponTests(unittest.TestCase):
         self.assertIn("pk on", c.get("/").data.decode())
 
 
+class SyncOrderTests(unittest.TestCase):
+    """0.3.14: restart z pustą bazą nie może nadpisać GitHuba (zgubione kupony 11.11)."""
+
+    def test_no_upload_before_download_and_grow_only(self):
+        from unittest import mock
+        from tnpred import gh_store, picks
+        remote = {}
+        mk = lambda k: bm.leg_id("ATP", "2026-11-09", "A X.", "B Y.", "Hard", 3, k)  # noqa: E731
+        c0 = sqlite3.connect(":memory:")
+        picks.add(c0, mk("w1"), "A", 0.7)
+        picks.confirm(c0)
+        remote["picks"] = picks.export_text(c0)[0]
+        remote["coupons"] = picks.export_coupons(c0)[0]
+        pushed = []
+
+        def pull(path):
+            k = [k for k, v in gh_store.FILES.items() if path.endswith(v)][0]
+            return remote.get(k), None
+
+        def push(text, path, message=""):
+            pushed.append(path)
+            k = [k for k, v in gh_store.FILES.items() if path.endswith(v)][0]
+            remote[k] = text
+        st = bootstrap.State(":memory:")                         # świeży Render: pusta baza
+        with mock.patch.object(gh_store, "enabled", lambda: True), mock.patch.object(gh_store, "pull", pull), \
+                mock.patch.object(gh_store, "push", push), mock.patch.object(gh_store, "check", lambda: (True, "ok")):
+            bootstrap.sync_up(st)                               # przed odczytem: nic nie wysyła
+            self.assertEqual(pushed, [])
+            bootstrap.sync_down(st)
+            self.assertTrue(st.gh_loaded)
+            self.assertEqual(len(picks.coupons(st.conn)), 1)       # kupon wrócił
+            bootstrap.sync_up(st, ("picks", "coupons"))
+            self.assertEqual(pushed, [])                           # bez zmian
+            with self.assertRaises(RuntimeError):                  # kupony tylko przybywają
+                gh_store.sync_up("coupons", lambda: ("id,created_at,note\n", 0), "kuponów")
+        self.assertIn("1,", remote["coupons"])
+
+
 if __name__ == "__main__":
     unittest.main()
