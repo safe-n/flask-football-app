@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
 
-from . import ai, avail, bets as bets_mod, kickoff as kick_mod, pdfexport, bootstrap, h2h as h2h_mod, config, db, draws, gh_store, history, ledger, leagues as lg_cat, params as prm, profile as prof, recent as recent_mod, recent_vis, stats, suggest as sg
+from . import ai, avail, bets as bets_mod, picks as picks_mod, betmarkets as bm, kickoff as kick_mod, pdfexport, bootstrap, h2h as h2h_mod, config, db, draws, gh_store, history, ledger, leagues as lg_cat, params as prm, profile as prof, recent as recent_mod, recent_vis, stats, suggest as sg
 from .betmarkets import GROUPS as BET_GROUPS, book_odds, catalogue, parse_leg
 from .odds import apply_blend, value_picks
 from .simulate import simulate_table
@@ -183,8 +183,16 @@ def create_app() -> Flask:
                               "form_h": {"all": h2h_mod.form(hist_df, r["home"]), "venue": h2h_mod.form(hist_df, r["home"], venue="home")},
                               "form_a": {"all": h2h_mod.form(hist_df, r["away"]), "venue": h2h_mod.form(hist_df, r["away"], venue="away")}})
         now = pd.Timestamp.now(tz="UTC")
+        mine = picks_mod.legs(conn) if items else set()
         for it in items:
             it["when"] = kick_mod.when(it["row"].get("kickoff"), it["row"]["date"], now)
+            r, specs = it["row"], picks_mod.tile_specs(it["p"], base)
+            lid = {k: bm.leg_id(league, r["date"], r["home"], r["away"], k) for k in specs}
+            it["x12"] = [{"k": k, "p": specs[k]["p"], "leg": lid[k], "on": lid[k] in mine, "fav": specs[k]["fav"]}
+                         for k in picks_mod.X12 if k in specs]
+            for k, tname in picks_mod.TILE_OF.items():           # kafelki procentowe dostają identyfikator typu (klik = Moje typy)
+                if k in specs and tname in it["tiles"]:
+                    it["tiles"][tname].update(leg=lid[k], on=lid[k] in mine)
         items.sort(key=lambda it: (it["when"]["day"], it["when"]["sort"]))
         return render_template("index.html", items=items, base=base, margin=margin, league=league, leagues=league_options(), skipped=skipped,
                                title=f"Mecze · {lg_cat.name(league)}")
@@ -452,7 +460,7 @@ def create_app() -> Flask:
     @app.get("/bets")
     def bets_page():
         conn = db.connect(config.DB_PATH)
-        if bets_mod.settle_open(conn, match_row):
+        if bets_mod.settle_open(conn, picks_mod.db_lookup(conn)):   # lookup(liga, data, dom, gość) - kolejność jak w id typu
             persist_bets()
         df = bets_mod.load(conn)
         s = bets_mod.summary(df) if len(df) else {}
@@ -497,6 +505,126 @@ def create_app() -> Flask:
             abort(404)
         persist_bets()
         return redirect(url_for("bets_page", league=league_arg()))
+
+    # ---- Moje typy: klikalne kafelki -> szkic kuponu -> kupon zatwierdzony na stałe (wzorzec: tnpred, docs/WZORZEC-MOJE-TYPY.md)
+    picks_push_lock = threading.Lock()
+
+    def persist_picks():
+        """Wysyła typy i kupony do GitHuba w tle, po kolei (dwa szybkie kliknięcia nie mogą się ścigać)."""
+        if not gh_store.enabled():
+            return
+
+        def run():
+            with picks_push_lock:
+                try:
+                    bootstrap.DIAG.setdefault("dziennik", {})["typy_zapis"] = gh_store.picks_sync_up(db.connect(config.DB_PATH))
+                except Exception as e:  # noqa: BLE001
+                    bootstrap.DIAG.setdefault("dziennik", {})["typy_zapis"] = f"błąd zapisu typów: {e}"
+        threading.Thread(target=run, daemon=True).start()
+
+    @app.post("/api/picks")
+    def api_picks():
+        """Przełącz typ z kafelka: dodaj (szansa modelu i odniesienie z chwili kliknięcia, liczone tutaj) albo usuń."""
+        d = request.get_json(silent=True) or request.form
+        leg = str(d.get("leg") or "")
+        try:
+            league, date, home, away, key = parse_leg(leg)
+        except ValueError as e:
+            return jsonify({"ok": False, "blad": str(e)}), 400
+        conn = db.connect(config.DB_PATH)
+        if leg in picks_mod.legs(conn):
+            try:
+                picks_mod.remove(conn, leg=leg)
+            except picks_mod.Locked as e:
+                return jsonify({"ok": False, "on": True, "blad": str(e)}), 409
+            persist_picks()
+            return jsonify({"ok": True, "on": False})
+        row = match_row(league, home, away, date)
+        if row is None:
+            return jsonify({"ok": False, "blad": "nie znaleziono meczu w terminarzu"}), 400
+        if row.get("hg") is not None and row["hg"] == row["hg"]:
+            return jsonify({"ok": False, "blad": "mecz już rozegrany - typu nie można dodać po fakcie"}), 400
+        m = model_nowait(league)
+        if m is None:
+            return jsonify({"ok": False, "blad": "model się jeszcze liczy - spróbuj za chwilę"}), 202
+        P, p, hist_df = m
+        pred = apply_blend(P.predict(home, away, row.get("referee"), date=row["date"]), row, p["blend_w"])
+        spec = picks_mod.tile_specs(pred, cached(("base", league), lambda: stats.base_rates(hist_df))).get(key)
+        if spec is None:
+            return jsonify({"ok": False, "blad": "nieznany typ"}), 400
+        picks_mod.add(conn, leg, spec["label"], spec["p"], spec["ref"], book_odds(row, key), spec["fav"])
+        persist_picks()
+        return jsonify({"ok": True, "on": True})
+
+    @app.get("/picks")
+    def picks_page():
+        conn = db.connect(config.DB_PATH)
+        if picks_mod.settle_open(conn, picks_mod.db_lookup(conn)):
+            persist_picks()
+        days, only = request.args.get("days") or "all", request.args.get("only") or ""
+        df = picks_mod.load(conn)
+        in_leagues = sorted(set(df.league)) if len(df) else []
+        if len(df) and only:
+            df = df[df.league == only]
+        since = ""
+        if days != "all":
+            try:
+                since = f"{pd.Timestamp.today() - pd.Timedelta(days=int(days)):%Y-%m-%d}"
+            except ValueError:
+                days = "all"
+            if since and len(df):
+                df = df[df.date >= since]
+        league = league_arg()
+
+        def q(**k):
+            return url_for("picks_page", **{a: v for a, v in {"league": league, "days": days, "only": only, **k}.items() if v})
+        filters = {"days": [("Wszystko", q(days="all")), ("30 dni", q(days="30")), ("90 dni", q(days="90"))],
+                   "only": [("Wszystkie ligi", q(only=""))] + [(lg_cat.name(c), q(only=c)) for c in in_leagues]}
+        dr = picks_mod.draft(conn)
+        d_p, d_odds = picks_mod.joint(dr)
+        cps = picks_mod.coupons(conn)
+        if only:
+            cps = [c for c in cps if any(l["league"] == only for l in c["legs"])]
+        if since:
+            cps = [c for c in cps if str(c["created_at"])[:10] >= since]
+        for c in cps:
+            c["date"] = pd.Timestamp(c["created_at"]).tz_convert(config.TZ).strftime("%d.%m.%Y %H:%M")
+        return render_template("picks.html", title="Moje typy", league=league, leagues=league_options(), s=picks_mod.summary(df),
+                               filters=filters, days=days, only=only, draft=picks_mod._records(dr), d_p=d_p, d_odds=d_odds,
+                               d_same=len(dr) > 0 and not picks_mod.independent(dr), coupons=cps,
+                               cs=picks_mod.coupon_summary(cps), msg=request.args.get("msg"), persisted=gh_store.enabled(),
+                               lname=lg_cat.name, now=pd.Timestamp.now(tz=config.TZ).strftime("%Y-%m-%d %H:%M"))
+
+    @app.post("/picks/confirm")
+    def picks_confirm():
+        try:
+            msg = f"Kupon nr {picks_mod.confirm(db.connect(config.DB_PATH), request.form.get('note') or '')} zatwierdzony"
+        except ValueError as e:
+            msg = str(e)
+        persist_picks()
+        return redirect(url_for("picks_page", league=league_arg(), msg=msg))
+
+    @app.post("/picks/<int:pick_id>/<action>")
+    def picks_action(pick_id, action):
+        conn, msg = db.connect(config.DB_PATH), None
+        picks_mod.ensure(conn)
+        try:
+            if action == "delete":
+                picks_mod.remove(conn, pick_id=pick_id)
+            elif action in ("hit", "miss", "void", "open"):
+                picks_mod.set_status(conn, pick_id, action)
+            elif action == "kurs":
+                try:
+                    k = float(str(request.form.get("kurs") or "").replace(",", "."))
+                except ValueError:
+                    k = None
+                picks_mod.set_kurs(conn, pick_id, k)
+            else:
+                abort(404)
+        except picks_mod.Locked as e:
+            msg = str(e)
+        persist_picks()
+        return redirect(url_for("picks_page", league=league_arg(), msg=msg))
 
     def _pdf(data: bytes, name: str):
         from flask import Response

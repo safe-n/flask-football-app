@@ -7,7 +7,7 @@ Repo rozwijają **dwie osobne rozmowy z Claude**, które nie widzą się nawzaje
 
 | obszar | pliki | rozmowa |
 |---|---|---|
-| piłka | `fbpred/`, `templates/`, `history/`, `params/`, `ledger/`, `README.md`, `CHANGELOG.md` | **wątek piłki** |
+| piłka | `fbpred/`, `templates/`, `history/`, `params/`, `ledger/`, `docs/`, `README.md`, `CHANGELOG.md` | **wątek piłki** |
 | tenis | `tnpred/`, `tennis_history/`, `tennis_params/`, `README-tenis.md`, `CHANGELOG-tenis.md`, `tests/test_tn010.py` | **wątek „Tenis + infrastruktura”** |
 | wspólne | `combo.py`, `requirements.txt`, `render.yaml`, `Dockerfile`, `lokalnie/`, `aktualizuj_tenis*.bat`, ten plik | **wątek „Tenis + infrastruktura”** |
 
@@ -40,6 +40,10 @@ Zmiany w obszarze drugiej rozmowy: tylko gdy właściciel poprosi, a jeśli to k
 - **Tenis – łatka ESPN**: wyniki z ostatnich dni + terminarz bez kursów (feed nieoficjalny, może zniknąć; `TN_ESPN=0` wyłącza).
 
 ## Dziennik zmian (najnowsze na górze)
+- **2026-11-11 · piłka 0.10.0** (wątek piłki, start Rozdziału 2): „Moje typy” w piłce wg `docs/WZORZEC-MOJE-TYPY.md` - klikalne kafelki
+  na stronie Mecze, szkic → kupon na stałe, zestawienie skuteczności z wydrukiem (`fbpred/picks.py`, `templates/picks.html`, `/picks`, `/api/picks`).
+  Pliki piłki w gałęzi dziennika: `ledger/picks.csv`, `ledger/pick_coupons.csv` (tenis ma swoje w `tennis/` - nie kolidują). Plików tenisa nie ruszano.
+  Przy okazji naprawione auto-rozliczanie „Moich zakładów” w piłce (zła kolejność argumentów lookupu).
 - **2026-11-10 · tenis 0.3.13** (wątek tenisa): kupony w „Moich typach” (szkic → zatwierdzony na stałe, AKO gdy są kursy).
   **Dla wątku piłki:** użytkownik chce tej samej funkcji w piłce (aktywne kafelki → Moje typy → kupony, zestawienie z wydrukiem).
   Pełny opis i lista kontrolna: `docs/WZORZEC-MOJE-TYPY.md` (kod wzorcowy w `tnpred/picks.py`, `templates/picks.html`).

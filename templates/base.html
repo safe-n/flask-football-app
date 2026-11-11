@@ -48,6 +48,21 @@ th:first-child,td:first-child{text-align:left}.m{color:var(--mut);font-size:13px
 .pg.W{background:var(--w)}.pg.R{background:var(--r)}.pg.P{background:var(--p)}
 .hl{outline:2px solid var(--acc)}.pick{color:var(--warn);font-size:13px;margin-top:6px}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}.t{font-weight:600}
+td.l,th.l{text-align:left}.ok{color:var(--up)}.bad{color:var(--dn)}details summary{cursor:pointer}
+.row.wrap{flex-wrap:wrap}.b.pk{cursor:pointer;position:relative;-webkit-tap-highlight-color:transparent;user-select:none}.b.pk:hover{filter:brightness(1.08)}
+.b.pk.on{background:rgba(79,179,232,.22);box-shadow:inset 0 0 0 2px #2f8fd0}
+.b.pk.on::after{content:"✓";position:absolute;top:1px;right:4px;font-size:11px;font-weight:800;color:#2f8fd0}.b.pk.busy{opacity:.5}
+.pt{width:100%}.pt td{white-space:normal}.pt td.c{text-align:center}.pt tr.hit td.r{background:rgba(31,157,92,.24);color:var(--up);font-weight:700}
+.pt tr.miss td.r{background:rgba(217,83,79,.2);color:var(--dn);font-weight:700}.pt tr.open td.r,.pt tr.void td.r{color:var(--mut)}
+.pt td.r{border-radius:6px;text-align:center;font-size:15px;min-width:44px}.pt details{margin-top:3px}.pt form{display:inline}.pt button{font-size:11px;padding:2px 6px}
+.pt input{width:58px;font-size:12px;padding:2px 4px}.diff.pos{color:var(--up)}.diff.neg{color:var(--dn)}.st.hit{background:var(--w)}
+.printonly{display:none}.cp .hd{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center}
+.cp.won{box-shadow:inset 4px 0 0 var(--w)}.cp.lost{box-shadow:inset 4px 0 0 var(--p)}.cp.draft{box-shadow:inset 0 0 0 2px #2f8fd0}
+.bk .kv{font-size:24px;line-height:56px}table.sm th,table.sm td{padding:4px 3px;font-size:12px}table.sm td.l{white-space:normal}.pt td.r{white-space:nowrap;font-size:13px}
+@media print{body{background:#fff;color:#000;max-width:none;padding:0;font-size:11px}nav,.noprint,form,button,.small{display:none!important}
+.printonly{display:block}.card,.kpi{background:#fff;border:1px solid #ccc;break-inside:avoid}.pt tr{break-inside:avoid}
+.pt tr.hit td.r{background:#d7f0df;color:#0b5d2a}.pt tr.miss td.r{background:#f7d9d6;color:#8b1e14}.kv.g,.diff.pos{color:#0b5d2a}.kv.r,.diff.neg{color:#8b1e14}
+a{color:#000;text-decoration:none}}
 .add{background:var(--acc);color:#fff;border:0;border-radius:6px;padding:3px 9px;cursor:pointer}.add:disabled{opacity:.6}.add.on{background:#6b7280}.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}.form label{font-size:13px;color:var(--mut)}.form input,.form select{width:100%}.warn{color:var(--warn)}.small{font-size:12px;color:var(--mut);margin-top:16px}.tabs a{margin-right:10px}
 </style>
 <script>
@@ -68,6 +83,13 @@ document.addEventListener('click',function(e){var t=e.target.closest&&e.target.c
   var ids=fbIds(t);
   if(ids.every(fbHas))ids.forEach(fbRemove);else ids.forEach(fbAdd);
   fbSync();});
+function pkToggle(t){if(t.classList.contains('busy'))return;t.classList.add('busy');
+  fetch('/api/picks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({leg:t.getAttribute('data-pick')})})
+  .then(function(r){return r.json();}).then(function(j){t.classList.remove('busy');if(!j.ok){alert(j.blad||'Nie udało się zapisać typu');return;}
+    t.classList.toggle('on',j.on);t.title=j.on?'Zapisany w Moich typach - kliknij, aby usunąć':'Kliknij, aby dodać do Moich typów';})
+  .catch(function(){t.classList.remove('busy');alert('Brak połączenia - typ nie został zapisany');});}
+document.addEventListener('click',function(e){var t=e.target.closest&&e.target.closest('.b.pk[data-pick]');if(t)pkToggle(t);});
+document.addEventListener('keydown',function(e){var t=e.target.closest&&e.target.closest('.b.pk[data-pick]');if(t&&(e.key==='Enter'||e.key===' ')){e.preventDefault();pkToggle(t);}});
 document.addEventListener('DOMContentLoaded',function(){fbBadge();fbSync();});
 window.addEventListener('pageshow',function(){fbBadge();fbSync();});
 </script>
@@ -76,7 +98,7 @@ window.addEventListener('pageshow',function(){fbBadge();fbSync();});
 <h1>{{ title }}</h1>
 <nav><a href="/?league={{ league }}">Mecze</a><a href="/match?league={{ league }}">Mecz</a><a href="/suggest?league={{ league }}">Podpowiedzi</a><a href="/coupon?league={{ league }}">Zestawienie<span id="fb-badge"></span></a><a href="/draws?league={{ league }}">Remisy</a><a href="/stats?league={{ league }}">Statystyki</a>
 <a href="/table?league={{ league }}">Tabela</a><a href="/strengths?league={{ league }}">Siła drużyn</a>
-<a href="/recent?league={{ league }}">Ostatnie</a><a href="/track?league={{ league }}">Dziennik</a><a href="/bets?league={{ league }}">Moje zakłady</a><a href="/data?league={{ league }}">Dane</a><a href="/tennis/" title="Tenis">🎾 Tenis</a></nav>
+<a href="/recent?league={{ league }}">Ostatnie</a><a href="/track?league={{ league }}">Dziennik</a><a href="/bets?league={{ league }}">Moje zakłady</a><a href="/picks?league={{ league }}">Moje typy</a><a href="/data?league={{ league }}">Dane</a><a href="/tennis/" title="Tenis">🎾 Tenis</a></nav>
 <form method="get" action="{{ request.path }}"><select name="league" onchange="this.form.submit()">
 {% for code, lab in leagues %}<option value="{{ code }}" {{ 'selected' if code == league }}>{{ lab }}</option>{% endfor %}
 </select></form>

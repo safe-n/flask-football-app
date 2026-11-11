@@ -135,3 +135,29 @@ def bets_sync_up(conn) -> str:
         return f"bez zmian ({n} zakładów)"
     push(local, path=BETS_PATH, message=f"bets: {n} zakładów")
     return f"zapisano {n} zakładów"
+
+
+PICKS_PATH, PICK_COUPONS_PATH = "ledger/picks.csv", "ledger/pick_coupons.csv"   # tenis ma własne pliki w folderze tennis/
+
+
+def picks_sync_down(conn) -> int:
+    """Wczytuje Moje typy i ich kupony z GitHuba (istniejące wiersze mają pierwszeństwo). -> liczba wczytanych typów."""
+    from . import picks as picks_mod
+    picks_mod.import_coupons(conn, pull(PICK_COUPONS_PATH)[0])
+    return picks_mod.import_text(conn, pull(PICKS_PATH)[0])
+
+
+def picks_sync_up(conn) -> str:
+    from . import picks as picks_mod
+    out = []
+    for path, export, label in ((PICKS_PATH, picks_mod.export_text, "typów"), (PICK_COUPONS_PATH, picks_mod.export_coupons, "kuponów")):
+        local, n = export(conn)
+        remote, _ = pull(path)
+        if remote is None and n == 0:
+            continue                                          # nic nie było i nic nie ma - nie twórz pustego pliku
+        if (remote or "").strip() == local.strip():
+            out.append(f"bez zmian ({n} {label})")
+        else:
+            push(local, path=path, message=f"picks: {n} {label}")
+            out.append(f"zapisano {n} {label}")
+    return ", ".join(out) or "nic do zapisania"

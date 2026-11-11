@@ -371,3 +371,9 @@ To informacja pomocnicza; nie zmienia prognozy. Limit dzienny: `AVAIL_DAILY_CAP`
 - Zakładka **Moje zakłady**: w Zestawieniu wpisz kursy i stawkę, kliknij „Zapisz w dzienniku zakładów”. Zakłady rozliczają się same po wynikach.
   Trwałość: tak samo jak dziennik prognoz (GITHUB_TOKEN + GITHUB_REPO na Renderze), plik `ledger/bets.csv` w gałęzi `ledger-data`.
 - `python -m fbpred h2h-test [--leagues E0,D1] [--last 5] [--min-meetings 3] [--fav 0.45]` - czy H2H faworyta wnosi coś ponad kursy.
+
+
+## Moje typy (0.10.0)
+Kliknij kafelek z procentem w zakładce **Mecze** - typ trafi do szkicu kuponu w zakładce **Moje typy**. „Zatwierdź kupon” zapisuje go na stałe
+(kursy opcjonalne; gdy są przy każdym typie - AKO). Po meczu typy rozliczają się same (zielony = wszedł, czerwony = nie wszedł), a zestawienie
+porównuje Twoją skuteczność z procentami modelu. To dziennik trafności bez stawek; opis: `docs/INSTRUKCJA.md` §6a.

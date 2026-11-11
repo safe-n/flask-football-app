@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% macro pc(x) %}{{ ('%.0f%%'|format(100*x)) if x is not none else '–' }}{% endmacro %}
+{% macro pc1(x) %}{% if x is none %}–{% elif x >= 0.1 %}{{ '%.0f%%'|format(100*x) }}{% else %}{{ '%.1f%%'|format(100*x) }}{% endif %}{% endmacro %}
+{% macro dpp(x) %}{% if x is not none %}<span class="diff {{ 'pos' if x > 0.005 else 'neg' if x < -0.005 else '' }}">{{ '%+.0f'|format(100*x) }} pp</span>{% else %}–{% endif %}{% endmacro %}
+{% macro tbl(lines, head) %}
+<table class="sm"><tr><th class="l">{{ head }}</th><th>typów</th><th>traf.</th><th title="skuteczność">skut.</th><th title="oczekiwana: średnia z klikniętych procentów">oczek.</th><th>różnica</th><th>zysk 1 j.</th></tr>
+{% for l in lines %}<tr><td class="l">{{ l.label }}</td><td>{{ l.n }}</td><td>{{ l.hit }}</td><td><b>{{ pc(l.rate) }}</b></td><td>{{ pc(l.exp) }}</td><td>{{ dpp(l.diff) }}</td>
+<td>{% if l.n_kurs %}<span class="{{ 'pos' if l.profit > 0 else 'neg' if l.profit < 0 else '' }}">{{ '%+.1f'|format(l.profit) }}</span> <small class="m">({{ l.n_kurs }})</small>{% else %}–{% endif %}</td></tr>{% endfor %}
+</table>{% endmacro %}
+{% macro legrow(r, editable) %}<tr class="{{ r.status }}"><td class="l"><small class="m">{{ r.date[8:10] }}.{{ r.date[5:7] }} · {{ lname(r.league) }}</small><br>{{ r.home }} – {{ r.away }}<br><b>{{ r.label }}</b>
+<details class="noprint"><summary class="m">⋯</summary>{% for act, lab in (('hit','✓ wszedł'),('miss','✗ nie wszedł'),('void','zwrot'),('open','w grze')) if act != r.status %}<form method="post" action="/picks/{{ r.id }}/{{ act }}?league={{ league }}"><button title="popraw wynik ręcznie">{{ lab }}</button></form>{% endfor %}{% if editable %}<form method="post" action="/picks/{{ r.id }}/delete?league={{ league }}"><button>usuń ze szkicu</button></form>{% endif %}</details></td>
+<td class="c"><b>{{ pc(r.p) }}</b>{% if r.ref is not none %}<br><small class="m">odn. {{ pc(r.ref) }}</small>{% endif %}</td>
+<td class="c">{% if editable %}<form method="post" action="/picks/{{ r.id }}/kurs?league={{ league }}"><input name="kurs" inputmode="decimal" value="{{ '%.2f'|format(r.kurs) if r.kurs else '' }}" placeholder="kurs" onchange="this.form.submit()"></form>{% else %}{{ '%.2f'|format(r.kurs) if r.kurs else '–' }}{% endif %}</td>
+<td class="r">{{ {'open':'w grze','hit':'✓','miss':'✗','void':'zwrot'}[r.status] }}</td></tr>{% endmacro %}
+{% block body %}
+<div class="printonly"><b>Moje typy (piłka nożna)</b> · wydruk {{ now }} · {{ 'ostatnie ' ~ days ~ ' dni' if days != 'all' else 'cały okres' }}{{ ' · ' ~ lname(only) if only else '' }}</div>
+{% if msg %}<div class="card noprint"><b>{{ msg }}</b></div>{% endif %}
+<div class="noprint">
+<p class="m">Kliknij kafelki z procentami w zakładce <a href="/?league={{ league }}">Mecze</a> - trafią do <b>szkicu kuponu</b> poniżej. „Zatwierdź kupon” zapisuje go na stałe (bez usuwania i zmiany kursów), a kolejne kliknięcia tworzą nowy szkic. Kursy są opcjonalne: gdy wpiszesz je przy każdym typie, kupon liczy się jako AKO (albo pojedynczy). Po meczach typy rozliczają się same: <b class="ok">zielony = wszedł</b>, <b class="bad">czerwony = nie wszedł</b>. To dziennik trafności bez stawek - pieniądze prowadzisz w „Moich zakładach”.
+{% if not persisted %}<span class="warn"> UWAGA: zapis trwały wyłączony (brak GITHUB_TOKEN/GITHUB_REPO) - typy znikną przy restarcie serwisu.</span>{% endif %}</p>
+<p class="tabs">{% for lab, href in filters.days %}<a href="{{ href }}">{{ lab }}</a>{% endfor %}{% if filters.only|length > 2 %} · {% for lab, href in filters.only %}<a href="{{ href }}">{{ lab }}</a>{% endfor %}{% endif %}
+ · <a href="#" onclick="window.print();return false">🖨 Drukuj / PDF</a></p>
+
+<div class="card cp draft"><div class="hd"><b>📝 Szkic kuponu</b><span class="m">{{ draft|length }} typ(ów)</span></div>
+{% if draft %}
+<table class="pt"><tr><th class="l">mecz · typ</th><th>szansa</th><th>kurs</th><th>wynik</th></tr>{% for r in draft %}{{ legrow(r, True) }}{% endfor %}</table>
+<p class="m">{% if d_same %}W szkicu są dwa typy z tego samego meczu - nie są niezależne, więc szansy łącznej nie liczymy (bukmacher zwykle też nie łączy ich w AKO).{% else %}Szansa wszystkich wg modelu: <b>{{ pc1(d_p) }}</b> (uczciwy kurs {{ '%.2f'|format(1/d_p) if d_p and d_p > 0.001 else '–' }}).{% endif %}
+{% if d_odds %}Kurs {{ 'AKO' if draft|length > 1 else '' }} <b>{{ '%.2f'|format(d_odds) }}</b>.{% else %}Bez kompletu kursów - kupon zapisze się jako zestaw typów.{% endif %}</p>
+<form method="post" action="/picks/confirm?league={{ league }}" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><input name="note" placeholder="notatka (opcjonalnie)" style="flex:1 1 160px;font-size:15px;padding:5px" maxlength="200"><button class="add" style="padding:8px 14px">✅ Zatwierdź kupon</button></form>
+{% else %}<p class="m">Pusty - kliknij kafelki z procentami w zakładce Mecze.</p>{% endif %}
+</div>
+</div>
+
+{% if cs or s.all %}
+<div class="bk">
+  {% if cs %}<div class="kpi"><div class="kv">{{ cs.won }}/{{ cs.n }}</div><div class="ks">kupony wygrane ({{ pc(cs.rate) }}{% if cs.exp is not none %}, oczekiwane {{ pc1(cs.exp) }}{% endif %})</div></div>{% endif %}
+  {% if s.all %}<div class="kpi"><div class="kv {{ 'g' if s.all.diff >= 0 else 'r' }}">{{ s.all.hit }}/{{ s.all.n }}</div><div class="ks">typy trafione ({{ pc(s.all.rate) }})</div></div>
+  <div class="kpi"><div class="kv {{ 'g' if s.all.diff >= 0 else 'r' }}">{{ '%+.0f'|format(100*s.all.diff) }} pp</div><div class="ks">Ty vs procenty modelu (oczekiwane {{ pc(s.all.exp) }})</div></div>{% endif %}
+  {% if cs and cs.n_kurs %}<div class="kpi"><div class="kv {{ 'g' if cs.profit >= 0 else 'r' }}">{{ '%+.1f'|format(cs.profit) }}</div><div class="ks">zysk kuponów z kursem, stawka 1 j. ({{ cs.n_kurs }}, ROI {{ '%+.0f%%'|format(100*cs.roi) }})</div></div>{% endif %}
+</div>
+{% endif %}
+
+<h2>Kupony</h2>
+{% if not coupons %}<div class="card"><p class="m">Brak zatwierdzonych kuponów.</p></div>{% endif %}
+{% for c in coupons %}
+<div class="card cp {{ c.status }}"><div class="hd"><b>Kupon nr {{ c.id }} · {{ c.kind }}{% if c.odds %} {{ '%.2f'|format(c.odds) }}{% endif %}</b>
+<span><span class="st {{ c.status }}">{{ {'open':'w grze','won':'wszedł','lost':'nie wszedł','void':'zwrot'}[c.status] }}</span>{% if c.profit is not none %} <span class="{{ 'pos' if c.profit > 0 else 'neg' }}">{{ '%+.2f'|format(c.profit) }} j.</span>{% endif %}</span></div>
+<div class="m">{{ c.date }} · {{ c.n }} typ(ów){% if c.p is not none %} · szansa całości wg modelu {{ pc1(c.p) }}{% else %} · typy z jednego meczu (bez szansy łącznej){% endif %}{% if c.note %} · {{ c.note }}{% endif %}</div>
+<table class="pt">{% for r in c.legs %}{{ legrow(r, False) }}{% endfor %}</table></div>
+{% endfor %}
+
+{% if s.all %}
+<div class="card"><div class="cap">Ostatnie rozliczone typy (od lewej najstarsze)</div><div class="fstrip">{% for ok, t in s.strip %}<span class="fc {{ 'yes' if ok else 'no' }}" title="{{ t }}">{{ '✓' if ok else '✗' }}</span>{% endfor %}</div></div>
+<div class="card"><b>Typy wg rodzaju</b>{{ tbl(s.kinds, 'rodzaj') }}</div>
+<div class="card"><b>Typy wg szansy z modelu</b>{{ tbl(s.buckets, 'szansa') }}
+<p class="m">Jak to czytać: „oczekiwana” to średnia z procentów, które kliknąłeś. Jeśli w przedziale 65–80% trafiasz ok. 72%, procenty są uczciwe; jeśli wyraźnie więcej - Twoja selekcja coś dodaje. Underdogi „z przeczucia” sprawdzisz w wierszu <i>Zwycięzca – underdog</i>: tam liczy się głównie zysk przy kursie. Kupon AKO wchodzi rzadko (szanse się mnożą) - oceniaj raczej typy niż kupony.
+Brier dla Twoich typów: {{ '%.3f'|format(s.brier) }} (mniej = lepiej; 0.25 = rzut monetą). Do ok. 100 typów różnice ±10 pp to zwykle przypadek.</p></div>
+{% elif s.total %}<p class="m">Typów: {{ s.total }}, w grze: {{ s.open }}. Zestawienie skuteczności pojawi się po pierwszych rozliczonych meczach.</p>
+{% endif %}
+{% endblock %}

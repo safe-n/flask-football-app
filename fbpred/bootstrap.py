@@ -333,17 +333,33 @@ def _ledger_pull(conn, log) -> None:
     try:
         d["trwalosc"] = f"GitHub, gałąź {config.LEDGER_BRANCH}: wczytano {gh_store.sync_down(conn)} prognoz przy starcie"
         d["zaklady"] = f"wczytano {gh_store.bets_sync_down(conn)} zakładów z GitHuba"
+        d["typy"] = f"wczytano {gh_store.picks_sync_down(conn)} typów (Moje typy) z GitHuba"
     except Exception as e:  # noqa: BLE001 - problem z GitHubem nie może zatrzymać aplikacji
         d["trwalosc"] = f"błąd odczytu z GitHuba: {e}"
         log(f"[ledger] {e}")
 
 
+def settle_picks(conn, log=_log) -> int:
+    """Rozlicza otwarte „Moje typy” po wynikach z bazy (wołane po każdym odświeżeniu danych)."""
+    from . import picks as picks_mod
+    try:
+        n = picks_mod.settle_open(conn, picks_mod.db_lookup(conn))
+        if n:
+            log(f"[picks] rozliczono {n} typów")
+        return n
+    except Exception as e:  # noqa: BLE001 - rozliczanie typów nie może zatrzymać odświeżania
+        log(f"[picks] {e}")
+        return 0
+
+
 def _ledger_push(conn, log) -> None:
     d = DIAG.setdefault("dziennik", {})
+    settle_picks(conn, log)
     if not gh_store.enabled():
         return
     try:
         d["zapis"] = gh_store.sync_up(conn)
+        d["typy_zapis"] = gh_store.picks_sync_up(conn)
     except Exception as e:  # noqa: BLE001
         d["zapis"] = f"błąd zapisu do GitHuba: {e}"
         log(f"[ledger] {e}")

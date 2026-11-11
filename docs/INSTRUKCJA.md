@@ -1,7 +1,7 @@
 # Instrukcja użytkownika – football-predictor
 
 Aplikacja: `https://flask-football-app.onrender.com` (Render) lub kopia lokalna `http://localhost:5000` / przez Tailscale z telefonu.
-Menu u góry: **Mecze · Mecz · Podpowiedzi · Zestawienie · Remisy · Statystyki · Tabela · Siła · Ostatnie · Dziennik · Moje zakłady · Dane · 🎾 Tenis**.
+Menu u góry: **Mecze · Mecz · Podpowiedzi · Zestawienie · Remisy · Statystyki · Tabela · Siła · Ostatnie · Dziennik · Moje zakłady · Moje typy · Dane · 🎾 Tenis**.
 Wybór ligi – lista lig pod menu. Po uśpieniu serwera (Render Free) pierwsze wejście trwa ok. minuty („Ładowanie danych").
 
 ## 1. Mecze (strona główna)
@@ -55,6 +55,19 @@ Notatnik własnych zakładów: pojedyncze i AKO, kurs, stawka, szansa wg modelu.
 gole, BTTS, remisy w połowach, kartki, rożne; AKO przegrywa od razu, gdy jeden typ nie wejdzie). Ręcznie: Wygrany / Przegrany / Zwrot / W grze / Usuń.
 Statystyki: zysk, ROI, trafność, średni kurs, wykres skumulowanego zysku oraz **„Czy model miał rację?"** (średnia szansa wg modelu vs faktyczna trafność, zysk
 oczekiwany vs rzeczywisty, kurs „na zero"). Przy kilkudziesięciu zakładach to głównie szum – sensowny obraz po kilkuset.
+
+## 6a. Moje typy (od 0.10.0)
+
+Dziennik **trafności bez stawek** (pieniądze prowadzisz w „Moich zakładach”).
+1. **Mecze:** kliknij kafelek z procentem (1/X/2, O2.5, BTTS, remisy, Żółte O3.5, Rożne O9.5) - dostaje niebieską ramkę i ✓. Drugie kliknięcie usuwa typ.
+2. **Moje typy → Szkic kuponu:** typy kliknięte od ostatniego zatwierdzenia, przy każdym szansa modelu, odniesienie (rynek dla 1X2, średnia ligi dla reszty) i pole kursu (opcjonalne).
+   Pod spodem szansa wszystkich typów naraz i kurs AKO, gdy każdy typ ma kurs. Dwa typy z jednego meczu nie są niezależne - wtedy szansy łącznej nie liczymy.
+3. **✅ Zatwierdź kupon** zamyka szkic **na stałe** (nie usuniesz typu ani nie zmienisz kursu); kolejne kliknięcia tworzą nowy szkic.
+4. Po meczu typy rozliczają się same: **zielony ✓ = wszedł, czerwony ✗ = nie wszedł**. Remisy w połowach, kartki i rożne czekają, aż źródło poda te dane
+   (w Lidze Europy ich nie ma - popraw ręcznie pod „⋯”). Mecz odwołany: „⋯” → zwrot.
+5. **Zestawienie:** trafione vs oczekiwane (średnia z klikniętych procentów), osobno wg rodzaju typu (faworyt / underdog / remis / over / BTTS / połowy / kartki / rożne)
+   i wg przedziału szansy; zysk przy stawce 1 j. tylko dla typów z kursem; Brier; pasek ✓/✗. **🖨 Drukuj / PDF** - wydruk z przeglądarki.
+Do ok. 100 typów różnice ±10 pp to zwykle przypadek. Typy z PC i z Rendera są osobne (jak zakłady).
 
 ## 7. Pozostałe zakładki
 

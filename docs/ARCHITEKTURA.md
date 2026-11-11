@@ -24,7 +24,7 @@
 | Ścieżka | Zawartość | Właściciel |
 |---|---|---|
 | `fbpred/` | pakiet piłki (poniżej) | wątek piłki |
-| `templates/` | szablony Jinja: `base.html` (CSS + skrypt koszyka w `<head>`), `page.html` (bloki p/h/tabs/html/t), `index.html` (Mecze), `match.html`, `suggest.html`, `coupon.html`, `bets.html` | piłka |
+| `templates/` | szablony Jinja: `base.html` (CSS + skrypt koszyka i kafelków w `<head>`), `picks.html` (Moje typy), `page.html` (bloki p/h/tabs/html/t), `index.html` (Mecze), `match.html`, `suggest.html`, `coupon.html`, `bets.html` | piłka |
 | `history/` | `LIGA_ROK.csv` – zakończone mecze (prawda), `odds/` – archiwum kursów przedmeczowych, `UPDATES.log` | piłka |
 | `params/` | `params_LIGA.json` – strojone parametry (ridge, xi, blend_w, shot_weight) | piłka |
 | `ledger/` | `predictions.csv`, `REPORT.md` – zapis codziennej akcji | piłka |
@@ -42,7 +42,7 @@
 | Modele | `models/` (goals, counts, markets), `predictor.py`, `params.py`, `fatigue.py`, `rest.py`, `profile.py` | Dixon-Coles + regresje, skład prognozy, parametry per liga, testy hipotez (zmęczenie, profil remisów) |
 | Rynek | `odds.py`, `betmarkets.py`, `draws.py`, `simulate.py` | de-vig, miks z rynkiem, edge, Kelly; katalog rynków i identyfikatory typów `liga~data~dom~gość~klucz`; ranking remisów; Monte Carlo tabeli |
 | Ocena | `backtest.py`, `recent.py`, `recent_vis.py`, `stats.py`, `h2h.py`, `ledger.py`, `report.py` | walk-forward, retrospektywa, bazowe częstości (średnie ligi), kafelki/kolory, H2H i forma, dziennik |
-| Użytkownik | `web.py`, `suggest.py`, `bets.py`, `pdfexport.py`, `kickoff.py`, `ai.py`, `notify.py`, `gh_store.py`, `cli.py` | strony i API, Podpowiedzi, Moje zakłady, PDF, godzina/status meczu, analiza AI (opcjonalnie), Telegram, trwałość na GitHubie, CLI |
+| Użytkownik | `web.py`, `suggest.py`, `bets.py`, `picks.py`, `pdfexport.py`, `kickoff.py`, `ai.py`, `notify.py`, `gh_store.py`, `cli.py` | strony i API, Podpowiedzi, Moje zakłady, Moje typy (0.10.0), PDF, godzina/status meczu, analiza AI (opcjonalnie), Telegram, trwałość na GitHubie, CLI |
 | Opcjonalne | `avail.py` | kontuzje/składy z API-Football (wymaga planu z bieżącym sezonem) |
 
 ## 4. Dane i baza
@@ -69,6 +69,7 @@
 | Wyniki meczów | `history/*.csv` w repo (aktualizuje je akcja `weekly`/`daily`) | tak – start ładuje z repo |
 | Dziennik prognoz | tabela `predictions` + `ledger/predictions.csv` (Actions) + gałąź `ledger-data` (aplikacja) | tak, **jeśli** na Renderze są `GITHUB_TOKEN` i `GITHUB_REPO` |
 | Moje zakłady | tabela `bets` + `ledger/bets.csv` na `ledger-data` | jak wyżej |
+| Moje typy i ich kupony (0.10.0) | tabele `picks`, `pick_coupons` + `ledger/picks.csv`, `ledger/pick_coupons.csv` na `ledger-data` | jak wyżej |
 | Parametry modeli | `params/*.json` w repo | tak |
 | Koszyk (Zestawienie), stawka | `localStorage` przeglądarki (`fb_coupon`, `fb_stake`) | per przeglądarka |
 
@@ -77,8 +78,8 @@ Kopia lokalna na PC używa `DB_PATH=data\football_local.db` i `LEDGER_BRANCH=led
 ## 6. Strony i API (`web.py`)
 
 Strony: `/` Mecze · `/match` · `/suggest` Podpowiedzi · `/coupon` Zestawienie · `/draws` · `/stats` · `/table` · `/strengths` ·
-`/recent` Ostatnie · `/track` Dziennik · `/bets` Moje zakłady · `/data` Dane (diagnostyka) · `/profile`.
-API/eksport: `/api/coupon`, `/api/predict`, `/api/bets` (POST), `/bets/<id>/<akcja>` (POST), `/api/ai/coupon` (POST, kod dostępu),
+`/recent` Ostatnie · `/track` Dziennik · `/bets` Moje zakłady · `/picks` Moje typy · `/data` Dane (diagnostyka) · `/profile`.
+API/eksport: `/api/coupon`, `/api/predict`, `/api/bets` (POST), `/bets/<id>/<akcja>` (POST), `/api/picks` (POST, przełącznik kafelka; 409 dla zatwierdzonych), `/picks/confirm`, `/picks/<id>/<hit|miss|void|open|kurs|delete>` (POST), `/api/ai/coupon` (POST, kod dostępu),
 `/export/recent.pdf`, `/export/journal.pdf`, `/export/coupon.pdf`, `/healthz` (zawsze 200 JSON, gdy proces żyje).
 
 Wzorce interfejsu: kafelki z średnią ligi i kolorami, chipy H2H/formy (W/R/P), pasek formy modelu (✓/✗), wykres trafności rynków (CSS),

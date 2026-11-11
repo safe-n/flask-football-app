@@ -1,3 +1,13 @@
+## 0.10.0 - Moje typy: klikalne kafelki, kupony, zestawienie skuteczności (Rozdział 2)
+- Mecze: kafelki z procentami (1/X/2, O2.5, BTTS, remisy HT/2H/„HT lub 2H”/„HT lub FT”/FT, Żółte O3.5, Rożne O9.5) są klikalne. Kliknięcie zapisuje typ (niebieska ramka i ✓), drugie go usuwa; zaznaczenie przetrwa odświeżenie strony. Kafelki „śr.” to średnie, nie typy.
+- Nowa zakładka „Moje typy” (`/picks`): szkic kuponu z polem kursu → „Zatwierdź kupon” (na stałe: bez usuwania i zmiany kursów; AKO, gdy każdy typ ma kurs, inaczej „bez kursów”), lista kuponów, zestawienie skuteczności (trafione vs oczekiwane, wg rodzaju typu i przedziału szansy, zysk przy stawce 1 j., Brier, pasek ✓/✗), filtry 30/90 dni i liga, „Drukuj / PDF”.
+- Typ zapamiętuje szansę modelu i odniesienie (rynek dla 1X2, średnia ligi dla reszty) z chwili kliknięcia, liczone po stronie serwera tą samą funkcją co Zestawienie. Typu nie da się dodać po meczu.
+- Rozliczanie samo po wynikach (przy odświeżeniu danych i przy wejściu w zakładkę); rynki połówkowe/kartki/rożne czekają na dane ze źródła, ręczna poprawka pod „⋯”.
+- Dwa typy z jednego meczu nie są niezależne: wtedy szansy łącznej nie liczymy (jak w Zestawieniu).
+- Trwałość: `ledger/picks.csv` i `ledger/pick_coupons.csv` w gałęzi dziennika (osobno od tenisa, który pisze do `tennis/`).
+- Poprawka: „Moje zakłady” nie rozliczały się same po wejściu w zakładkę (wyszukiwarka meczu dostawała argumenty w złej kolejności) - teraz się rozliczają.
+- Nowe: `fbpred/picks.py`, `templates/picks.html`, `tests/test_v100.py` (11 testów).
+
 ## Dokumentacja Rozdziału 1 (bez zmian w kodzie, wersja nadal 0.9.5)
 - Nowy katalog `docs/`: KONCEPCJA, ARCHITEKTURA, INSTRUKCJA, OPERACJE, ROZDZIAL-1-PODSUMOWANIE oraz indeks `docs/README.md`; link w głównym README.
 
