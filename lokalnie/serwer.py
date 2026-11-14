@@ -13,8 +13,10 @@ import glob
 import os
 import re
 import shutil
+import socket
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -59,6 +61,20 @@ def update(g: str | None) -> str:
     return after
 
 
+def port_busy(port: str, wait: float = 8.0) -> bool:
+    """Czy coś już nasłuchuje na porcie? Windows pozwala dwóm serwerom zająć ten sam port (SO_REUSEADDR) -
+    wtedy strony serwuje stara kopia, a restart trafia do drugiej. Czekamy chwilę, bo po restarcie port zwalnia się z opóźnieniem."""
+    end = time.time() + wait
+    while True:
+        with socket.socket() as s:
+            s.settimeout(0.5)
+            if s.connect_ex(("127.0.0.1", int(port))) != 0:
+                return False
+        if time.time() > end:
+            return True
+        time.sleep(1)
+
+
 def main() -> int:
     g = find_git()
     env = os.environ.copy()
@@ -71,6 +87,12 @@ def main() -> int:
         print("Sprawdzam biblioteki...")
         subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "--disable-pip-version-check",
                         "-r", "requirements.txt", "waitress"], cwd=ROOT)
+        if port_busy(PORT):
+            print(f"\n[!] Port {PORT} jest już zajęty - aplikacja działa w innym oknie (np. z autostartu).")
+            print("    Druga kopia NIE zostanie uruchomiona (dwie kopie = restart nie podmienia wersji).")
+            print("    Zamknij wszystkie okna aplikacji i uruchom jedno: lokalnie\\uruchom_aplikacje.bat")
+            input("\nNaciśnij Enter, aby zamknąć to okno...")
+            return 1
         name = os.getenv("COMPUTERNAME", "NAZWA-KOMPUTERA")
         print(f"\nAplikacja startuje. Na tym komputerze:  http://localhost:{PORT}   (tenis: /tennis/)")
         print(f"Z telefonu przez Tailscale:            http://{name}:{PORT}   (tenis: /tennis/)")

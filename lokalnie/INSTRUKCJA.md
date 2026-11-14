@@ -27,6 +27,10 @@ i kliknij **„🔄 Aktualizuj i zrestartuj”**. Po ok. minucie strona wróci s
 (Render aktualizuje się sam). Jeśli w oknie pojawi się „Nie udało się pobrać zmian”, w folderze są zmienione pliki –
 sprawdź zakładkę Changes w GitHub Desktop.
 
+**Po restarcie wersja w nagłówku tenisa się nie zmienia?** Prawdopodobnie działają DWIE kopie aplikacji (np. autostart + ręczne
+uruchomienie) - Windows pozwala obu zająć port 5000 i strony serwuje stara. Zamknij wszystkie czarne okna aplikacji i uruchom
+jedno (`uruchom_aplikacje.bat`). Od listopada 2026 starter sam odmawia uruchomienia drugiej kopii.
+
 ## 3. Dostęp z telefonu (Tailscale, bezpłatnie)
 1. Laptop: zainstaluj Tailscale z **tailscale.com/download**, zaloguj się (np. kontem Google).
 2. Telefon: aplikacja **Tailscale** ze sklepu, zaloguj się **tym samym kontem**, włącz połączenie.
