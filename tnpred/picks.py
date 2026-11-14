@@ -58,6 +58,8 @@ def kind(key: str, p: float | None = None) -> str:
         return "Tie-break"
     if key == "str":
         return "Bez straty seta"
+    if key == "nstr":
+        return "Over setów"
     return "Inne"
 
 
@@ -212,7 +214,7 @@ def summary(df: pd.DataFrame) -> dict:
     if done.empty:
         return out
     out["all"] = _line(done, "Wszystkie")
-    order = ["Zwycięzca – faworyt", "Zwycięzca – underdog", "Over gemów", "Under gemów", "Tie-break", "Bez straty seta", "Inne"]
+    order = ["Zwycięzca – faworyt", "Zwycięzca – underdog", "Over gemów", "Under gemów", "Tie-break", "Over setów", "Bez straty seta", "Inne"]
     out["kinds"] = [_line(done[done.grp == k], k) for k in order if (done.grp == k).any()]
     out["buckets"] = [_line(done[(done.p >= lo) & (done.p < hi)], lab) for lo, hi, lab in BUCKETS
                       if ((done.p >= lo) & (done.p < hi)).any()]

@@ -1,3 +1,11 @@
+## 0.3.15 - niższa linia Over i kafelek „3 sety” (Over 2.5 seta)
+- Kafelek Over w meczach do 2 setów ma stałą linię touru: WTA **19.5**, ATP **21.5** (zamiast 22.5 / linii bukmachera).
+  Na danych 2024–26 oba progi wchodzą w ok. 56% meczów (WTA 19.5: 56.4%, ATP 21.5: 55.7%; 22.5 to już zwykle trzeci set).
+  Zmiana przez `TN_OVER_LINE_WTA`, `TN_OVER_LINE_ATP`, `TN_OVER_LINE_BO5` (38.5).
+- Nowy kafelek „3 sety” = Over 2.5 seta (w meczach do 3 wygranych setów: „4+ sety” = Over 3.5), klucz `nstr`,
+  rozliczany w Moich typach i w kuponie zakładów; rodzaj „Over setów” w zestawieniu.
+- Kafelki węższe (6 w rzędzie mieści się od 360 px szerokości ekranu).
+
 ## 0.3.14 - poprawka: restart nie kasuje już typów, kuponów, zakładów ani dziennika
 - Błąd (od 0.2.x): wątek tła po starcie najpierw odświeżał dane i ZAPISYWAŁ je do GitHuba, a dopiero potem czytał z GitHuba.
   Na Renderze baza po restarcie jest pusta, więc każdy restart (np. po aktualizacji piłki 11.11 9:25) nadpisywał

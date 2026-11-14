@@ -103,13 +103,19 @@ def short(name: str) -> str:
     return " ".join(toks)
 
 
-def tile_specs(pred: dict, line: float | None) -> list[dict]:
+def over_line(tour: str, best_of: int) -> float:
+    from . import config
+    return config.OVER_LINE.get(tour, 21.5) if int(best_of) == 3 else config.OVER_LINE_BO5
+
+
+def tile_specs(pred: dict, line: float | None = None) -> list[dict]:
     """Kafelki z listy meczów: klucz typu, etykieta, szansa modelu, punkt odniesienia (rynek / średnia)."""
     m, base = pred["m"], pred["base"] or {}
     pm = pred.get("p_market")
-    ln = line if line else (22.5 if pred["best_of"] == 3 else 38.5)
+    ln = line if line else over_line(pred["tour"], pred["best_of"])
     p_over = sum(v for k, v in m["games_pmf"].items() if k > float(ln))
     need = pred["best_of"] // 2 + 1
+    b_str = base.get("straight")
     return [
         {"key": "w1", "tile": short(pred["p1"]), "label": f"{pred['p1']} wygra", "p": m["p1"], "ref": pm, "rl": "rynek",
          "title": f"{pred['p1']} wygra: model (Elo zmieszane z rynkiem) vs kurs bez marży"},
@@ -118,6 +124,10 @@ def tile_specs(pred: dict, line: float | None) -> list[dict]:
         {"key": f"o{float(ln):g}", "tile": f"Over {ln:g}", "label": f"Over {ln:g} gemów", "p": p_over,
          "ref": (base.get("over") or {}).get(f"{float(ln)}"), "rl": "śr.",
          "title": f"Średnia liczba gemów: model {m['games_mean']:.1f}, nawierzchnia {base.get('games_mean', float('nan')):.1f}"},
+        {"key": "nstr", "tile": f"{need + 1} sety" if need == 2 else f"{need + 1}+ sety",
+         "label": f"Over {need + 0.5:g} seta (mecz w {need + 1}{'' if need == 2 else '+'} setach)",
+         "p": 1 - m["straight"], "ref": None if b_str is None else 1 - b_str, "rl": "śr.",
+         "title": f"Over {need + 0.5:g} seta: przegrany zdobędzie co najmniej jednego seta"},
         {"key": "tb", "tile": "Tie-break", "label": "Tie-break w meczu", "p": m["p_tb"], "ref": base.get("p_tb"), "rl": "śr.",
          "title": "Co najmniej jeden tie-break w meczu"},
         {"key": "str", "tile": f"{need}:0 / 0:{need}", "label": f"Bez straty seta ({need}:0 / 0:{need})", "p": m["straight"],

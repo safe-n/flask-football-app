@@ -40,6 +40,7 @@ def catalogue(pred: dict) -> dict[str, dict]:
         add(f"s{sc}", f"Wynik w setach {sc} ({_short(a)}–{_short(b)})", "Sety", p)
     if m.get("straight") is not None:
         add("str", "Bez straty seta (zwycięzca, np. 2:0 / 0:2)", "Sety", m["straight"])
+        add("nstr", "Over 2.5 seta (mecz w 3 setach; do 3 wygranych: 4+ sety)", "Sety", 1 - m["straight"])
     add("ws1", f"{a} wygra co najmniej seta", "Sety", m["win_a_set"]["1"])
     add("ws2", f"{b} wygra co najmniej seta", "Sety", m["win_a_set"]["2"])
     add("tb", "Tie-break w meczu – tak", "Tie-break", m["p_tb"])
@@ -136,6 +137,8 @@ def leg_won(key: str, res: dict | None) -> bool | None:
         return (s1, s2) == (int(x), int(y))
     if key == "str":
         return s1 == 0 or s2 == 0
+    if key == "nstr":
+        return s1 > 0 and s2 > 0
     if key == "ws1":
         return s1 >= 1
     if key == "ws2":

@@ -68,7 +68,8 @@ Zawsze dopisany komentarz o małej próbie: do ok. 100 typów ±10 pp to zwykle 
   - Błąd 409 (zatwierdzony typ) pokazuje `alert` z komunikatem.
   - Na czas zapytania kafelek dostaje klasę `busy`, żeby podwójne kliknięcie nie dodało i od razu nie usunęło typu.
 - Serwer sam liczy `p`, `ref` i etykietę z tej samej funkcji, która rysuje kafelki (`tile_specs`), więc procent zapisany = procent widziany.
-- Linia over jest w kluczu (`o22.5`), żeby typ rozliczał się względem linii widzianej przy kliknięciu.
+- Linia over jest w kluczu (`o19.5`), żeby typ rozliczał się względem linii widzianej przy kliknięciu. Od tenisa 0.3.15 linia kafelka
+  jest stała dla touru (WTA 19.5, ATP 21.5 - ok. 56% trafień historycznie), bo użytkownik gra niższe linie niż główna linia bukmachera.
 - Widok na telefonie: tabela z 4 kolumnami (mecz·typ / szansa / kurs / wynik), akcje schowane pod `<details>⋯</details>`; brak poziomego przewijania przy 400 px.
 - Nowy rynek w tenisie: `str` (zwycięzca bez straty seta). W piłce odpowiedniki kafelków to np. 1/X/2, Over 2.5, BTTS; trzeba się upewnić, że `leg_won` fbpred zna każdy klucz kafelka.
 

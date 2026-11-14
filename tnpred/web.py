@@ -174,7 +174,7 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
                 f'<span class="m">{escape(p["tour"])} · {escape(r.get("tournament") or "")} · {escape(p["surface"])} · do {p["best_of"] // 2 + 1} setów{o_txt}'
                 f'{" · " + src if src else ""}</span></div>'
                 f'<div class="bar2" title="{escape(p["p1"])} {V.pct(p["m"]["p1"])}"><i style="width:{100 * p["m"]["p1"]:.0f}%"></i></div>'
-                f'{V.tiles_for(p, line, h, day, mine)}{V.h2h_row(m.df, p)}'
+                f'{V.tiles_for(p, None, h, day, mine)}{V.h2h_row(m.df, p)}'
                 f'<div class="pgrow"><span class="lb">forma {escape(V.short(p["p1"]))}</span>{ft.form(m.df, p["tour"], p["p1"], 5)["html"]}</div>'
                 f'<div class="pgrow"><span class="lb">forma {escape(V.short(p["p2"]))}</span>{ft.form(m.df, p["tour"], p["p2"], 5)["html"]}</div>'
                 f'{warn}<div class="row" style="align-items:center">{"".join(legs)} <a href="{href}">szczegóły →</a>'
@@ -323,7 +323,7 @@ def create_app(state: bootstrap.State | None = None, background: bool | None = N
                 f'<span class="m">{escape(tour)} · {escape(p["surface"])} · Bo{bo} · {escape(date)}</span></div>'
                 f'<div class="bar2"><i style="width:{100 * p["m"]["p1"]:.0f}%"></i></div>'
                 f'<div class="m">{escape(V.short(p["p1"]))} {V.pct(p["m"]["p1"])} ({V.fair(p["m"]["p1"])}) – {escape(V.short(p["p2"]))} {V.pct(p["m"]["p2"])} ({V.fair(p["m"]["p2"])}) · {mk}</div>'
-                f'{V.tiles_for(p, _f(row.get("total_line")), hl(), date[:10], picks_mod.legs(st.conn))}{V.h2h_row(m.df, p)}'
+                f'{V.tiles_for(p, None, hl(), date[:10], picks_mod.legs(st.conn))}{V.h2h_row(m.df, p)}'
                 + "".join(f'<div class="warn m">⚠ {escape(w)}</div>' for w in p["warn"]) + "</div>")
         detail = (f'<div class="card">{V.games_chart(p, _f(row.get("total_line")))}'
                   f'<p class="m">Punkt przy serwisie (z modelu): {escape(V.short(p["p1"]))} {V.pct(p["serve"][0], 1)}, '

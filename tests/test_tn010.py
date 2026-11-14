@@ -773,5 +773,34 @@ class SyncOrderTests(unittest.TestCase):
         self.assertIn("1,", remote["coupons"])
 
 
+class OverLineTests(unittest.TestCase):
+    """0.3.15: niższa linia Over (WTA 19.5, ATP 21.5) i kafelek Over 2.5 seta."""
+
+    def test_tiles_and_settlement(self):
+        from tnpred import views as V, picks
+        m = {"p1": 0.6, "p2": 0.4, "straight": 0.64, "p_tb": 0.25, "games_mean": 20.4,
+             "games_pmf": {18: 0.3, 20: 0.3, 22: 0.2, 25: 0.2}}
+        base = {"over": {"19.5": 0.56, "21.5": 0.55}, "straight": 0.65, "p_tb": 0.23, "games_mean": 20.0}
+        for tour, ln in (("WTA", 19.5), ("ATP", 21.5)):
+            pred = {"m": m, "base": base, "p_market": 0.6, "tour": tour, "best_of": 3, "p1": "A X.", "p2": "B Y.", "surface": "Hard"}
+            sp = {x["key"]: x for x in V.tile_specs(pred)}
+            self.assertIn(f"o{ln:g}", sp)
+            self.assertAlmostEqual(sp[f"o{ln:g}"]["ref"], base["over"][f"{ln}"])
+            self.assertAlmostEqual(sp["nstr"]["p"], 0.36)
+            self.assertAlmostEqual(sp["nstr"]["ref"], 0.35)
+            self.assertEqual(sp["nstr"]["label"], "Over 2.5 seta (mecz w 3 setach)")
+        pred["best_of"] = 5
+        self.assertEqual({x["key"]: x for x in V.tile_specs(pred)}["nstr"]["tile"], "4+ sety")
+        conn = sqlite3.connect(":memory:")
+        mk = lambda k: bm.leg_id("WTA", "2026-11-09", "A X.", "B Y.", "Hard", 3, k)  # noqa: E731
+        for k in ("nstr", "o19.5", "str"):
+            picks.add(conn, mk(k), k, 0.5)
+        res = {"winner": "A X.", "loser": "B Y.", "w1": 6, "l1": 4, "w2": 3, "l2": 6, "w3": 6, "l3": 2, "comment": "Completed"}
+        picks.settle_open(conn, lambda *a: res)
+        st = dict(zip(*[picks.load(conn)[c] for c in ("key", "status")]))
+        self.assertEqual(st, {"nstr": "hit", "o19.5": "hit", "str": "miss"})      # 27 gemów, 3 sety
+        self.assertEqual(picks.kind("nstr"), "Over setów")
+
+
 if __name__ == "__main__":
     unittest.main()

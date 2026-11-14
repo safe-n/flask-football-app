@@ -59,6 +59,9 @@ ODDS_REGIONS = os.getenv("TN_ODDS_REGIONS", "eu")
 ODDS_MARKETS = os.getenv("TN_ODDS_MARKETS", "h2h")             # np. "h2h,totals,spreads" (3× droższe, nie zawsze dostępne)
 ODDS_REFRESH_HOURS = float(os.getenv("TN_ODDS_REFRESH_HOURS", "12"))
 ODDS_MONTHLY_BUDGET = int(os.getenv("TN_ODDS_BUDGET", "450"))  # zostaw zapas z 500
+# linia gemów na kafelku Over (mecze do 2 setów); ok. 56% meczów kończy się powyżej w obu tourach (2024-26)
+OVER_LINE = {"ATP": float(os.getenv("TN_OVER_LINE_ATP", "21.5")), "WTA": float(os.getenv("TN_OVER_LINE_WTA", "19.5"))}
+OVER_LINE_BO5 = float(os.getenv("TN_OVER_LINE_BO5", "38.5"))
 ESPN = os.getenv("TN_ESPN", "1") != "0"                       # łatka wyników + terminarz z ESPN (bez klucza)
 ESPN_DAYS = int(os.getenv("TN_ESPN_DAYS", "14"))              # ile dni wstecz łatać wyniki (tennis-data ma do ~8 dni zwłoki)
 
