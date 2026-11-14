@@ -10,6 +10,6 @@ id,created_at,leg,tour,date,p1,p2,key,label,grp,p,ref,kurs,status,settled_at,cou
 10,2026-11-10T21:47:44+00:00,WTA~2026-11-11~Svitolina E.~Muchova K.~Hard~3~w2,WTA,2026-11-11,Svitolina E.,Muchova K.,w2,Muchova K. wygra,Zwycięzca – faworyt,0.5795219474944242,0.5764503883374064,1.67,miss,2026-11-12T02:22:44+00:00,2.0
 11,2026-11-10T21:47:46+00:00,WTA~2026-11-11~Sabalenka A.~Andreeva M.~Hard~3~w2,WTA,2026-11-11,Sabalenka A.,Andreeva M.,w2,Andreeva M. wygra,Zwycięzca – underdog,0.4927183119402494,0.49645933276756593,1.915,hit,2026-11-12T02:22:44+00:00,2.0
 12,2026-11-14T09:21:05+00:00,WTA~2026-11-14~Pegula J.~Andreeva M.~Hard~3~w2,WTA,2026-11-14,Pegula J.,Andreeva M.,w2,Andreeva M. wygra,Zwycięzca – faworyt,0.6946914914866573,0.6964083739012095,1.4,open,,
-13,2026-11-14T09:21:46+00:00,WTA~2026-11-14~Svitolina E.~Noskova L.~Hard~3~w1,WTA,2026-11-14,Svitolina E.,Noskova L.,w1,Svitolina E. wygra,Zwycięzca – faworyt,0.5866296939106701,,,open,,
+13,2026-11-14T09:21:46+00:00,WTA~2026-11-14~Svitolina E.~Noskova L.~Hard~3~w1,WTA,2026-11-14,Svitolina E.,Noskova L.,w1,Svitolina E. wygra,Zwycięzca – faworyt,0.5866296939106701,,2.35,open,,
 14,2026-11-14T09:21:56+00:00,ATP~2026-11-15~Zverev A.~Jodar R.~Hard~3~o22.5,ATP,2026-11-15,Zverev A.,Jodar R.,o22.5,Over 22.5 gemów,Over gemów,0.4905044644930186,0.4670284938941655,,open,,
 15,2026-11-14T09:22:11+00:00,ATP~2026-11-15~Shelton B.~Fils A.~Hard~3~tb,ATP,2026-11-15,Shelton B.,Fils A.,tb,Tie-break w meczu,Tie-break,0.530854223600118,0.41221166892808686,,open,,
