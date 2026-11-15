@@ -2558,3 +2558,30 @@ date,tour,tournament,location,series,court,surface,round,best_of,winner,loser,wr
 2026-11-07,ATP,BNP Paribas Masters,Paris,Masters 1000,Indoor,Hard,Semifinals,3,Shelton B.,Van Assche L.,4.0,47.0,5.0,7.0,6.0,3.0,6.0,4.0,,,,,2.0,1.0,Completed,,,1.25,4.0,1.26,3.73,1.29,4.0
 2026-11-07,ATP,BNP Paribas Masters,Paris,Masters 1000,Indoor,Hard,Semifinals,3,Alcaraz C.,Ruud C.,3.0,23.0,6.0,4.0,6.0,4.0,,,,,,,2.0,0.0,Completed,,,1.17,5.0,1.17,4.73,1.18,5.0
 2026-11-08,ATP,BNP Paribas Masters,Paris,Masters 1000,Indoor,Hard,The Final,3,Alcaraz C.,Shelton B.,3.0,4.0,7.0,6.0,7.0,5.0,,,,,,,2.0,0.0,Completed,,,1.25,4.0,1.24,3.89,1.26,4.2
+2026-11-08,ATP,Nordic Open,Stockholm,ATP250,Indoor,Hard,1st Round,3,Cerundolo J.M.,Ymer E.,54.0,254.0,6.0,1.0,7.0,6.0,,,,,,,2.0,0.0,Completed,,,1.3,3.5,1.32,3.21,1.34,3.5
+2026-11-08,ATP,Nordic Open,Stockholm,ATP250,Indoor,Hard,1st Round,3,Tirante T.A.,Munar J.,51.0,70.0,7.0,6.0,6.0,3.0,,,,,,,2.0,0.0,Completed,,,2.3,1.62,2.25,1.6,2.3,1.62
+2026-11-09,ATP,Nordic Open,Stockholm,ATP250,Indoor,Hard,1st Round,3,Michelsen A.,Hanfmann Y.,35.0,67.0,6.0,2.0,6.0,3.0,,,,,,,2.0,0.0,Completed,,,1.25,4.0,1.27,3.66,1.3,4.0
+2026-11-09,ATP,Nordic Open,Stockholm,ATP250,Indoor,Hard,1st Round,3,Norrie C.,Duckworth J.,53.0,76.0,7.0,5.0,6.0,0.0,,,,,,,2.0,0.0,Completed,,,1.4,3.0,1.38,2.94,1.4,3.1
+2026-11-09,ATP,Nordic Open,Stockholm,ATP250,Indoor,Hard,1st Round,3,Gojo B.,Machac T.,134.0,60.0,6.0,3.0,6.0,4.0,,,,,,,2.0,0.0,Completed,,,3.2,1.36,2.97,1.37,3.2,1.42
+2026-11-09,ATP,Nordic Open,Stockholm,ATP250,Indoor,Hard,1st Round,3,Humbert U.,Vallejo D.,39.0,56.0,6.0,4.0,6.0,3.0,,,,,,,2.0,0.0,Completed,,,1.4,3.0,1.41,2.8,1.44,3.0
+2026-11-09,ATP,Nordic Open,Stockholm,ATP250,Indoor,Hard,1st Round,3,Etcheverry T.,Dahlin M.,29.0,778.0,6.0,4.0,6.0,7.0,6.0,3.0,,,,,2.0,1.0,Completed,,,1.2,4.5,1.2,4.29,1.22,4.5
+2026-11-09,ATP,Nordic Open,Stockholm,ATP250,Indoor,Hard,1st Round,3,Samuel T.,Borg L.,95.0,599.0,6.0,3.0,6.0,2.0,,,,,,,2.0,0.0,Completed,,,1.1,7.0,1.09,6.71,1.1,7.0
+2026-11-10,ATP,Nordic Open,Stockholm,ATP250,Indoor,Hard,1st Round,3,Shevchenko A.,Mannarino A.,107.0,61.0,6.0,1.0,6.0,3.0,,,,,,,2.0,0.0,Completed,,,2.1,1.73,2.07,1.71,2.11,1.83
+2026-11-10,ATP,Nordic Open,Stockholm,ATP250,Indoor,Hard,1st Round,3,Sonego L.,Halys Q.,115.0,45.0,6.0,4.0,7.0,6.0,,,,,,,2.0,0.0,Completed,,,2.1,1.73,2.03,1.75,2.1,2.0
+2026-11-10,ATP,Nordic Open,Stockholm,ATP250,Indoor,Hard,1st Round,3,Kecmanovic M.,Rinderknech A.,64.0,58.0,7.0,6.0,4.0,6.0,6.0,4.0,,,,,2.0,1.0,Completed,,,2.63,1.5,2.51,1.5,2.63,1.53
+2026-11-10,ATP,Nordic Open,Stockholm,ATP250,Indoor,Hard,1st Round,3,Rune H.,Bergs Z.,406.0,44.0,6.0,3.0,6.0,4.0,,,,,,,2.0,0.0,Completed,,,1.57,2.38,1.57,2.32,1.6,2.5
+2026-11-10,ATP,Nordic Open,Stockholm,ATP250,Indoor,Hard,2nd Round,3,Michelsen A.,Cerundolo J.M.,35.0,54.0,6.0,3.0,6.0,2.0,,,,,,,2.0,0.0,Completed,,,1.25,4.0,1.24,3.82,1.27,4.0
+2026-11-10,ATP,Nordic Open,Stockholm,ATP250,Indoor,Hard,2nd Round,3,Tirante T.A.,Etcheverry T.,51.0,29.0,,,,,,,,,,,,,Walkover,,,2.1,1.73,2.06,1.73,2.14,1.78
+2026-11-10,ATP,Nordic Open,Stockholm,ATP250,Indoor,Hard,2nd Round,3,Musetti L.,Samuel T.,25.0,95.0,6.0,1.0,6.0,4.0,,,,,,,2.0,0.0,Completed,,,1.22,4.33,1.23,3.9,1.27,4.33
+2026-11-11,ATP,Nordic Open,Stockholm,ATP250,Indoor,Hard,2nd Round,3,Tabilo A.,Sonego L.,31.0,115.0,7.0,6.0,6.0,7.0,7.0,5.0,,,,,2.0,1.0,Completed,,,2.3,1.62,2.25,1.61,2.38,1.65
+2026-11-11,ATP,Nordic Open,Stockholm,ATP250,Indoor,Hard,2nd Round,3,Humbert U.,Gojo B.,39.0,134.0,6.0,2.0,6.0,4.0,,,,,,,2.0,0.0,Completed,,,1.5,2.63,1.47,2.6,1.5,2.7
+2026-11-11,ATP,Nordic Open,Stockholm,ATP250,Indoor,Hard,2nd Round,3,Fritz T.,Norrie C.,10.0,53.0,7.0,5.0,6.0,3.0,,,,,,,2.0,0.0,Completed,,,1.29,3.75,1.27,3.59,1.3,3.75
+2026-11-11,ATP,Nordic Open,Stockholm,ATP250,Indoor,Hard,2nd Round,3,Shevchenko A.,Ruud C.,107.0,18.0,6.0,7.0,6.0,4.0,6.0,3.0,,,,,2.0,1.0,Completed,,,5.0,1.17,4.53,1.18,5.0,1.2
+2026-11-11,ATP,Nordic Open,Stockholm,ATP250,Indoor,Hard,2nd Round,3,Rune H.,Kecmanovic M.,406.0,64.0,2.0,6.0,6.0,1.0,6.0,4.0,,,,,2.0,1.0,Completed,,,1.36,3.2,1.33,3.16,1.36,3.25
+2026-11-12,ATP,Nordic Open,Stockholm,ATP250,Indoor,Hard,Quarterfinals,3,Tabilo A.,Michelsen A.,31.0,35.0,7.0,5.0,7.0,6.0,,,,,,,2.0,0.0,Completed,,,4.0,1.25,3.82,1.24,4.1,1.25
+2026-11-12,ATP,Nordic Open,Stockholm,ATP250,Indoor,Hard,Quarterfinals,3,Tirante T.A.,Shevchenko A.,51.0,107.0,7.0,6.0,6.0,7.0,6.0,3.0,,,,,2.0,1.0,Completed,,,1.91,1.91,1.93,1.82,2.03,1.91
+2026-11-12,ATP,Nordic Open,Stockholm,ATP250,Indoor,Hard,Quarterfinals,3,Fritz T.,Rune H.,10.0,406.0,,,,,,,,,,,,,Walkover,,,1.44,2.75,1.43,2.71,1.45,2.75
+2026-11-12,ATP,Nordic Open,Stockholm,ATP250,Indoor,Hard,Quarterfinals,3,Musetti L.,Humbert U.,25.0,39.0,7.0,6.0,3.0,6.0,6.0,4.0,,,,,2.0,1.0,Completed,,,1.44,2.75,1.47,2.6,1.5,2.75
+2026-11-13,ATP,Nordic Open,Stockholm,ATP250,Indoor,Hard,Semifinals,3,Tirante T.A.,Tabilo A.,51.0,31.0,7.0,5.0,7.0,6.0,,,,,,,2.0,0.0,Completed,,,2.3,1.62,2.25,1.6,2.3,1.64
+2026-11-13,ATP,Nordic Open,Stockholm,ATP250,Indoor,Hard,Semifinals,3,Fritz T.,Musetti L.,10.0,25.0,6.0,4.0,6.0,2.0,,,,,,,2.0,0.0,Completed,,,1.57,2.38,1.57,2.32,1.6,2.38
+2026-11-14,ATP,Nordic Open,Stockholm,ATP250,Indoor,Hard,The Final,3,Fritz T.,Tirante T.A.,10.0,51.0,6.0,2.0,4.0,6.0,7.0,6.0,,,,,2.0,1.0,Completed,,,1.13,6.0,1.14,5.29,1.16,6.0
