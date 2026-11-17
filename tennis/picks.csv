@@ -14,3 +14,4 @@ id,created_at,leg,tour,date,p1,p2,key,label,grp,p,ref,kurs,status,settled_at,cou
 14,2026-11-14T09:21:56+00:00,ATP~2026-11-15~Zverev A.~Jodar R.~Hard~3~o22.5,ATP,2026-11-15,Zverev A.,Jodar R.,o22.5,Over 22.5 gemów,Over gemów,0.4905044644930186,0.4670284938941655,,miss,2026-11-15T17:01:42+00:00,3.0
 15,2026-11-14T09:22:11+00:00,ATP~2026-11-15~Shelton B.~Fils A.~Hard~3~tb,ATP,2026-11-15,Shelton B.,Fils A.,tb,Tie-break w meczu,Tie-break,0.530854223600118,0.41221166892808686,,miss,2026-11-16T02:02:36+00:00,3.0
 16,2026-11-17T08:28:41+00:00,ATP~2026-11-17~Fils A.~Jodar R.~Hard~3~w2,ATP,2026-11-17,Fils A.,Jodar R.,w2,Jodar R. wygra,Zwycięzca – faworyt,0.5070112941684258,0.5093791418493778,1.91,open,,
+17,2026-11-17T08:28:56+00:00,ATP~2026-11-17~Zverev A.~Shelton B.~Hard~3~tb,ATP,2026-11-17,Zverev A.,Shelton B.,tb,Tie-break w meczu,Tie-break,0.5753714626309193,0.41230685822716184,,open,,
