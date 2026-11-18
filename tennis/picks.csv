@@ -15,5 +15,5 @@ id,created_at,leg,tour,date,p1,p2,key,label,grp,p,ref,kurs,status,settled_at,cou
 15,2026-11-14T09:22:11+00:00,ATP~2026-11-15~Shelton B.~Fils A.~Hard~3~tb,ATP,2026-11-15,Shelton B.,Fils A.,tb,Tie-break w meczu,Tie-break,0.530854223600118,0.41221166892808686,,miss,2026-11-16T02:02:36+00:00,3
 16,2026-11-17T08:28:41+00:00,ATP~2026-11-17~Fils A.~Jodar R.~Hard~3~w2,ATP,2026-11-17,Fils A.,Jodar R.,w2,Jodar R. wygra,Zwycięzca – faworyt,0.5070112941684258,0.5093791418493778,1.91,miss,2026-11-17T23:07:24+00:00,4
 17,2026-11-17T08:28:56+00:00,ATP~2026-11-17~Zverev A.~Shelton B.~Hard~3~tb,ATP,2026-11-17,Zverev A.,Shelton B.,tb,Tie-break w meczu,Tie-break,0.5753714626309193,0.41230685822716184,,hit,2026-11-18T01:04:48+00:00,4
-18,2026-11-18T07:30:22+00:00,ATP~2026-11-18~Alcaraz C.~Medvedev D.~Hard~3~w1,ATP,2026-11-18,Alcaraz C.,Medvedev D.,w1,Alcaraz C. wygra,Zwycięzca – faworyt,0.7894872499278931,0.7886691828291784,1.25,open,,5
+18,2026-11-18T07:30:22+00:00,ATP~2026-11-18~Alcaraz C.~Medvedev D.~Hard~3~w1,ATP,2026-11-18,Alcaraz C.,Medvedev D.,w1,Alcaraz C. wygra,Zwycięzca – faworyt,0.7894872499278931,0.7886691828291784,1.25,hit,2026-11-18T18:42:40+00:00,5
 19,2026-11-18T07:32:39+00:00,ATP~2026-11-18~Cobolli F.~Tiafoe F.~Hard~3~w1,ATP,2026-11-18,Cobolli F.,Tiafoe F.,w1,Cobolli F. wygra,Zwycięzca – underdog,0.4371768367604965,0.4418391822487707,2.19,open,,5
