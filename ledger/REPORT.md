@@ -2,37 +2,37 @@
 
 ## D1
 
-Rozliczone prognozy: **20**, oczekujące: **18**
+Rozliczone prognozy: **21**, oczekujące: **17**
 
 Log-loss na żywo (mniej = lepiej):
 
 | rynek | n | model | baseline | rynek_ll | model_na_tych_samych | brier |
 |---|---|---|---|---|---|---|
-| 1X2 | 20 | 0.8559 | 1.0392 | 0.8316 | 0.8509 | – |
-| Over 2.5 | 20 | 0.5706 | 0.6287 | – | – | 0.1916 |
-| BTTS | 20 | 0.6270 | 0.6325 | – | – | 0.2173 |
-| Remis do przerwy | 20 | 0.6650 | 0.6749 | – | – | 0.2364 |
-| Remis HT lub 2H | 20 | 0.6628 | 0.6674 | – | – | 0.2349 |
-| Remis HT lub FT | 20 | 0.6719 | 0.6943 | – | – | 0.2394 |
+| 1X2 | 21 | 0.9204 | 1.0557 | 0.8316 | 0.8509 | – |
+| Over 2.5 | 21 | 0.6177 | 0.6435 | – | – | 0.2122 |
+| BTTS | 21 | 0.6247 | 0.6267 | – | – | 0.2162 |
+| Remis do przerwy | 21 | 0.6984 | 0.6901 | – | – | 0.2516 |
+| Remis HT lub 2H | 21 | 0.6747 | 0.6639 | – | – | 0.2408 |
+| Remis HT lub FT | 21 | 0.6950 | 0.6965 | – | – | 0.2504 |
 
 Symulacja typów (edge ≥ 3%): zakłady 17, ROI -4.24% _(mała próba = głównie szum)_
 
 ## E0
 
-Rozliczone prognozy: **25**, oczekujące: **20**
+Rozliczone prognozy: **26**, oczekujące: **20**
 
 Log-loss na żywo (mniej = lepiej):
 
 | rynek | n | model | baseline | rynek_ll | model_na_tych_samych | brier |
 |---|---|---|---|---|---|---|
-| 1X2 | 25 | 1.0368 | 1.0585 | 1.0251 | 1.0475 | – |
-| Over 2.5 | 25 | 0.7175 | 0.7378 | – | – | 0.2620 |
-| BTTS | 25 | 0.7388 | 0.7134 | – | – | 0.2725 |
-| Remis do przerwy | 25 | 0.6429 | 0.6553 | – | – | 0.2255 |
-| Remis HT lub 2H | 25 | 0.6493 | 0.6458 | – | – | 0.2284 |
-| Remis HT lub FT | 25 | 0.6910 | 0.6926 | – | – | 0.2489 |
+| 1X2 | 26 | 1.0560 | 1.0732 | 1.0564 | 1.0670 | – |
+| Over 2.5 | 26 | 0.7214 | 0.7404 | – | – | 0.2640 |
+| BTTS | 26 | 0.7357 | 0.7096 | – | – | 0.2709 |
+| Remis do przerwy | 26 | 0.6353 | 0.6490 | – | – | 0.2218 |
+| Remis HT lub 2H | 26 | 0.6540 | 0.6548 | – | – | 0.2307 |
+| Remis HT lub FT | 26 | 0.6948 | 0.6933 | – | – | 0.2508 |
 
-Symulacja typów (edge ≥ 3%): zakłady 13, ROI 59.92% _(mała próba = głównie szum)_
+Symulacja typów (edge ≥ 3%): zakłady 14, ROI 67.29% _(mała próba = głównie szum)_
 
 ## EL
 
@@ -42,18 +42,18 @@ _Jeszcze nic do rozliczenia._
 
 ## F1
 
-Rozliczone prognozy: **25**, oczekujące: **18**
+Rozliczone prognozy: **26**, oczekujące: **17**
 
 Log-loss na żywo (mniej = lepiej):
 
 | rynek | n | model | baseline | rynek_ll | model_na_tych_samych | brier |
 |---|---|---|---|---|---|---|
-| 1X2 | 25 | 0.9226 | 1.0371 | 0.8898 | 0.9464 | – |
-| Over 2.5 | 25 | 0.7229 | 0.7187 | – | – | 0.2637 |
-| BTTS | 25 | 0.6980 | 0.7113 | – | – | 0.2522 |
-| Remis do przerwy | 25 | 0.6439 | 0.6547 | – | – | 0.2260 |
-| Remis HT lub 2H | 25 | 0.7323 | 0.7131 | – | – | 0.2691 |
-| Remis HT lub FT | 25 | 0.6741 | 0.6904 | – | – | 0.2406 |
+| 1X2 | 26 | 0.9245 | 1.0302 | 0.8898 | 0.9464 | – |
+| Over 2.5 | 26 | 0.7262 | 0.7147 | – | – | 0.2654 |
+| BTTS | 26 | 0.6973 | 0.7068 | – | – | 0.2518 |
+| Remis do przerwy | 26 | 0.6516 | 0.6663 | – | – | 0.2298 |
+| Remis HT lub 2H | 26 | 0.7207 | 0.7065 | – | – | 0.2635 |
+| Remis HT lub FT | 26 | 0.6712 | 0.6915 | – | – | 0.2392 |
 
 Symulacja typów (edge ≥ 3%): zakłady 18, ROI -22.06% _(mała próba = głównie szum)_
 
@@ -110,17 +110,17 @@ Symulacja typów (edge ≥ 3%): zakłady 11, ROI 140.64% _(mała próba = głów
 
 ## SP1
 
-Rozliczone prognozy: **25**, oczekujące: **20**
+Rozliczone prognozy: **26**, oczekujące: **19**
 
 Log-loss na żywo (mniej = lepiej):
 
 | rynek | n | model | baseline | rynek_ll | model_na_tych_samych | brier |
 |---|---|---|---|---|---|---|
-| 1X2 | 25 | 0.9282 | 1.0694 | 0.7817 | 0.8730 | – |
-| Over 2.5 | 25 | 0.6737 | 0.6970 | – | – | 0.2405 |
-| BTTS | 25 | 0.7004 | 0.7027 | – | – | 0.2538 |
-| Remis do przerwy | 25 | 0.6784 | 0.6859 | – | – | 0.2430 |
-| Remis HT lub 2H | 25 | 0.6897 | 0.6755 | – | – | 0.2474 |
-| Remis HT lub FT | 25 | 0.6819 | 0.7105 | – | – | 0.2444 |
+| 1X2 | 26 | 0.9563 | 1.0767 | 0.7817 | 0.8730 | – |
+| Over 2.5 | 26 | 0.6708 | 0.6947 | – | – | 0.2391 |
+| BTTS | 26 | 0.6973 | 0.7040 | – | – | 0.2523 |
+| Remis do przerwy | 26 | 0.6837 | 0.6909 | – | – | 0.2456 |
+| Remis HT lub 2H | 26 | 0.6797 | 0.6670 | – | – | 0.2426 |
+| Remis HT lub FT | 26 | 0.6801 | 0.7061 | – | – | 0.2436 |
 
 Symulacja typów (edge ≥ 3%): zakłady 23, ROI -37.57% _(mała próba = głównie szum)_
