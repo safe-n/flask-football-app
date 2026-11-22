@@ -1,3 +1,4 @@
 id,created_at,leg,league,date,home,away,key,label,grp,p,ref,kurs,status,settled_at,coupon
 1,2026-11-22T12:36:27+00:00,E0~2026-11-22~Liverpool~Man United~btts,E0,2026-11-22,Liverpool,Man United,btts,Obie strzelą (BTTS tak),BTTS,0.6225,0.558246828143022,,open,,
 2,2026-11-22T12:36:37+00:00,E0~2026-11-23~Brentford~Everton~d_either,E0,2026-11-23,Brentford,Everton,d_either,Remis w 1. LUB 2. połowie,Remisy w połowach,0.6135,0.5824682814302191,,open,,
+3,2026-11-22T13:12:27+00:00,I1~2026-11-22~Sassuolo~Genoa~btts,I1,2026-11-22,Sassuolo,Genoa,btts,Obie strzelą (BTTS tak),BTTS,0.5494,0.4954233409610984,,open,,
