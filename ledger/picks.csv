@@ -10,3 +10,4 @@ id,created_at,leg,league,date,home,away,key,label,grp,p,ref,kurs,status,settled_
 9,2026-11-22T13:16:44+00:00,P1~2026-11-28~Academico Viseu~Alverca~d_either,P1,2026-11-28,Academico Viseu,Alverca,d_either,Remis w 1. LUB 2. połowie,Remisy w połowach,0.6527,0.6183098591549295,,open,,
 10,2026-11-22T13:17:48+00:00,SP1~2026-11-22~Barcelona~Villarreal~1,SP1,2026-11-22,Barcelona,Villarreal,1,1 – gospodarz wygra,Zwycięzca – faworyt,0.8164,0.8164,1.2,open,,
 11,2026-11-22T13:18:06+00:00,SP1~2026-11-22~Barcelona~Villarreal~btts,SP1,2026-11-22,Barcelona,Villarreal,btts,Obie strzelą (BTTS tak),BTTS,0.623,0.5542986425339367,,open,,
+12,2026-11-22T13:18:20+00:00,SP1~2026-11-22~Santander~Sociedad~c9.5,SP1,2026-11-22,Santander,Sociedad,c9.5,Rożne over 9.5,Rożne,0.7054,0.4789533560864619,,open,,
