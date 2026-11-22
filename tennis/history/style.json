@@ -1,9 +1,9 @@
 {
  "N": 80,
  "b": 3.45,
- "fitted_at": "2026-11-16T01:52:16.055901+00:00",
+ "fitted_at": "2026-11-22T21:51:47.280830+00:00",
  "k": 40.0,
- "last_match": "2026-11-15",
+ "last_match": "2026-11-22",
  "n": {
   "ATP": {
    "Albot R.": 11,
@@ -99,7 +99,7 @@
    "Hurkacz H.": 80,
    "Jacquet K.": 24,
    "Jarry N.": 65,
-   "Jodar R.": 61,
+   "Jodar R.": 64,
    "Karatsev A.": 11,
    "Kecmanovic M.": 80,
    "Khachanov K.": 80,
@@ -229,7 +229,7 @@
  "players": {
   "ATP": {
    "Albot R.": 0.0513,
-   "Alcaraz C.": 0.0563,
+   "Alcaraz C.": 0.0466,
    "Altmaier D.": -0.0131,
    "Arnaldi M.": -0.0604,
    "Atmane T.": 0.0056,
@@ -264,7 +264,7 @@
    "Choinski J.": 0.0174,
    "Cilic M.": -0.0227,
    "Cina F.": -0.0088,
-   "Cobolli F.": -0.0357,
+   "Cobolli F.": -0.0309,
    "Collignon R.": 0.0602,
    "Comesana F.": 0.0038,
    "Coria F.": -0.103,
@@ -292,7 +292,7 @@
    "Faria J.": -0.0073,
    "Fearnley J.": -0.0197,
    "Fery A.": 0.0207,
-   "Fils A.": 0.0308,
+   "Fils A.": 0.023,
    "Fognini F.": -0.0571,
    "Fonseca J.": 0.0491,
    "Fritz T.": 0.0347,
@@ -321,7 +321,7 @@
    "Hurkacz H.": 0.1045,
    "Jacquet K.": 0.0274,
    "Jarry N.": 0.0568,
-   "Jodar R.": -0.058,
+   "Jodar R.": -0.0592,
    "Karatsev A.": -0.0344,
    "Kecmanovic M.": -0.0267,
    "Khachanov K.": 0.0481,
@@ -350,7 +350,7 @@
    "McDonald M.": -0.0575,
    "Mcdonald M.": -0.069,
    "Medjedovic H.": 0.0352,
-   "Medvedev D.": -0.0197,
+   "Medvedev D.": -0.0205,
    "Mensik J.": 0.0325,
    "Merida Aguilar D.": -0.0889,
    "Michelsen A.": -0.042,
@@ -404,7 +404,7 @@
    "Seyboth Wild T.": -0.0645,
    "Shang J.": -0.0068,
    "Shapovalov D.": -0.0744,
-   "Shelton B.": 0.0584,
+   "Shelton B.": 0.0676,
    "Shevchenko A.": -0.0076,
    "Shimabukuro S.": -0.0237,
    "Sinner J.": 0.0003,
@@ -420,7 +420,7 @@
    "Tabilo A.": -0.0229,
    "Thiem D.": 0.0334,
    "Thompson J.": -0.0621,
-   "Tiafoe F.": -0.0192,
+   "Tiafoe F.": -0.0077,
    "Tien L.": -0.0432,
    "Tirante T.A.": -0.0082,
    "Trungelliti M.": -0.0026,
@@ -445,7 +445,7 @@
    "Zhang Zh.": 0.0195,
    "Zheng M.": -0.0039,
    "Zhou Y.": 0.024,
-   "Zverev A.": 0.0877
+   "Zverev A.": 0.0941
   }
  },
  "tours": [
