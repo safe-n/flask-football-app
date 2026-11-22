@@ -1,3 +1,8 @@
+## 0.10.1 - poprawka: kliknięcie kafelka „Brak połączenia - typ nie został zapisany”
+- Przyczyna (logi Rendera): `database is locked`. Zapis prognoz do dziennika w tle liczył model mecz po meczu w otwartej transakcji, więc blokował bazę dłużej niż 30 s limitu. Teraz najpierw liczy, potem zapisuje jednym krótkim poleceniem.
+- Zapis typu ponawia się przy chwilowo zajętej bazie; gdy mimo to się nie uda, serwer odpowiada czytelnym komunikatem (HTTP 503), a przeglądarka pokazuje błąd serwera zamiast mylącego „Brak połączenia”.
+- Testy: blokada podczas liczenia dziennika, ponawianie, odpowiedź 503 w JSON.
+
 ## 0.10.0 - Moje typy: klikalne kafelki, kupony, zestawienie skuteczności (Rozdział 2)
 - Mecze: kafelki z procentami (1/X/2, O2.5, BTTS, remisy HT/2H/„HT lub 2H”/„HT lub FT”/FT, Żółte O3.5, Rożne O9.5) są klikalne. Kliknięcie zapisuje typ (niebieska ramka i ✓), drugie go usuwa; zaznaczenie przetrwa odświeżenie strony. Kafelki „śr.” to średnie, nie typy.
 - Nowa zakładka „Moje typy” (`/picks`): szkic kuponu z polem kursu → „Zatwierdź kupon” (na stałe: bez usuwania i zmiany kursów; AKO, gdy każdy typ ma kurs, inaczej „bez kursów”), lista kuponów, zestawienie skuteczności (trafione vs oczekiwane, wg rodzaju typu i przedziału szansy, zysk przy stawce 1 j., Brier, pasek ✓/✗), filtry 30/90 dni i liga, „Drukuj / PDF”.

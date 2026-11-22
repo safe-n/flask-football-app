@@ -85,7 +85,8 @@ document.addEventListener('click',function(e){var t=e.target.closest&&e.target.c
   fbSync();});
 function pkToggle(t){if(t.classList.contains('busy'))return;t.classList.add('busy');
   fetch('/api/picks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({leg:t.getAttribute('data-pick')})})
-  .then(function(r){return r.json();}).then(function(j){t.classList.remove('busy');if(!j.ok){alert(j.blad||'Nie udało się zapisać typu');return;}
+  .then(function(r){return r.json().catch(function(){return {ok:false,blad:'Błąd serwera (HTTP '+r.status+') - typ nie został zapisany. Spróbuj ponownie za chwilę.'};});})
+  .then(function(j){t.classList.remove('busy');if(!j.ok){alert(j.blad||'Nie udało się zapisać typu');return;}
     t.classList.toggle('on',j.on);t.title=j.on?'Zapisany w Moich typach - kliknij, aby usunąć':'Kliknij, aby dodać do Moich typów';})
   .catch(function(){t.classList.remove('busy');alert('Brak połączenia - typ nie został zapisany');});}
 document.addEventListener('click',function(e){var t=e.target.closest&&e.target.closest('.b.pk[data-pick]');if(t)pkToggle(t);});

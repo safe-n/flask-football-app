@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 import threading
 import time
 
@@ -15,6 +16,7 @@ from .odds import apply_blend, value_picks
 from .simulate import simulate_table
 
 TTL = 3600
+BUSY = "Serwer właśnie odświeża dane - typ NIE został zapisany. Spróbuj ponownie za kilkanaście sekund."
 
 
 def _pct(x: float) -> str:
@@ -534,9 +536,11 @@ def create_app() -> Flask:
         conn = db.connect(config.DB_PATH)
         if leg in picks_mod.legs(conn):
             try:
-                picks_mod.remove(conn, leg=leg)
+                picks_mod.retry(lambda: picks_mod.remove(conn, leg=leg))
             except picks_mod.Locked as e:
                 return jsonify({"ok": False, "on": True, "blad": str(e)}), 409
+            except sqlite3.OperationalError:
+                return jsonify({"ok": False, "blad": BUSY}), 503
             persist_picks()
             return jsonify({"ok": True, "on": False})
         row = match_row(league, home, away, date)
@@ -552,7 +556,10 @@ def create_app() -> Flask:
         spec = picks_mod.tile_specs(pred, cached(("base", league), lambda: stats.base_rates(hist_df))).get(key)
         if spec is None:
             return jsonify({"ok": False, "blad": "nieznany typ"}), 400
-        picks_mod.add(conn, leg, spec["label"], spec["p"], spec["ref"], book_odds(row, key), spec["fav"])
+        try:
+            picks_mod.retry(lambda: picks_mod.add(conn, leg, spec["label"], spec["p"], spec["ref"], book_odds(row, key), spec["fav"]))
+        except sqlite3.OperationalError:
+            return jsonify({"ok": False, "blad": BUSY}), 503
         persist_picks()
         return jsonify({"ok": True, "on": True})
 

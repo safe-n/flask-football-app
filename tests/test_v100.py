@@ -255,3 +255,58 @@ class TestPicksWeb(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestDbBusy(unittest.TestCase):
+    """0.10.1: kliknięcie kafelka na Renderze dawało 500 „database is locked” w trakcie odświeżania danych."""
+
+    def test_log_predictions_does_not_hold_lock_while_predicting(self):
+        from fbpred import ledger
+        path = Path(tempfile.mkdtemp()) / "l.db"
+        conn = db.connect(path)
+        ledger.ensure(conn)
+        other = sqlite3.connect(path, timeout=0.2)
+        base = {"1x2": {"1": .5, "X": .3, "2": .2}, "goals": {"over_2.5": .5, "btts_yes": .5}, "halves": {}}
+
+        class P:
+            calls = 0
+
+            def predict(self, *a, **k):                                                    # w trakcie liczenia inny wątek pisze
+                P.calls += 1
+                other.execute("INSERT INTO predictions (fixture_id, league) VALUES (?, 'X')", (1000 + P.calls,))
+                other.commit()
+                return base
+        up = pd.DataFrame([{"fixture_id": i, "date": "2099-01-0%d" % i, "home": f"H{i}", "away": f"A{i}"} for i in (1, 2, 3)])
+        self.assertEqual(ledger.log_predictions(conn, P(), up, "E0"), 3)
+        self.assertEqual(conn.execute("SELECT COUNT(*) FROM predictions").fetchone()[0], 6)
+
+    def test_retry(self):
+        n = {"i": 0}
+
+        def flaky():
+            n["i"] += 1
+            if n["i"] < 3:
+                raise sqlite3.OperationalError("database is locked")
+            return "ok"
+        self.assertEqual(picks.retry(flaky, pause=0.01), "ok")
+        with self.assertRaises(sqlite3.OperationalError):
+            picks.retry(lambda: (_ for _ in ()).throw(sqlite3.OperationalError("database is locked")), tries=2, pause=0.01)
+        with self.assertRaises(sqlite3.OperationalError):                                   # inny błąd - bez powtórek
+            picks.retry(lambda: (_ for _ in ()).throw(sqlite3.OperationalError("no such table")), pause=0.01)
+
+
+class TestPicksWebBusy(TestPicksWeb):
+    def test_busy_returns_json(self):
+        m = self.up[0]
+        leg = bm.leg_id("E0", self.tom, m["home"], m["away"], "1")
+        old_add, old_def = picks.add, picks.retry.__defaults__
+        picks.add = lambda *a, **k: (_ for _ in ()).throw(sqlite3.OperationalError("database is locked"))
+        picks.retry.__defaults__ = (2, 0.01)
+        try:
+            r = self._post(leg)
+        finally:
+            picks.add, picks.retry.__defaults__ = old_add, old_def
+        self.assertEqual(r.status_code, 503)
+        self.assertFalse(r.get_json()["ok"])
+        self.assertIn("NIE został zapisany", r.get_json()["blad"])
+        self.assertIn("r.json().catch", self.html)                                          # przeglądarka nie pisze „brak połączenia” przy błędzie serwera

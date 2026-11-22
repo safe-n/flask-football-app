@@ -42,8 +42,8 @@ def log_predictions(conn, predictor, upcoming: pd.DataFrame, league: str, versio
     ensure(conn)
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
     today = date.today().isoformat()
-    n = 0
-    for r in upcoming.to_dict("records"):
+    out = []                                      # najpierw liczymy wszystko, potem jeden krótki zapis: liczenie modelu
+    for r in upcoming.to_dict("records"):         # w otwartej transakcji blokowało bazę na dziesiątki sekund (kliknięcia kafelków)
         mdate = pd.Timestamp(r["date"]).strftime("%Y-%m-%d")
         # zamrożenie: w dniu meczu (i później) nie nadpisujemy istniejącej prognozy - zero podglądania
         if mdate <= today and conn.execute("SELECT 1 FROM predictions WHERE fixture_id=?",
@@ -59,11 +59,13 @@ def log_predictions(conn, predictor, upcoming: pd.DataFrame, league: str, versio
                 "p_draw_either": h.get("draw_either_half"), "p_draw_htft": h.get("draw_ht_or_ft"),
                 "o_home": _f(r.get("o_home")), "o_draw": _f(r.get("o_draw")), "o_away": _f(r.get("o_away")),
                 "o_over25": _f(r.get("o_over25")), "o_under25": _f(r.get("o_under25")), "payload": json.dumps(p)}
-        conn.execute(f"INSERT OR REPLACE INTO predictions ({', '.join(vals)}) VALUES ({', '.join('?' * len(vals))})",
-                     tuple(vals.values()))
-        n += 1
+        out.append(vals)
+    if out:
+        cols = list(out[0])
+        conn.executemany(f"INSERT OR REPLACE INTO predictions ({', '.join(cols)}) VALUES ({', '.join('?' * len(cols))})",
+                         [tuple(v[c] for c in cols) for v in out])
     conn.commit()
-    return n
+    return len(out)
 
 
 def _f(x):

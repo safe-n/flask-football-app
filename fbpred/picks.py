@@ -42,6 +42,18 @@ def ensure(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def retry(fn, tries: int = 4, pause: float = 1.5):
+    """Powtarza zapis, gdy baza jest chwilowo zajęta (odświeżanie danych w tle)."""
+    import time
+    for i in range(tries):
+        try:
+            return fn()
+        except sqlite3.OperationalError as e:
+            if "locked" not in str(e) or i == tries - 1:
+                raise
+            time.sleep(pause)
+
+
 class Locked(ValueError):
     """Typ jest na zatwierdzonym kuponie - nie można go usunąć ani zmienić kursu."""
 

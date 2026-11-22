@@ -40,6 +40,9 @@ Zmiany w obszarze drugiej rozmowy: tylko gdy właściciel poprosi, a jeśli to k
 - **Tenis – łatka ESPN**: wyniki z ostatnich dni + terminarz bez kursów (feed nieoficjalny, może zniknąć; `TN_ESPN=0` wyłącza).
 
 ## Dziennik zmian (najnowsze na górze)
+- **2026-11-22 · piłka 0.10.1** (wątek piłki): „database is locked” przy klikaniu kafelków - `ledger.log_predictions` trzymał transakcję
+  podczas liczenia modelu. **Dla wątku tenisa:** jeśli tenis zapisuje w pętli z liczeniem między INSERT a commit, ma ten sam problem
+  (osobna baza, więc nie wpływa na piłkę).
 - **2026-11-14 · lokalnie/serwer.py** (wątek tenisa): starter nie uruchamia drugiej kopii, gdy port 5000 jest zajęty. Przyczyna:
   na PC działały dwie kopie (Windows pozwala obu nasłuchiwać na 5000), /restart podmieniał jedną, a strony serwowała stara z 10.11.
 - **2026-11-14 · tenis 0.3.15**: kafelek Over z linią WTA 19.5 / ATP 21.5 i nowy kafelek „3 sety” (Over 2.5 seta).
