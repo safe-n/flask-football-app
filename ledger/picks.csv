@@ -7,3 +7,4 @@ id,created_at,leg,league,date,home,away,key,label,grp,p,ref,kurs,status,settled_
 6,2026-11-22T13:15:14+00:00,N1~2026-11-22~Ajax~Den Haag~o2.5,N1,2026-11-22,Ajax,Den Haag,o2.5,Over 2.5 goli,Over goli,0.7318,0.6077348066298343,1.29,open,,
 7,2026-11-22T13:16:26+00:00,P1~2026-11-27~Maritimo~Nacional~d_either,P1,2026-11-27,Maritimo,Nacional,d_either,Remis w 1. LUB 2. połowie,Remisy w połowach,0.6622,0.6183098591549295,,open,,
 8,2026-11-22T13:16:31+00:00,P1~2026-11-28~Moreirense~Santa Clara~d_either,P1,2026-11-28,Moreirense,Santa Clara,d_either,Remis w 1. LUB 2. połowie,Remisy w połowach,0.6969,0.6183098591549295,,open,,
+9,2026-11-22T13:16:44+00:00,P1~2026-11-28~Academico Viseu~Alverca~d_either,P1,2026-11-28,Academico Viseu,Alverca,d_either,Remis w 1. LUB 2. połowie,Remisy w połowach,0.6527,0.6183098591549295,,open,,
