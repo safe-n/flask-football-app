@@ -1,0 +1,25 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if command -v python3 >/dev/null 2>&1; then P=python3; else P=python; fi; \"$P\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/start_sesji.py\""
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if command -v python3 >/dev/null 2>&1; then P=python3; else P=python; fi; \"$P\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/straznik.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

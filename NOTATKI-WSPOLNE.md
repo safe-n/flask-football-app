@@ -40,6 +40,11 @@ Zmiany w obszarze drugiej rozmowy: tylko gdy właściciel poprosi, a jeśli to k
 - **Tenis – łatka ESPN**: wyniki z ostatnich dni + terminarz bez kursów (feed nieoficjalny, może zniknąć; `TN_ESPN=0` wyłącza).
 
 ## Dziennik zmian (najnowsze na górze)
+- **2026-11-27 · infrastruktura – strażnik obszarów** (osobna rozmowa o narzędziach Claude Code, na prośbę właściciela):
+  `.claude/settings.json` + `.claude/hooks/`. Na starcie sesji Claude dostaje zasady z tego pliku i 5 najnowszych wpisów dziennika.
+  Edycja plików z tabeli „Kto co prowadzi” jest blokowana, dopóki sesja nie zapisze swojego wątku w `.claude/watek.local`
+  (`pilka` / `tenis`; `oba` tylko na wyraźną prośbę właściciela; plik w `.gitignore`). Podział obszarów jest w `.claude/hooks/obszary.py` –
+  przy zmianie tabeli popraw oba miejsca. Strażnik pilnuje tylko narzędzi edycji, nie poleceń w terminalu. Kod aplikacji bez zmian.
 - **2026-11-22 · piłka 0.10.1** (wątek piłki): „database is locked” przy klikaniu kafelków - `ledger.log_predictions` trzymał transakcję
   podczas liczenia modelu. **Dla wątku tenisa:** jeśli tenis zapisuje w pętli z liczeniem między INSERT a commit, ma ten sam problem
   (osobna baza, więc nie wpływa na piłkę).
