@@ -36,9 +36,17 @@ Symulacja typów (edge ≥ 3%): zakłady 17, ROI 50.71% _(mała próba = główn
 
 ## EL
 
-Rozliczone prognozy: **0**, oczekujące: **18**
+Rozliczone prognozy: **18**, oczekujące: **0**
 
-_Jeszcze nic do rozliczenia._
+Log-loss na żywo (mniej = lepiej):
+
+| rynek | n | model | baseline | brier |
+|---|---|---|---|---|
+| 1X2 | 18 | 1.0544 | 1.0705 | – |
+| Over 2.5 | 18 | 0.6662 | 0.6546 | 0.2367 |
+| BTTS | 18 | 0.6601 | 0.6774 | 0.2337 |
+
+Symulacja typów (edge ≥ 3%): zakłady 0, ROI 0.0% _(mała próba = głównie szum)_
 
 ## F1
 
@@ -59,7 +67,7 @@ Symulacja typów (edge ≥ 3%): zakłady 23, ROI -18.0% _(mała próba = główn
 
 ## I1
 
-Rozliczone prognozy: **45**, oczekujące: **18**
+Rozliczone prognozy: **45**, oczekujące: **20**
 
 Log-loss na żywo (mniej = lepiej):
 
@@ -76,7 +84,7 @@ Symulacja typów (edge ≥ 3%): zakłady 33, ROI -7.48% _(mała próba = główn
 
 ## N1
 
-Rozliczone prognozy: **32**, oczekujące: **16**
+Rozliczone prognozy: **32**, oczekujące: **17**
 
 Log-loss na żywo (mniej = lepiej):
 
@@ -93,7 +101,7 @@ Symulacja typów (edge ≥ 3%): zakłady 21, ROI -28.1% _(mała próba = główn
 
 ## P1
 
-Rozliczone prognozy: **21**, oczekujące: **15**
+Rozliczone prognozy: **21**, oczekujące: **17**
 
 Log-loss na żywo (mniej = lepiej):
 
@@ -110,7 +118,7 @@ Symulacja typów (edge ≥ 3%): zakłady 11, ROI 140.64% _(mała próba = głów
 
 ## SP1
 
-Rozliczone prognozy: **35**, oczekujące: **21**
+Rozliczone prognozy: **35**, oczekujące: **22**
 
 Log-loss na żywo (mniej = lepiej):
 
