@@ -396,6 +396,53 @@ def run_once(leagues_: list[str] | None = None, years: int | None = None, log=_l
             log(f"[bootstrap] błąd: {e}")
 
 
+_bg_pid: int | None = None
+_pid_lock = threading.Lock()
+
+
+def under_preloading_server() -> bool:
+    """Czy aplikację ładuje gunicorn. Render uruchamia go z wczytaniem aplikacji w procesie głównym (pid w logach
+    „[bootstrap] start” = pid mastera), a strony obsługuje proces potomny po fork(). Waitress na PC i testy - jeden proces."""
+    import sys
+    return "gunicorn" in os.path.basename(sys.argv[0] or "")
+
+
+def ensure_background(auto: bool, eager: bool = False) -> bool:
+    """Start pracy na bazie (wczytanie historii + wątek odświeżania) w procesie, który NAPRAWDĘ obsługuje strony.
+
+    Wcześniej robiło to wczytanie aplikacji, czyli pod gunicornem proces główny. Fork w trakcie zapisu kopiował do
+    procesu stron wewnętrzny stan blokad SQLite („ta baza jest zajęta przez połączenie w tym procesie”), którego nikt
+    już nie zwalniał - każdy zapis z kafelka czekał 30 s i kończył się „database is locked” aż do restartu (0.10.2).
+    eager=True: od razu w tym wątku, przy każdym create_app (PC, testy; wątek odświeżania i tak startuje raz);
+    inaczej raz na proces, w tle, przy pierwszym zapytaniu (Render). Wzorzec: tnpred.bootstrap.ensure_background."""
+    global _bg_pid, _start_lock, _work_lock, _started
+    pid = os.getpid()
+    if _bg_pid == pid and not eager:
+        return False
+    with _pid_lock:
+        if _bg_pid == pid and not eager:
+            return False
+        if _bg_pid is not None:                    # kopia po fork: świeże blokady i flagi (wątki rodzica tu nie istnieją)
+            _start_lock, _work_lock, _started = threading.Lock(), threading.Lock(), False
+        _bg_pid = pid
+
+    def first():
+        try:
+            load_local()                         # historia z CSV -> SQLite (offline), niezależnie od AUTO_BOOTSTRAP
+        except Exception as e:  # noqa: BLE001 - błąd odczytu historii nie może zablokować serwera
+            print(f"[bootstrap] load_local nie powiodło się: {e}", flush=True)
+        if auto:
+            start_background()
+        else:
+            print("[bootstrap] AUTO_BOOTSTRAP wyłączony - brak odświeżania z internetu (dane z history/ wczytane)", flush=True)
+    if eager:
+        first()
+    else:
+        print(f"[bootstrap] proces stron pid {pid}: start pracy na bazie w tle", flush=True)
+        threading.Thread(target=first, name="fbpred-start", daemon=True).start()
+    return True
+
+
 def start_background() -> None:
     """Uruchamia (raz na proces) wątek: zasilenie przy starcie, potem odświeżanie co REFRESH_HOURS."""
     global _started

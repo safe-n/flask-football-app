@@ -76,14 +76,15 @@ def match_sections(p: dict) -> tuple[dict, list[tuple[str, list]], list[str]]:
 
 def create_app() -> Flask:
     app = Flask(__name__, template_folder=str(config.ROOT / "templates"))
-    try:
-        bootstrap.load_local()        # historia z CSV -> SQLite od razu (offline), niezależnie od AUTO_BOOTSTRAP
-    except Exception as e:  # noqa: BLE001 - błąd odczytu historii nie może zablokować startu serwera
-        print(f"[bootstrap] load_local nie powiodło się: {e}", flush=True)
-    if config.AUTO_BOOTSTRAP:
-        bootstrap.start_background()
-    else:
-        print("[bootstrap] AUTO_BOOTSTRAP wyłączony - brak odświeżania z internetu (dane z history/ wczytane)", flush=True)
+    # Pod gunicornem (Render) NIE dotykamy bazy przy wczytaniu aplikacji - robi to proces stron przy pierwszym zapytaniu.
+    lazy = bootstrap.under_preloading_server()
+    if not lazy:
+        bootstrap.ensure_background(config.AUTO_BOOTSTRAP, eager=True)
+
+    @app.before_request
+    def _fb_background():
+        if lazy:
+            bootstrap.ensure_background(config.AUTO_BOOTSTRAP)
     cache: dict[tuple, tuple[float, object]] = {}
 
     def cached(key: tuple, build):

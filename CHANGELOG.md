@@ -1,3 +1,12 @@
+## 0.10.2 - poprawka: „Serwer właśnie odświeża dane - typ NIE został zapisany” przy każdym kliknięciu na Renderze
+- Przyczyna (logi Rendera + odtworzenie): gunicorn na Renderze wczytuje aplikację w procesie głównym (pid w „[bootstrap] start” = pid mastera),
+  a strony obsługuje proces potomny po fork(). Piłka przy wczytaniu wczytywała historię do SQLite i startowała wątek odświeżania -
+  w procesie głównym. Fork w trakcie zapisu kopiował do procesu stron stan blokad SQLite, którego nikt już nie zwalniał,
+  więc KAŻDY zapis z kafelka czekał 30 s i kończył się „database is locked” aż do następnego restartu. Ponawianie z 0.10.1 nie mogło pomóc.
+- Teraz pod gunicornem piłka nie dotyka bazy przy wczytaniu; wczytanie historii i wątek odświeżania startują w procesie stron przy pierwszym
+  zapytaniu (`bootstrap.ensure_background`, wzorzec z tenisa). Na PC (waitress, jeden proces) i w testach - bez zmian, od razu.
+- Testy: `tests/test_v102.py` (proces główny nie otwiera bazy ani nie startuje wątku; proces po fork zapisuje typ).
+
 ## 0.10.1 - poprawka: kliknięcie kafelka „Brak połączenia - typ nie został zapisany”
 - Przyczyna (logi Rendera): `database is locked`. Zapis prognoz do dziennika w tle liczył model mecz po meczu w otwartej transakcji, więc blokował bazę dłużej niż 30 s limitu. Teraz najpierw liczy, potem zapisuje jednym krótkim poleceniem.
 - Zapis typu ponawia się przy chwilowo zajętej bazie; gdy mimo to się nie uda, serwer odpowiada czytelnym komunikatem (HTTP 503), a przeglądarka pokazuje błąd serwera zamiast mylącego „Brak połączenia”.

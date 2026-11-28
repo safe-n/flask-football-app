@@ -40,6 +40,11 @@ Zmiany w obszarze drugiej rozmowy: tylko gdy właściciel poprosi, a jeśli to k
 - **Tenis – łatka ESPN**: wyniki z ostatnich dni + terminarz bez kursów (feed nieoficjalny, może zniknąć; `TN_ESPN=0` wyłącza).
 
 ## Dziennik zmian (najnowsze na górze)
+- **2026-11-28 · piłka 0.10.2** (wątek piłki): prawdziwa przyczyna „database is locked” na Renderze - piłka pracowała na SQLite w procesie
+  głównym gunicorna przed fork(); proces stron dziedziczył „zajęte” blokady na zawsze (odtworzone testem). Piłka startuje teraz jak tenis:
+  w procesie stron, przy pierwszym zapytaniu. **Dla wątku tenisa:** log „[tnpred] historia z repo: OK” pojawia się PRZED „Starting gunicorn”,
+  czyli tenis też zapisuje do `data/tennis.db` w procesie głównym - to samo ryzyko dla zapisów tenisa (np. typów); wątek tła tenisa
+  jest już poprawnie per-proces, ale wczytanie historii przy imporcie warto przenieść tak samo.
 - **2026-11-27 · infrastruktura – strażnik obszarów** (osobna rozmowa o narzędziach Claude Code, na prośbę właściciela):
   `.claude/settings.json` + `.claude/hooks/`. Na starcie sesji Claude dostaje zasady z tego pliku i 5 najnowszych wpisów dziennika.
   Edycja plików z tabeli „Kto co prowadzi” jest blokowana, dopóki sesja nie zapisze swojego wątku w `.claude/watek.local`
